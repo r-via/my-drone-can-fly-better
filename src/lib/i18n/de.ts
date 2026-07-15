@@ -366,7 +366,7 @@ export const de: Dict = {
       logo: 'MY DRONE CAN FLY BETTER',
       headerTagline: 'Analyse 100 % lokal - deine Logs verlassen deinen Browser nicht.',
       footer:
-        'Deterministische Analyse - jedes Verdikt ist auf eine explizite Regel zurückführbar. Keine Daten werden gesendet.',
+        'Deterministische Analyse - jedes Verdikt ist auf eine explizite Regel zurückführbar. Es wird nichts ohne deine Zustimmung gesendet.',
       languageLabel: 'Sprache',
       supportKofi: 'Auf Ko-fi unterstützen',
       footerKofi: 'Diese Seite rettet dir Packs? Spendier einen Kaffee:',
@@ -512,6 +512,19 @@ export const de: Dict = {
       saveWarnCode: 'save',
       saveWarnAfter:
         ' im CLI, nicht mit dem Save-Button der GUI: auf manchen Versionen kann er deine komplette Config löschen (bekannter Bug).',
+    },
+
+    // Opt-in-Switch: rohe .bbl-Datei mit dem Dev teilen (unten in ReportView).
+    shareLog: {
+      title: 'Hilf mit, das Tool zu verbessern',
+      description:
+        'Schickt das/die rohe(n) .bbl-Log(s) dieser Analyse an Rémi (den Dev der Seite), in einen privaten Kanal. Hilft, echte Fälle zu finden, die die Regeln übersehen. Es wird nichts gesendet, bevor du diesen Switch aktivierst.',
+      toggleLabel: (count: number): string =>
+        count > 1 ? `${count} Logs teilen` : 'Dieses Log teilen',
+      sending: 'Wird gesendet…',
+      sent: 'Log gesendet - danke!',
+      error: 'Senden fehlgeschlagen - versuch es später noch mal.',
+      tooLarge: 'Log zu groß, um automatisch geteilt zu werden.',
     },
 
     charts: {

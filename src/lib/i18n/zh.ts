@@ -373,7 +373,7 @@ export const zh: Dict = {
       logo: 'MY DRONE CAN FLY BETTER',
       headerTagline: '100% 本地分析 - 你的日志不会离开浏览器。',
       footer:
-        '确定性分析 - 每个判定都能追溯到一条明确的规则。不发送任何数据。',
+        '确定性分析 - 每个判定都能追溯到一条明确的规则。未经你同意不会发送任何数据。',
       languageLabel: '语言',
       supportKofi: '在 Ko-fi 上支持',
       footerKofi: '这个网站帮你省下了电池？请杯咖啡吧：',
@@ -528,6 +528,18 @@ export const zh: Dict = {
       saveWarnCode: 'save',
       saveWarnAfter:
         '，别用 GUI 的 Save 按钮：在某些版本上它会清掉你的全部配置（已知 bug）。',
+    },
+
+    // 分享开关（opt-in）：把原始 .bbl 发给开发者（ReportView 底部）。
+    shareLog: {
+      title: '帮忙改进这个工具',
+      description:
+        '把这次分析用到的原始 .bbl 日志发给 Rémi（本站开发者），发到一个私密频道。这能帮他发现规则漏掉的真实案例。除非你打开这个开关，否则什么都不会发送。',
+      toggleLabel: (count: number): string => (count > 1 ? `分享这 ${count} 个日志` : '分享这个日志'),
+      sending: '发送中…',
+      sent: '日志已发送，谢谢！',
+      error: '发送失败 - 请稍后重试。',
+      tooLarge: '日志太大，无法自动分享。',
     },
 
     // SVG 图表 - 以 `labels` prop 传入的扁平对象（纯组件，无 hook）。
