@@ -1,6 +1,8 @@
 // Chaînes du lint de config CLI (src/lib/cli/config.ts) - référence FR.
 // Une entrée par règle : title/detail/evidence/fix. Les entrées interpolées
 // sont des fonctions fléchées ; les nombres arrivent déjà formatés (string).
+// Pas de `as const` : les chaînes doivent rester typées `string` pour que les
+// traductions (const xx: Dict = …) puissent porter d'autres textes.
 
 export const lint = {
   rpmFilterOffBidir: {
@@ -67,4 +69,4 @@ export const lint = {
       `vbat_warning_cell_voltage = ${raw} (${volts} V/cellule)`,
     fix: 'Vise 3.4-3.5 V/cellule pour un usage LiPo classique.',
   },
-} as const;
+};

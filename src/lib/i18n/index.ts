@@ -1,7 +1,10 @@
-// Registre des locales. en/es/de/zh pointent sur fr tant que les traductions
-// ne sont pas livrées (fallback sans trou) - chaque traduction est un fichier
+// Registre des locales. La référence est fr/ ; chaque traduction est un fichier
 // `const xx: Dict = {...}` : le compilateur garantit la complétude.
+import { de } from './de';
+import { en } from './en';
+import { es } from './es';
 import { fr } from './fr';
+import { zh } from './zh';
 
 import type { Dict } from './fr';
 
@@ -17,13 +20,7 @@ export const LOCALES: ReadonlyArray<{ code: Locale; label: string }> = [
   { code: 'zh', label: '中文' },
 ];
 
-const REGISTRY: Record<Locale, Dict> = {
-  fr,
-  en: fr,
-  es: fr,
-  de: fr,
-  zh: fr,
-};
+const REGISTRY: Record<Locale, Dict> = { fr, en, es, de, zh };
 
 export function getDict(locale: Locale): Dict {
   return REGISTRY[locale] ?? REGISTRY.en;

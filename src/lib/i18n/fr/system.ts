@@ -1,5 +1,7 @@
 // Chaînes système : erreurs du parseur bbl, messages de progression du worker,
 // erreurs de lecture côté client - référence FR.
+// Pas de `as const` : les chaînes doivent rester typées `string` pour que les
+// traductions (const xx: Dict = …) puissent porter d'autres textes.
 
 export const system = {
   // src/lib/bbl/parse.ts - erreurs utilisateur (sessions ignorées / fatales).
@@ -20,4 +22,4 @@ export const system = {
   // src/lib/analyze-client.ts - pont UI ↔ worker.
   progressPreparing: 'Préparation…',
   workerUnexpectedError: 'Erreur inattendue dans le worker',
-} as const;
+};
