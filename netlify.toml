@@ -4,3 +4,13 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+[functions]
+  directory = "netlify/functions"
+
+# Keeps the client code (ShareLogToggle) from depending on the
+# .netlify/functions implementation path.
+[[redirects]]
+  from = "/api/submit-log"
+  to = "/.netlify/functions/submit-log"
+  status = 200
