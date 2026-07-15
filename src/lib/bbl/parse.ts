@@ -157,6 +157,7 @@ async function parseSession(
   const parser = await Parser.init(wasmModule!);
   const file = parser.loadFile(chunk);
   const h = file.parseHeaders(0);
+  if (!h) throw new Error('Headers illisibles (session corrompue ?)');
 
   const rawHeaders = extractHeaderText(chunk);
   const fieldNames = [...h.mainFrameDef.keys()];
