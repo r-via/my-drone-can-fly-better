@@ -373,7 +373,7 @@ export const zh: Dict = {
       logo: 'MY DRONE CAN FLY BETTER',
       headerTagline: '100% 本地分析 - 你的日志不会离开浏览器。',
       footer:
-        '确定性分析 - 每个判定都能追溯到一条开源规则。不发送任何数据。',
+        '确定性分析 - 每个判定都能追溯到一条明确的规则。不发送任何数据。',
       languageLabel: '语言',
       supportKofi: '在 Ko-fi 上支持',
       footerKofi: '这个网站帮你省下了电池？请杯咖啡吧：',
@@ -387,10 +387,9 @@ export const zh: Dict = {
 
     // 首页（hero、步骤、按钮、读取错误、加载动画）。
     page: {
-      heroTitle: 'My Drone Can Fly Better',
-      heroTagline: '你的飞行，解码给你看。不靠 AI。',
+      heroTagline: '你的飞行，解码给你看。',
       heroIntro:
-        '把你的 Betaflight 黑匣子日志拖进来：My Drone Can Fly Better 负责解码，并给出量化判定 - 振动、滤波、PID、电机、电池 - 附带可以直接粘贴的 CLI 命令。没有 AI，没有上传：只有信号和规则，一切可追溯。',
+        '把你的 Betaflight 黑匣子日志拖进来：My Drone Can Fly Better 负责解码，并给出量化判定 - 振动、滤波、PID、电机、电池 - 附带可以直接粘贴的 CLI 命令。没有上传：只有信号和规则，一切可追溯。',
       heroAria: '简介',
       steps: [
         {

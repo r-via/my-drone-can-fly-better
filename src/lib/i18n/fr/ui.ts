@@ -8,7 +8,7 @@ export const ui = {
     logo: 'MY DRONE CAN FLY BETTER',
     headerTagline: 'Analyse 100 % locale - tes logs ne quittent pas ton navigateur.',
     footer:
-      'Analyse déterministe - chaque verdict est traçable à une règle open source. Aucune donnée envoyée.',
+      'Analyse déterministe - chaque verdict est traçable à une règle explicite. Aucune donnée envoyée.',
     languageLabel: 'Langue',
     supportKofi: 'Soutenir sur Ko-fi',
     footerKofi: 'Ce site te fait gagner des packs ? Offre un café :',
@@ -22,10 +22,9 @@ export const ui = {
 
   // Page d'accueil (hero, étapes, bouton, erreurs de lecture, spinner).
   page: {
-    heroTitle: 'My Drone Can Fly Better',
-    heroTagline: 'Ton vol, décodé. Sans IA.',
+    heroTagline: 'Ton vol, décodé.',
     heroIntro:
-      "Glisse tes logs blackbox Betaflight : My Drone Can Fly Better les décode et te sort des verdicts chiffrés - vibrations, filtres, PID, moteurs, batterie - avec les commandes CLI prêtes à coller. Pas d'IA, pas d'upload : du signal et des règles, tout est traçable.",
+      "Glisse tes logs blackbox Betaflight : My Drone Can Fly Better les décode et te sort des verdicts chiffrés - vibrations, filtres, PID, moteurs, batterie - avec les commandes CLI prêtes à coller. Pas d'upload : du signal et des règles, tout est traçable.",
     heroAria: 'Présentation',
     steps: [
       {

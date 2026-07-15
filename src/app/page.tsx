@@ -98,10 +98,9 @@ export default function Page() {
       <section aria-label={t.heroAria} className="space-y-5">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-            {t.heroTitle}
+            {t.heroTagline}
             <span className="text-accent">_</span>
           </h1>
-          <p className="mt-1 text-lg font-medium text-ink-2">{t.heroTagline}</p>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-2">{t.heroIntro}</p>
         </div>
 

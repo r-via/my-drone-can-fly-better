@@ -1,6 +1,6 @@
 # My Drone Can Fly Better
 
-**Ton vol, décodé. Sans IA.** Analyse de logs blackbox Betaflight 100 % dans le navigateur : tu glisses tes `.bbl` (et optionnellement ton `diff all`), le site te dit ce qui ne va pas et quoi corriger - verdicts chiffrés, commandes CLI prêtes à coller. Aucune donnée envoyée, aucun serveur, aucun réseau de neurones : uniquement du DSP (FFT, déconvolution) et des règles déterministes, lisibles et ajustables dans `src/lib/rules/`.
+**Ton vol, décodé.** Analyse de logs blackbox Betaflight 100 % dans le navigateur : tu glisses tes `.bbl` (et optionnellement ton `diff all`), le site te dit ce qui ne va pas et quoi corriger - verdicts chiffrés, commandes CLI prêtes à coller. Aucune donnée envoyée, aucun serveur, aucun réseau de neurones : uniquement du DSP (FFT, déconvolution) et des règles déterministes, lisibles et ajustables dans `src/lib/rules/`.
 
 ## Lancer
 

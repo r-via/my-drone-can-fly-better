@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'My Drone Can Fly Better - Betaflight blackbox analysis, no AI',
+  title: 'My Drone Can Fly Better - Betaflight blackbox analysis',
   description:
     'Fully local Betaflight blackbox analysis: DSP and deterministic rules, quantified verdicts, ready-to-paste CLI commands. Your logs never leave your browser.',
 };

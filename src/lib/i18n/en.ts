@@ -369,7 +369,7 @@ export const en: Dict = {
       logo: 'MY DRONE CAN FLY BETTER',
       headerTagline: '100% local analysis - your logs never leave your browser.',
       footer:
-        'Deterministic analysis - every verdict traces back to an open source rule. No data sent.',
+        'Deterministic analysis - every verdict traces back to an explicit rule. No data sent.',
       languageLabel: 'Language',
       supportKofi: 'Support on Ko-fi',
       footerKofi: 'This site saving you packs? Buy me a coffee:',
@@ -382,10 +382,9 @@ export const en: Dict = {
     },
 
     page: {
-      heroTitle: 'My Drone Can Fly Better',
-      heroTagline: 'Your flight, decoded. No AI.',
+      heroTagline: 'Your flight, decoded.',
       heroIntro:
-        'Drop your Betaflight blackbox logs: My Drone Can Fly Better decodes them and gives you numbers-backed verdicts - vibrations, filters, PID, motors, battery - with CLI commands ready to paste. No AI, no upload: signal and rules, everything traceable.',
+        'Drop your Betaflight blackbox logs: My Drone Can Fly Better decodes them and gives you numbers-backed verdicts - vibrations, filters, PID, motors, battery - with CLI commands ready to paste. No upload: signal and rules, everything traceable.',
       heroAria: 'Introduction',
       steps: [
         {
