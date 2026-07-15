@@ -3,6 +3,7 @@
 import { useState, type ChangeEvent, type DragEvent } from 'react';
 
 import { useLocale } from '@/lib/i18n/locale';
+import { AlertIcon, DroneIcon } from '@/components/icons';
 
 const ACCEPTED = /\.(bbl|bfl)$/i;
 
@@ -62,10 +63,10 @@ export default function UploadZone({
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
-        className={`block cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
+        className={`group block cursor-pointer rounded-2xl border-2 border-dashed p-10 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
           dragOver
             ? 'border-accent bg-accent/10'
-            : 'border-line bg-surface hover:border-ink-3'
+            : 'border-line-strong bg-surface hover:border-accent hover:bg-accent/[0.06]'
         } ${disabled ? 'pointer-events-none opacity-50' : ''}`}
       >
         <input
@@ -78,18 +79,19 @@ export default function UploadZone({
           className="sr-only"
           aria-describedby="bbl-help"
         />
+        <DroneIcon className="mx-auto mb-3.5 size-14 text-ink-3 transition-transform group-hover:scale-105" />
         <p className="text-base font-medium text-ink">
           {t.dropTitle}
           <span className="text-ink-3">{t.dropBrowse}</span>
         </p>
-        <p id="bbl-help" className="mt-1 font-mono text-xs text-ink-3">
+        <p id="bbl-help" className="mt-1.5 font-mono text-[11.5px] text-ink-3">
           {t.dropHelp}
         </p>
       </label>
 
       {rejected.length > 0 ? (
-        <p role="status" className="text-xs text-warn">
-          <span aria-hidden="true">⚠️</span> {t.rejected(rejected.join(', '))}
+        <p role="status" className="flex items-center gap-1.5 text-xs text-warn">
+          <AlertIcon className="size-3.5 shrink-0" /> {t.rejected(rejected.join(', '))}
         </p>
       ) : null}
 
@@ -98,7 +100,7 @@ export default function UploadZone({
           {files.map((f) => (
             <li
               key={`${f.name}:${f.size}`}
-              className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface px-3 py-2"
+              className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3.5 py-2.5"
             >
               <span className="min-w-0 truncate font-mono text-sm text-ink">{f.name}</span>
               <span className="flex shrink-0 items-center gap-3">
@@ -110,7 +112,7 @@ export default function UploadZone({
                   aria-label={t.removeFile(f.name)}
                   disabled={disabled}
                   onClick={() => onFilesChange(files.filter((x) => x !== f))}
-                  className="rounded px-1.5 text-sm text-ink-3 hover:text-crit"
+                  className="rounded-full px-1.5 text-sm text-ink-3 transition-colors hover:text-crit"
                 >
                   ✕
                 </button>
@@ -120,7 +122,7 @@ export default function UploadZone({
         </ul>
       ) : null}
 
-      <details className="rounded-lg border border-line bg-surface">
+      <details className="rounded-2xl border border-line bg-surface">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-ink-2 hover:text-ink">
           {t.pasteSummaryBefore}
           <code className="font-mono">{t.pasteSummaryCode}</code>

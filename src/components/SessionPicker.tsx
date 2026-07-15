@@ -31,10 +31,10 @@ export default function SessionPicker({ items, selected, onSelect }: SessionPick
             role="tab"
             aria-selected={active}
             onClick={() => onSelect(item.value)}
-            className={`rounded-md border px-3 py-1.5 text-left text-sm transition-colors ${
+            className={`rounded-full border px-3.5 py-1.5 text-left text-sm transition-colors ${
               active
                 ? 'border-accent bg-accent/10 text-ink'
-                : 'border-line bg-surface text-ink-2 hover:border-ink-3 hover:text-ink'
+                : 'border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink'
             }`}
           >
             <span className="font-medium">{item.label}</span>

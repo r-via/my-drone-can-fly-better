@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 /* ---------------------------------------------------------------------------
-   Debrief — tokens d'instrumentation FPV.
+   Debrief - tokens d'instrumentation FPV.
    Sombre par défaut, thème clair via prefers-color-scheme.
    Les variables --chart-* sont consommées par les composants de graphes.
 --------------------------------------------------------------------------- */
@@ -9,26 +9,41 @@
 :root {
   color-scheme: dark;
 
-  --bg: #0a0e14;
-  --surface: #101623;
-  --surface-2: #151d2c;
-  --line: rgba(148, 163, 184, 0.15);
+  --bg: #0a0b12;
+  --surface: #12141f;
+  --surface-2: #181b29;
+  --surface-3: #212540;
+  --line: rgba(163, 172, 204, 0.14);
+  --line-strong: rgba(163, 172, 204, 0.26);
 
-  --ink: #e7edf5;
-  --ink-2: #9aa8bd;
-  --ink-3: #64748b;
+  --ink: #eef1f8;
+  --ink-2: #9aa3ba;
+  --ink-3: #656d84;
 
-  /* Accents UI (jamais utilisés comme couleurs de séries) */
-  --accent: #22d3ee;
-  --amber: #fbbf24;
+  /* Accent "signal" - vert-jaune phosphore, la teinte classique de l'OSD
+     Betaflight dans les lunettes FPV. Jamais utilisé comme couleur de série.
+     text-bg reste le texte "inverse" sur fond accent (fonctionne dans les
+     deux thèmes puisque bg est toujours à l'opposé de l'accent en luminance). */
+  --accent: #c6ff5e;
+  --accent-glow: rgba(198, 255, 94, 0.38);
+  --amber: #ffb238;
+
+  /* Remplissage des boutons pleins (CTA, copier). Distinct de --accent : en
+     clair, un vert assez sombre pour le contraste texte lirait "kaki" en
+     grand aplat - on utilise --ink à la place, l'accent reste sur les
+     petits éléments (icônes, anneaux, liens) où cette teinte lit "signal". */
+  --cta: var(--accent);
+  --cta-ink: var(--bg);
 
   /* Statuts (toujours accompagnés d'une icône + libellé, jamais seuls) */
-  --ok: #34d399;
-  --info: #38bdf8;
-  --warn: #fbbf24;
-  --crit: #f87171;
+  --ok: #33e0a1;
+  --info: #5ec8ff;
+  --warn: #ffb238;
+  --crit: #ff5266;
 
-  /* Graphes — trio roll/pitch/yaw validé CVD sur la surface sombre */
+  --scanline-opacity: 0.05;
+
+  /* Graphes - trio roll/pitch/yaw validé CVD sur la surface sombre */
   --chart-axis: #64748b;
   --chart-grid: rgba(148, 163, 184, 0.1);
   --chart-roll: #0891b2;
@@ -54,22 +69,30 @@
   :root {
     color-scheme: light;
 
-    --bg: #f3f5f9;
+    --bg: #f2f3f9;
     --surface: #ffffff;
-    --surface-2: #eaeef5;
-    --line: rgba(15, 23, 42, 0.12);
+    --surface-2: #eceef6;
+    --surface-3: #e2e5f2;
+    --line: rgba(30, 34, 63, 0.12);
+    --line-strong: rgba(30, 34, 63, 0.22);
 
-    --ink: #131c2b;
-    --ink-2: #4a586e;
-    --ink-3: #64748b;
+    --ink: #121423;
+    --ink-2: #4b5170;
+    --ink-3: #767ca0;
 
-    --accent: #0e7490;
-    --amber: #b45309;
+    --accent: #5c8a00;
+    --accent-glow: rgba(92, 138, 0, 0.18);
+    --amber: #a3630a;
 
-    --ok: #047857;
-    --info: #0369a1;
-    --warn: #b45309;
-    --crit: #b91c1c;
+    --cta: var(--ink);
+    --cta-ink: var(--bg);
+
+    --ok: #0f8f68;
+    --info: #1b6fae;
+    --warn: #a3630a;
+    --crit: #c92c46;
+
+    --scanline-opacity: 0.035;
 
     /* Trio validé CVD sur surface blanche */
     --chart-axis: #64748b;
@@ -98,19 +121,24 @@
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-accent: var(--accent);
+  --color-cta: var(--cta);
+  --color-cta-ink: var(--cta-ink);
   --color-amber: var(--amber);
   --color-ok: var(--ok);
   --color-info: var(--info);
   --color-warn: var(--warn);
   --color-crit: var(--crit);
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: var(--font-rajdhani), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo,
     Consolas, 'Liberation Mono', monospace;
 }
@@ -118,13 +146,45 @@
 body {
   background-color: var(--bg);
   color: var(--ink);
+  position: relative;
+}
+
+/* Trame façon OSD - très discrète, purement décorative. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, var(--scanline-opacity)) 0px,
+    rgba(255, 255, 255, var(--scanline-opacity)) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(60% 40% at 50% -10%, var(--accent-glow), transparent 70%);
+  opacity: 0.5;
 }
 
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+  border-radius: 4px;
 }
 
 ::selection {
   background: color-mix(in oklab, var(--accent) 30%, transparent);
+}
+
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }

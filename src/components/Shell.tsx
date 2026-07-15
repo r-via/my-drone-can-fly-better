@@ -23,10 +23,10 @@ export default function Shell({ children }: { children: ReactNode }) {
     <>
       <header className="border-b border-line">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <p className="text-sm font-semibold tracking-[0.18em] text-ink">
+          <p className="flex items-baseline gap-2 font-display text-[15px] font-bold tracking-[0.14em] text-ink">
             <span aria-hidden="true" className="font-mono text-accent">
               //
-            </span>{' '}
+            </span>
             {dict.ui.app.logo}
           </p>
           <div className="flex items-center gap-3">
@@ -35,7 +35,7 @@ export default function Shell({ children }: { children: ReactNode }) {
               href={KOFI_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md bg-amber/15 px-2.5 py-1.5 text-xs font-semibold text-amber transition-colors hover:bg-amber/25"
+              className="inline-flex items-center gap-1.5 rounded-full bg-amber/15 px-3 py-1.5 text-xs font-bold text-amber transition-all hover:-translate-y-px hover:bg-amber/25 hover:shadow-[0_6px_18px_-8px_var(--amber)]"
             >
               <KofiIcon className="size-4" />
               <span>{dict.ui.app.supportKofi}</span>
@@ -54,7 +54,7 @@ export default function Shell({ children }: { children: ReactNode }) {
               href={KOFI_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-semibold text-amber hover:underline"
+              className="font-bold text-amber hover:underline"
             >
               ko-fi.com/rvia
             </a>

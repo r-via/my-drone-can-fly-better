@@ -12,7 +12,18 @@ import type {
 } from '@/lib/types';
 import CliExport from '@/components/CliExport';
 import FindingCard, { SEVERITY_META } from '@/components/FindingCard';
+import {
+  AlertIcon,
+  BatteryIcon,
+  BoltIcon,
+  CheckIcon,
+  ClockIcon,
+  GaugeIcon,
+  TimerIcon,
+  WaveIcon,
+} from '@/components/icons';
 import MetricTile, { type MetricTone } from '@/components/MetricTile';
+import ScoreGauge from '@/components/ScoreGauge';
 import SessionPicker, { type SessionPickerItem } from '@/components/SessionPicker';
 import { SpectrumChart } from '@/components/charts/SpectrumChart';
 import { StepResponseChart } from '@/components/charts/StepResponseChart';
@@ -108,6 +119,41 @@ function groupFindings(
 }
 
 // ---------------------------------------------------------------------------
+// Score /100 - purement une visualisation du même verdict, pas une nouvelle
+// règle : pénalité fixe par sévérité, plafonnée à 0. Le détail par catégorie
+// reste affiché à côté pour que le chiffre soit traçable, pas une boîte noire.
+// ---------------------------------------------------------------------------
+
+const SEVERITY_PENALTY: Record<Severity, number> = { crit: 25, warn: 12, info: 4, ok: 0 };
+
+function computeFlightScore(groups: Array<{ category: FindingCategory; findings: Finding[] }>): {
+  score: number;
+  penalties: Array<{ category: FindingCategory; penalty: number }>;
+} {
+  const penalties = groups
+    .map((g) => ({
+      category: g.category,
+      penalty: g.findings.reduce((sum, f) => sum + SEVERITY_PENALTY[f.severity], 0),
+    }))
+    .filter((p) => p.penalty > 0)
+    .sort((a, b) => b.penalty - a.penalty);
+  const score = Math.max(0, 100 - penalties.reduce((sum, p) => sum + p.penalty, 0));
+  return { score, penalties };
+}
+
+/** Catégories affichées en aperçu rapide - seulement celles pertinentes pour ce vol. */
+const CHIP_CATEGORIES: FindingCategory[] = [
+  'securite',
+  'vibrations',
+  'filtres',
+  'pid',
+  'moteurs',
+  'batterie',
+  'gps',
+  'log',
+];
+
+// ---------------------------------------------------------------------------
 // Blocs
 // ---------------------------------------------------------------------------
 
@@ -123,6 +169,7 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
 
   const worst = worstSeverity(findings);
   const sev = SEVERITY_META[worst];
+  const SevIcon = sev.icon;
 
   const sagPerCell = power && power.cells > 0 ? power.sagV / power.cells : null;
   const sagTone: MetricTone =
@@ -138,15 +185,31 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
     satPct >= th.saturationCrit ? 'crit' : satPct >= th.saturationWarn ? 'warn' : 'ok';
 
   const groups = groupFindings(findings);
+  const { score, penalties } = computeFlightScore(groups);
+  const breakdown = penalties
+    .slice(0, 3)
+    .map((p) => `${dict.ui.categories[p.category]} -${p.penalty}`)
+    .join(' · ');
+
+  const chipCategories = CHIP_CATEGORIES.filter((cat) => {
+    if (cat === 'gps') return analysis.gps.available;
+    if (cat === 'batterie') return power !== null;
+    return true;
+  });
+  const chips = chipCategories.map((cat) => {
+    const group = groups.find((g) => g.category === cat);
+    return { category: cat, worst: group ? worstSeverity(group.findings) : ('ok' as Severity) };
+  });
 
   return (
     <div className="space-y-4">
-      {/* Bandeau profil + verdict global */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface-2 p-4">
-        <div className="min-w-0">
-          <p className="text-base font-semibold text-ink">
+      {/* Bandeau profil + score de vol */}
+      <div className="flex flex-col gap-5 rounded-2xl border border-line-strong bg-surface-2 p-5 sm:flex-row sm:items-center">
+        <ScoreGauge score={score} worst={worst} />
+        <div className="min-w-0 flex-1">
+          <p className="font-display text-xl font-bold text-ink">
             {meta.craftName || profileText.label}
-            <span className="ml-2 text-sm font-normal text-ink-3">
+            <span className="ml-2 font-sans text-sm font-normal text-ink-3">
               {t.profileTag(profileText.label)}
             </span>
           </p>
@@ -154,26 +217,27 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
             {meta.firmware}
             {meta.boardInfo ? ` · ${meta.boardInfo}` : ''}
           </p>
+          <p
+            className={`mt-3 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-bold ${sev.badge}`}
+          >
+            <SevIcon className="size-3.5" />
+            {dict.ui.verdict[worst]}
+          </p>
+          {breakdown ? <p className="mt-2 font-mono text-[11px] text-ink-3">100 - {breakdown}</p> : null}
           {profileText.notes.length > 0 ? (
-            <ul className="mt-1 space-y-0.5 text-xs text-ink-2">
+            <ul className="mt-3 space-y-0.5 text-xs text-ink-2">
               {profileText.notes.map((note) => (
                 <li key={note}>• {note}</li>
               ))}
             </ul>
           ) : null}
         </div>
-        <p
-          className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${sev.badge}`}
-        >
-          <span aria-hidden="true">{sev.icon}</span>
-          {dict.ui.verdict[worst]}
-        </p>
       </div>
 
       {/* Tuiles chiffrées */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <MetricTile label={t.tileDuration} value={fmt.duration(meta.durationS)} />
-        <MetricTile label={t.tileSampleRate} value={fmt.hz(meta.sampleRateHz)} />
+        <MetricTile label={t.tileDuration} value={fmt.duration(meta.durationS)} icon={ClockIcon} />
+        <MetricTile label={t.tileSampleRate} value={fmt.hz(meta.sampleRateHz)} icon={WaveIcon} />
         <MetricTile
           label={t.tileBattery}
           value={power ? `${power.cells}S` : 'n/a'}
@@ -185,24 +249,54 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
                 : t.batteryNoVbat
           }
           tone={sagTone}
+          icon={BatteryIcon}
         />
         <MetricTile
           label={t.tileMaxCurrent}
           value={power && power.ampMax != null ? fmt.fixed(power.ampMax, 1) : 'n/a'}
           unit={power && power.ampMax != null ? 'A' : undefined}
           hint={power && power.ampAvg != null ? t.currentAvg(fmt.fixed(power.ampAvg, 1)) : undefined}
+          icon={BoltIcon}
         />
-        <MetricTile label={t.tileSaturation} value={fmt.fixed(satPct, 1)} unit="%" tone={satTone} />
+        <MetricTile
+          label={t.tileSaturation}
+          value={fmt.fixed(satPct, 1)}
+          unit="%"
+          tone={satTone}
+          icon={GaugeIcon}
+        />
         <MetricTile
           label={t.tileFlightTime}
           value={fmt.duration(analysis.timeline.flightTimeS)}
           hint={t.flightTimeHint}
+          icon={TimerIcon}
         />
+      </div>
+
+      {/* Aperçu rapide par catégorie */}
+      <div className="flex flex-wrap gap-2">
+        {chips.map((chip) => {
+          const chipSev = SEVERITY_META[chip.worst];
+          const ChipIcon = chipSev.icon;
+          return (
+            <span
+              key={chip.category}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                chip.worst === 'ok'
+                  ? 'border-line text-ink-2'
+                  : 'border-line-strong text-ink'
+              }`}
+            >
+              <ChipIcon className={`size-3.5 ${chipSev.text}`} />
+              {dict.ui.categories[chip.category]}
+            </span>
+          );
+        })}
       </div>
 
       {/* Graphes (chaque SVG porte son propre titre) */}
       {analysis.timeline.segments.length > 0 ? (
-        <figure className="rounded-lg border border-line bg-surface p-4">
+        <figure className="rounded-2xl border border-line bg-surface p-4">
           <figcaption className="mb-2 text-sm font-semibold text-ink">
             {t.timelineCaption}
           </figcaption>
@@ -214,7 +308,7 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
         </figure>
       ) : null}
       {analysis.spectrum ? (
-        <div className="rounded-lg border border-line bg-surface p-4">
+        <div className="rounded-2xl border border-line bg-surface p-4">
           <SpectrumChart
             axes={analysis.spectrum.axes}
             motorFundamentalHz={analysis.spectrum.motorFundamentalHz}
@@ -223,15 +317,15 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
         </div>
       ) : null}
       {analysis.step ? (
-        <div className="rounded-lg border border-line bg-surface p-4">
+        <div className="rounded-2xl border border-line bg-surface p-4">
           <StepResponseChart axes={analysis.step.axes} labels={dict.ui.charts.step} />
         </div>
       ) : null}
 
       {/* Verdicts par catégorie */}
       {groups.length === 0 ? (
-        <p className="rounded-lg border border-line bg-surface p-4 text-sm text-ink-2">
-          <span aria-hidden="true">✅</span> {t.noFindings}
+        <p className="flex items-center gap-2 rounded-2xl border border-line bg-surface p-4 text-sm text-ink-2">
+          <CheckIcon className="size-4 shrink-0 text-ok" /> {t.noFindings}
         </p>
       ) : (
         groups.map((group) => (
@@ -283,7 +377,7 @@ function FileSection({
 
   return (
     <section aria-label={t.fileAria(file.fileName)} className="space-y-4">
-      <div className="rounded-lg border border-line bg-surface p-4">
+      <div className="rounded-2xl border border-line bg-surface p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="min-w-0 truncate font-mono text-base font-semibold text-ink">
             {file.fileName}
@@ -296,9 +390,9 @@ function FileSection({
         {skipped > 0 ? (
           <ul className="mt-2 space-y-1 text-xs text-ink-2">
             {file.skipped.map((s) => (
-              <li key={s.index}>
-                <span aria-hidden="true">⚠️</span>{' '}
-                {t.skippedSession(String(s.index + 1), s.error, fmt.bytes(s.sizeBytes))}
+              <li key={s.index} className="flex items-start gap-1.5">
+                <AlertIcon className="mt-0.5 size-3.5 shrink-0 text-warn" />
+                <span>{t.skippedSession(String(s.index + 1), s.error, fmt.bytes(s.sizeBytes))}</span>
               </li>
             ))}
           </ul>
@@ -313,7 +407,7 @@ function FileSection({
       {current ? (
         <SessionBlock sessionReport={current} />
       ) : (
-        <p className="rounded-lg border border-line bg-surface p-4 text-sm text-ink-2">
+        <p className="rounded-2xl border border-line bg-surface p-4 text-sm text-ink-2">
           {t.noUsableSession}
         </p>
       )}
@@ -341,11 +435,11 @@ export default function ReportView({ report, onReset }: { report: Report; onRese
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-ink">{t.title}</h1>
+        <h1 className="font-display text-2xl font-bold text-ink">{t.title}</h1>
         <button
           type="button"
           onClick={onReset}
-          className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink-2 hover:border-ink-3 hover:text-ink"
+          className="rounded-full border border-line bg-surface px-4 py-1.5 text-sm font-semibold text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
         >
           {t.newAnalysis}
         </button>

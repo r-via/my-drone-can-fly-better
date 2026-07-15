@@ -2,12 +2,14 @@
 
 import { useLocale } from '@/lib/i18n/locale';
 
+import type { ComponentType } from 'react';
+
 export type MetricTone = 'neutral' | 'ok' | 'warn' | 'crit';
 
-const TONE_DOT: Record<Exclude<MetricTone, 'neutral'>, string> = {
-  ok: 'bg-ok',
-  warn: 'bg-warn',
-  crit: 'bg-crit',
+const TONE_VAR: Record<Exclude<MetricTone, 'neutral'>, string> = {
+  ok: 'var(--ok)',
+  warn: 'var(--warn)',
+  crit: 'var(--crit)',
 };
 
 export interface MetricTileProps {
@@ -19,27 +21,43 @@ export interface MetricTileProps {
   /** Ligne secondaire optionnelle (contexte, détail). */
   hint?: string;
   tone?: MetricTone;
+  /** Petit glyphe de contexte (horloge, batterie, ...), purement décoratif. */
+  icon?: ComponentType<{ className?: string }>;
 }
 
-export default function MetricTile({ label, value, unit, hint, tone = 'neutral' }: MetricTileProps) {
+export default function MetricTile({
+  label,
+  value,
+  unit,
+  hint,
+  tone = 'neutral',
+  icon: Icon,
+}: MetricTileProps) {
   const { dict } = useLocale();
-  const toneMeta = tone === 'neutral' ? null : { dot: TONE_DOT[tone], sr: dict.ui.metricTone[tone] };
+  const toneColor = tone === 'neutral' ? undefined : TONE_VAR[tone];
+  const toneSr = tone === 'neutral' ? null : dict.ui.metricTone[tone];
   return (
-    <div className="rounded-lg border border-line bg-surface p-3">
-      <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-3">
-        {toneMeta ? (
-          <>
-            <span aria-hidden="true" className={`size-1.5 rounded-full ${toneMeta.dot}`} />
-            <span className="sr-only">{toneMeta.sr} - </span>
-          </>
+    <div className="group relative overflow-hidden rounded-2xl border border-line bg-surface p-3.5 transition-all hover:-translate-y-0.5 hover:border-line-strong">
+      <span
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 h-[2px]"
+        style={{ background: toneColor ?? 'var(--line-strong)' }}
+      />
+      <div className="flex items-center justify-between">
+        {Icon ? <Icon className="size-[15px] text-ink-3" /> : <span />}
+        {toneColor ? (
+          <span aria-hidden="true" className="size-1.5 rounded-full" style={{ background: toneColor }} />
         ) : null}
+      </div>
+      <p className="mt-2 text-[10.5px] font-semibold uppercase tracking-wider text-ink-3">
+        {toneSr ? <span className="sr-only">{toneSr} - </span> : null}
         {label}
       </p>
-      <p className="mt-1 font-mono text-xl font-semibold leading-tight text-ink sm:text-2xl">
+      <p className="mt-0.5 font-mono text-xl font-bold leading-tight text-ink sm:text-2xl">
         {value}
         {unit ? <span className="ml-1 text-sm font-normal text-ink-2">{unit}</span> : null}
       </p>
-      {hint ? <p className="mt-1 text-xs text-ink-2">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-[10.5px] text-ink-3">{hint}</p> : null}
     </div>
   );
 }

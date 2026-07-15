@@ -1,5 +1,6 @@
 import Shell from '@/components/Shell';
 import { LocaleProvider } from '@/lib/i18n/locale';
+import { manrope, rajdhani } from './fonts';
 
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
@@ -21,7 +22,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className="flex min-h-dvh flex-col bg-bg font-sans text-ink antialiased">
+      <body
+        className={`${manrope.variable} ${rajdhani.variable} flex min-h-dvh flex-col bg-bg font-sans text-ink antialiased`}
+      >
         <LocaleProvider>
           <Shell>{children}</Shell>
         </LocaleProvider>

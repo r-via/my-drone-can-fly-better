@@ -5,6 +5,7 @@ import { useAnalyzer } from '@/lib/analyze-client';
 import { useLocale } from '@/lib/i18n/locale';
 import ReportView from '@/components/ReportView';
 import UploadZone from '@/components/UploadZone';
+import { AlertIcon } from '@/components/icons';
 
 export default function Page() {
   const analyzer = useAnalyzer();
@@ -78,11 +79,11 @@ export default function Page() {
       <div
         role="status"
         aria-live="polite"
-        className="flex min-h-64 flex-col items-center justify-center gap-4 rounded-xl border border-line bg-surface p-8 text-center"
+        className="flex min-h-64 flex-col items-center justify-center gap-4 rounded-2xl border border-line bg-surface p-8 text-center"
       >
         <span
           aria-hidden="true"
-          className="size-8 animate-spin rounded-full border-2 border-line border-t-accent"
+          className="size-8 animate-spin rounded-full border-2 border-line border-t-accent shadow-[0_0_18px_-4px_var(--accent-glow)]"
         />
         <p className="font-mono text-sm text-ink">
           {analyzer.status === 'working' ? (analyzer.step ?? t.workingFallback) : t.readingFiles}
@@ -97,18 +98,23 @@ export default function Page() {
     <div className="space-y-8">
       <section aria-label={t.heroAria} className="space-y-5">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
+          <h1 className="font-display text-4xl font-bold tracking-tight text-ink sm:text-[42px]">
             {t.heroTagline}
-            <span className="text-accent">_</span>
+            <span className="animate-[blink_1.1s_steps(1)_infinite] text-accent motion-reduce:animate-none">
+              _
+            </span>
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-2">{t.heroIntro}</p>
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink-2">{t.heroIntro}</p>
         </div>
 
         <ol className="grid gap-3 sm:grid-cols-3">
           {t.steps.map((step, i) => (
-            <li key={step.title} className="rounded-lg border border-line bg-surface p-4">
-              <p className="font-mono text-xs font-semibold text-accent">0{i + 1}</p>
-              <p className="mt-1 text-sm font-semibold text-ink">{step.title}</p>
+            <li
+              key={step.title}
+              className="rounded-2xl border border-line bg-surface p-4 transition-all hover:-translate-y-0.5 hover:border-line-strong hover:shadow-[0_16px_40px_-24px_rgba(0,0,0,0.7)]"
+            >
+              <p className="font-display text-xs font-bold text-accent">0{i + 1}</p>
+              <p className="mt-1 text-sm font-bold text-ink">{step.title}</p>
               <p className="mt-1 text-xs leading-relaxed text-ink-2">{step.text}</p>
             </li>
           ))}
@@ -118,12 +124,13 @@ export default function Page() {
       {analyzer.status === 'error' || readError ? (
         <div
           role="alert"
-          className="rounded-lg border border-crit/40 bg-crit/10 p-4 text-sm text-ink"
+          className="flex items-start gap-2.5 rounded-2xl border border-crit/40 bg-crit/10 p-4 text-sm text-ink"
         >
-          <p className="font-semibold text-crit">
-            <span aria-hidden="true">❌</span> {t.errorTitle}
-          </p>
-          <p className="mt-1 text-ink-2">{readError ?? analyzer.error ?? t.errorUnknown}</p>
+          <AlertIcon className="mt-0.5 size-4 shrink-0 text-crit" />
+          <div>
+            <p className="font-bold text-crit">{t.errorTitle}</p>
+            <p className="mt-1 text-ink-2">{readError ?? analyzer.error ?? t.errorUnknown}</p>
+          </div>
         </div>
       ) : null}
 
@@ -139,7 +146,7 @@ export default function Page() {
           type="button"
           onClick={() => void startAnalysis()}
           disabled={files.length === 0 || reading}
-          className="w-full rounded-lg bg-accent px-4 py-3 text-base font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:px-8"
+          className="w-full rounded-full bg-cta px-8 py-3.5 font-display text-base font-bold tracking-wide text-cta-ink shadow-[0_14px_34px_-14px_var(--accent-glow)] transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-14px_var(--accent-glow)] active:translate-y-0 active:scale-[0.98] disabled:pointer-events-none disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none sm:w-auto"
         >
           {t.analyzeButton(files.length)}
         </button>

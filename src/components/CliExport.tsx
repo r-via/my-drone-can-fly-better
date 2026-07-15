@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/lib/i18n/locale';
+import { AlertIcon, CheckIcon, CopyIcon } from '@/components/icons';
 import type { Finding } from '@/lib/types';
 
 /** Rassemble toutes les lignes fix.cli des findings, dédupliquées, ordre préservé. */
@@ -36,7 +37,7 @@ export default function CliExport({ findings }: { findings: Finding[] }) {
 
   if (lines.length === 0) {
     return (
-      <section aria-label={t.sectionAria} className="rounded-lg border border-line bg-surface p-4">
+      <section aria-label={t.sectionAria} className="rounded-2xl border border-line bg-surface p-4">
         <h3 className="text-sm font-semibold text-ink">{t.title}</h3>
         <p className="mt-1 text-sm text-ink-2">{t.nothingToFix}</p>
       </section>
@@ -57,16 +58,19 @@ export default function CliExport({ findings }: { findings: Finding[] }) {
   };
 
   return (
-    <section aria-label={t.sectionAria} className="rounded-lg border border-line bg-surface p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-ink">
-          {t.title} <span className="text-ink-3">{t.countSuffix(lines.length)}</span>
+    <section aria-label={t.sectionAria} className="overflow-hidden rounded-2xl border border-line-strong bg-surface">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-2 px-4 py-3.5">
+        <h3 className="text-sm font-bold text-ink">
+          {t.title} <span className="font-mono text-xs font-normal text-ink-3">{t.countSuffix(lines.length)}</span>
         </h3>
         <button
           type="button"
           onClick={copy}
-          className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-bg transition-opacity hover:opacity-90"
+          className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors ${
+            copied ? 'bg-ok text-bg' : 'bg-cta text-cta-ink hover:opacity-90'
+          }`}
         >
+          {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
           {copied ? t.copied : t.copyAll}
         </button>
         <span aria-live="polite" className="sr-only">
@@ -74,16 +78,21 @@ export default function CliExport({ findings }: { findings: Finding[] }) {
         </span>
       </div>
 
-      <pre className="mt-3 overflow-x-auto rounded-md bg-bg/60 p-3 font-mono text-xs leading-relaxed text-ink">
-        {script}
-      </pre>
+      <div className="p-4">
+        <pre className="overflow-x-auto rounded-lg bg-bg/60 p-3 font-mono text-xs leading-relaxed text-ink">
+          {script}
+        </pre>
 
-      <p role="note" className="mt-3 text-xs text-ink-2">{t.verifyNote}</p>
-      <p role="note" className="mt-1 text-xs text-warn">
-        <span aria-hidden="true">⚠️</span> {t.saveWarnBefore}
-        <code className="font-mono">{t.saveWarnCode}</code>
-        {t.saveWarnAfter}
-      </p>
+        <p role="note" className="mt-3 text-xs text-ink-2">{t.verifyNote}</p>
+        <p role="note" className="mt-2 flex items-start gap-1.5 rounded-lg bg-warn/10 p-2.5 text-xs text-warn">
+          <AlertIcon className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            {t.saveWarnBefore}
+            <code className="font-mono">{t.saveWarnCode}</code>
+            {t.saveWarnAfter}
+          </span>
+        </p>
+      </div>
     </section>
   );
 }
