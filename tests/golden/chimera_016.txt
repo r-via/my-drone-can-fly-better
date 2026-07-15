@@ -1,0 +1,26 @@
+Header not found in file: minthrottle (using default value: 0)
+
+===== chimera/blackbox/btfl_016.bbl =====  50077 frames  (~25s @ 1988 Hz)  | 6S détecté
+throttle stick : avg 1208  (min 1000 max 1434)
+vbat           : max 25.44V  min 20.68V  (4.24->3.45 V/cell)  sag 4.76V
+courant        : avg 2.0A  max 54.9A
+moteurs        : avg 26%  | par moteur (M1-4): 25 26 26 27 %  | saturation 0.08%
+eRPM zeros (desync): [0, 0, 0, 0]  ->  OK
+axe    | bruit non-filtré | bruit filtré | erreur suivi | pic gyro
+Roll   |      7.0         |      1.0     |     3.4 deg/s | 255 deg/s
+Pitch  |     12.7         |      1.0     |     4.3 deg/s | 369 deg/s
+Yaw    |      9.6         |      0.6     |     1.1 deg/s | 66 deg/s
+
+--- Spectre gyro NON-FILTRÉ (source du jello) ---
+fondamentale moteur médiane ≈ 138 Hz (harmoniques x2 x3)
+rotation par moteur (médiane/p90 Hz) : M1=130/169  M2=141/178  M3=137/168  M4=142/184
+pic dominant global : 137 Hz (axe P) -> le plus proche de M3 (137 Hz, écart 1 Hz)
+Roll  pics: 183Hz(1467)  162Hz(1422)  118Hz(1391)  175Hz(1390)  151Hz(1254)
+       bandes RMS: prop-wash/pilotage <40Hz=433  RÉSONANCE CHÂSSIS 40-120Hz=298  plage moteur 120-350Hz=605  harmoniques >350Hz=121   << dominante: plage moteur 120-350Hz
+Pitch pics: 137Hz(4792)  147Hz(4453)  158Hz(3522)  129Hz(3302)  166Hz(2411)
+       bandes RMS: prop-wash/pilotage <40Hz=458  RÉSONANCE CHÂSSIS 40-120Hz=336  plage moteur 120-350Hz=1541  harmoniques >350Hz=86   << dominante: plage moteur 120-350Hz
+Yaw   pics: 183Hz(2896)  165Hz(2563)  175Hz(2499)  118Hz(2292)  150Hz(2185)
+       bandes RMS: prop-wash/pilotage <40Hz=127  RÉSONANCE CHÂSSIS 40-120Hz=502  plage moteur 120-350Hz=1010  harmoniques >350Hz=69   << dominante: plage moteur 120-350Hz
+
+GPS            : sats max 12  | vitesse max 2.9 m/s  | alt baro max 3 m
+failsafePhase  : {'': 1, 0: 50076}   (0 = jamais declenche)

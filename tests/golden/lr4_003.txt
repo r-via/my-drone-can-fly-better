@@ -1,0 +1,13 @@
+
+===== explorer lr4/btfl_003.bbl =====  7219 frames  (~4s)  | 4S détecté
+throttle stick : avg 1224  (min 1000 max 1465)
+vbat           : max 16.28V  min 15.37V  (4.07->3.84 V/cell)  sag 0.91V
+courant        : avg 3.7A  max 16.9A
+moteurs        : avg 26%  | par moteur (M1-4): 22 30 20 31 %  | saturation 0.07%
+eRPM zeros (desync): [0, 0, 0, 0]  ->  OK
+axe    | bruit non-filtré | bruit filtré | erreur suivi | pic gyro
+Roll   |     20.0         |      1.7     |     2.1 deg/s | 67 deg/s
+Pitch  |     16.2         |      3.7     |     4.3 deg/s | 201 deg/s
+Yaw    |     10.9         |      1.5     |     1.0 deg/s | 25 deg/s
+GPS            : sats max 8  | vitesse max 2.1 m/s  | alt baro max 2 m
+failsafePhase  : {'': 1, 0: 7218}   (0 = jamais declenche)
