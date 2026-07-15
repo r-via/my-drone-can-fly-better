@@ -187,11 +187,21 @@ export function welchSpectrum(sig: ArrayLike<number>, fsHz: number, win = 4096):
     segCount++;
   }
 
+  // Normalisation par l'énergie de la fenêtre, ANCRÉE à la fenêtre de
+  // référence 4096 : |FFT| croît en ~sqrt(w) pour un même processus de bruit,
+  // donc sans ceci les magnitudes d'un log court (fenêtre réduite) sous-lisent
+  // de 25-75 % face aux seuils calibrés sur 4096. Pour w = 4096 le facteur
+  // vaut 1 : parité golden avec analyze_shimera.py conservée.
+  let hannEnergy = 0;
+  for (let k = 0; k < w; k++) hannEnergy += hann[k] * hann[k];
+  const REF_ENERGY = 0.375 * (4096 - 1); // somme exacte de hann² symétrique sur 4096 points (1535.625)
+  const scale = w === 4096 ? 1 : Math.sqrt(REF_ENERGY / hannEnergy);
+
   const freqs = new Float32Array(nBins);
   const mags = new Float32Array(nBins);
   for (let b = 0; b < nBins; b++) {
     freqs[b] = (b * fsHz) / w;
-    mags[b] = acc[b] / segCount;
+    mags[b] = (acc[b] / segCount) * scale;
   }
   return { freqs, mags };
 }

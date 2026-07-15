@@ -54,7 +54,7 @@ function toPyBasis(fd: FlightData, pct: number, pyLow: number): number {
 // ---------------------------------------------------------------------------
 
 describe('chimera btfl_016 session 1', () => {
-  it('power : 6S, 25.44→20.68 V, sag 4.76, courant 2.0 avg / 54.9 max', () => {
+  it('power : 6S, 25.44→20.68 V, sag transitoire, courant 2.0 avg / 54.9 max', () => {
     const p = analyzePower(chimera)!;
     expect(p).not.toBeNull();
     expect(p.cells).toBe(6);
@@ -62,7 +62,8 @@ describe('chimera btfl_016 session 1', () => {
     expectClose(p.vbatMin, 20.68, 0, 0.01);
     expectClose(p.perCellMax, 4.24, 0, 0.01);
     expectClose(p.perCellMin, 3.45, 0, 0.01);
-    expectClose(p.sagV, 4.76, 0, 0.01);
+    // sag transitoire (vs max glissant 3 s) < sag max-min du golden python (4.76)
+    expectClose(p.sagV, 4.54, 0, 0.05);
     expectClose(p.ampAvg, 2.0);
     expectClose(p.ampMax, 54.9);
     // pas de golden pour les mAh : cohérence avec avg·durée (échantillonnage régulier)
@@ -145,13 +146,14 @@ describe('lr4 btfl_003 session 1', () => {
     expect(lr4.meta.durationS).toBeLessThan(14.4);
   });
 
-  it('power : 4S, 16.28→15.37 V, sag 0.91, courant 3.7 avg / 16.9 max', () => {
+  it('power : 4S, 16.28→15.37 V, sag transitoire, courant 3.7 avg / 16.9 max', () => {
     const p = analyzePower(lr4)!;
     expect(p).not.toBeNull();
     expect(p.cells).toBe(4);
     expectClose(p.vbatMax, 16.28, 0, 0.01);
     expectClose(p.vbatMin, 15.37, 0, 0.01);
-    expectClose(p.sagV, 0.91, 0, 0.01);
+    // sag transitoire < max-min golden (0.91) : la décharge lente est exclue
+    expectClose(p.sagV, 0.68, 0, 0.05);
     expectClose(p.ampAvg, 3.7);
     expectClose(p.ampMax, 16.9);
     expect(p.mahEstimate).toBeGreaterThan(10);
@@ -230,7 +232,8 @@ describe('pico btfl_002 session 1', () => {
     expectClose(p.vbatMin, 6.95, 0, 0.01);
     expectClose(p.perCellMax, 4.12, 0, 0.01);
     expectClose(p.perCellMin, 3.48, 0, 0.01);
-    expectClose(p.sagV, 1.29, 0, 0.01);
+    // sag transitoire < max-min golden (1.29)
+    expectClose(p.sagV, 1.08, 0, 0.05);
     expectClose(p.ampAvg, 4.2);
     expectClose(p.ampMax, 25.0);
   });

@@ -20,6 +20,8 @@ export interface SessionMeta {
   motorOutputHigh: number; // défaut 2047
   /** Toutes les lignes "H clé:valeur" de la session (snapshot config Betaflight). */
   headers: Record<string, string>;
+  /** Frames au temps aberrant (re-base flash, wrap µs 32 bits) corrigées au dt nominal. */
+  timeAnomalies?: number;
 }
 
 export type F32x3 = [Float32Array, Float32Array, Float32Array];

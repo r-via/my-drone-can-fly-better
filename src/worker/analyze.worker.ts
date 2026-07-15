@@ -20,7 +20,11 @@ let wasmReady: Promise<void> | null = null;
 
 function ensureWasm(): Promise<void> {
   wasmReady ??= (async () => {
-    const res = await fetch('/blackbox-log.wasm');
+    // Résolu depuis l'URL du chunk worker ({base}/_next/static/chunks/xxx.js)
+    // et non depuis la racine : un chemin absolu casserait le site dès qu'il
+    // est servi sous un sous-chemin (GitHub Pages project site, basePath).
+    const wasmUrl = new URL('../../../blackbox-log.wasm', self.location.href);
+    const res = await fetch(wasmUrl);
     if (!res.ok) throw new Error(`Chargement du décodeur WASM impossible (HTTP ${res.status})`);
     await initWasm(await res.arrayBuffer());
   })();

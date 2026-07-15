@@ -191,15 +191,36 @@ async function parseSession(
 
   if (rows.length === 0) throw new Error('Aucune frame décodée (données corrompues ?)');
 
-  const t0 = times[0];
-  const time = new Float64Array(times.length);
-  for (let i = 0; i < times.length; i++) time[i] = times[i] - t0;
-
   const dts: number[] = [];
   const step = Math.max(1, Math.floor(times.length / 2000));
-  for (let i = step; i < times.length; i += step) dts.push((times[i] - times[i - step]) / step);
+  for (let i = step; i < times.length; i += step) {
+    const d = (times[i] - times[i - step]) / step;
+    if (d > 0 && d < 0.5) dts.push(d);
+  }
   const dt = median(dts);
   const sampleRateHz = dt > 0 ? 1 / dt : 2000;
+  const nominalDt = dt > 0 ? dt : 1 / 2000;
+
+  // Le temps décodé n'est pas fiable à 100 % : re-base du compteur après un trou
+  // d'écriture flash (retombe vers 0), wrap du compteur µs 32 bits (~71 min non
+  // géré par le crate), frame corrompue. Sans garde-fou on sort des durées de
+  // vol négatives et des intégrales mAh fausses → on reconstruit un temps
+  // monotone : tout dt négatif/invalide est remplacé par le dt nominal.
+  // Les sauts POSITIFS sont conservés : ce sont des pauses d'enregistrement
+  // légitimes (désarmé, flash saturé) que la timeline doit montrer.
+  const time = new Float64Array(times.length);
+  let timeAnomalies = 0;
+  time[0] = 0;
+  for (let i = 1; i < times.length; i++) {
+    const d = times[i] - times[i - 1];
+    if (Number.isFinite(d) && d > 0) {
+      time[i] = time[i - 1] + d;
+    } else {
+      time[i] = time[i - 1] + nominalDt;
+      timeAnomalies++;
+    }
+  }
+  const t0 = times[0];
 
   const motorOutput = (rawHeaders['motorOutput'] ?? '48,2047').split(',').map(Number);
 
@@ -217,6 +238,7 @@ async function parseSession(
     motorOutputLow: motorOutput[0] ?? 48,
     motorOutputHigh: motorOutput[1] ?? 2047,
     headers: rawHeaders,
+    timeAnomalies,
   };
 
   const triple = (base: string): F32x3 | null =>

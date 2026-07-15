@@ -319,18 +319,9 @@ export function lintConfig(
     }
   }
 
-  // cells-mismatch — la batterie branchée ne colle pas au profil.
-  if (analysis?.power && profile.expectedCells !== null && analysis.power.cells !== profile.expectedCells) {
-    findings.push({
-      id: 'cells-mismatch',
-      severity: 'warn',
-      category: 'config',
-      title: 'Nombre de cellules inattendu',
-      detail:
-        `Le log montre du ${analysis.power.cells}S alors que le profil ${profile.label} attend du ${profile.expectedCells}S. Mauvaise batterie branchée, ou profil mal détecté ?`,
-      evidence: `${analysis.power.cells}S détecté (vbat max ${analysis.power.vbatMax.toFixed(2)} V), attendu ${profile.expectedCells}S`,
-    });
-  }
+  // NB : le contrôle du nombre de cellules vs profil vit dans le moteur de
+  // règles (battery-cells-unexpected, engine.ts) — le dupliquer ici produisait
+  // deux findings pour la même anomalie dans chaque rapport.
 
   return findings.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
 }

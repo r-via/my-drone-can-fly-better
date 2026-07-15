@@ -58,7 +58,7 @@ export default function UploadZone({
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
-        className={`block cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
+        className={`block cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent ${
           dragOver
             ? 'border-accent bg-accent/10'
             : 'border-line bg-surface hover:border-ink-3'

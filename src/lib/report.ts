@@ -57,10 +57,15 @@ export function buildSessionReport(fd: FlightData, pasteConfig: CliConfig | null
   const profile = pickProfile(fd.meta.craftName);
   const analysis = analyzeFlightData(fd, profile.motorPoles);
   const config = pasteConfig ?? configFromHeaders(fd.meta.headers);
-  const findings = sortFindings([
+  let findings = sortFindings([
     ...evaluateSession(analysis, profile),
     ...lintConfig(config, profile, analysis),
   ]);
+  // « Tout est propre » (émis par le moteur, qui ne voit pas le lint config)
+  // n'a plus sa place si le lint a trouvé des warn/crit dans le même rapport.
+  if (findings.some((f) => f.severity === 'warn' || f.severity === 'crit')) {
+    findings = findings.filter((f) => f.id !== 'all-good');
+  }
   return { analysis, profile, findings };
 }
 

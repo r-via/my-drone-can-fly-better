@@ -25,10 +25,12 @@ export default function Page() {
   const [files, setFiles] = useState<File[]>([]);
   const [cliText, setCliText] = useState('');
   const [reading, setReading] = useState(false);
+  const [readError, setReadError] = useState<string | null>(null);
 
   const startAnalysis = async () => {
     if (files.length === 0 || reading) return;
     setReading(true);
+    setReadError(null);
     try {
       const payload = await Promise.all(
         files.map(async (f) => ({
@@ -37,6 +39,16 @@ export default function Page() {
         })),
       );
       analyzer.analyze(payload, cliText);
+    } catch (e) {
+      // File.arrayBuffer() peut rejeter (carte SD éjectée, fichier modifié
+      // après sélection) : sans ce catch le clic échouait en silence.
+      setReadError(
+        e instanceof Error && e.name === 'NotReadableError'
+          ? 'Fichier illisible — la carte SD a peut-être été éjectée, ou le fichier a changé depuis sa sélection. Re-sélectionne-le.'
+          : e instanceof Error
+            ? `Lecture du fichier impossible : ${e.message}`
+            : 'Lecture du fichier impossible.',
+      );
     } finally {
       setReading(false);
     }
@@ -49,6 +61,8 @@ export default function Page() {
         onReset={() => {
           analyzer.reset();
           setFiles([]);
+          setCliText('');
+          setReadError(null);
         }}
       />
     );
@@ -102,7 +116,7 @@ export default function Page() {
         </ol>
       </section>
 
-      {analyzer.status === 'error' ? (
+      {analyzer.status === 'error' || readError ? (
         <div
           role="alert"
           className="rounded-lg border border-crit/40 bg-crit/10 p-4 text-sm text-ink"
@@ -110,7 +124,7 @@ export default function Page() {
           <p className="font-semibold text-crit">
             <span aria-hidden="true">❌</span> Analyse impossible
           </p>
-          <p className="mt-1 text-ink-2">{analyzer.error ?? 'Erreur inconnue.'}</p>
+          <p className="mt-1 text-ink-2">{readError ?? analyzer.error ?? 'Erreur inconnue.'}</p>
         </div>
       ) : null}
 

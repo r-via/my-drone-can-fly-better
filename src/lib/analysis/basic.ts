@@ -76,7 +76,10 @@ export function analyzePower(fd: FlightData): PowerMetrics | null {
   }
   if (vbatMax <= 0) return null; // pas de vbat exploitable
 
-  const cells = Math.max(1, Math.round(vbatMax / 4.2));
+  // Plus petit nombre de cellules qui garde vbatMax sous 4.35 V/cellule (LiHV).
+  // round(v/4.2) se trompait sur un pack entamé : 22.56 V → 5S (4.51 V/cell,
+  // physiquement impossible) au lieu de 6S à 3.76 V/cell.
+  const cells = Math.max(1, Math.ceil(vbatMax / 4.35));
 
   let ampAvg: number | null = null;
   let ampMax: number | null = null;
@@ -92,11 +95,34 @@ export function analyzePower(fd: FlightData): PowerMetrics | null {
     ampAvg = sum / amp.length;
     ampMax = max;
     // Intégrale trapèze du courant (A) sur le temps (s) → A·s, puis /3.6 → mAh.
+    // dt clampé à 1 s : une pause d'enregistrement (désarmé) ne doit pas
+    // compter comme de la consommation au courant du moment.
     let ampSeconds = 0;
     for (let i = 1; i < amp.length; i++) {
-      ampSeconds += ((amp[i] + amp[i - 1]) / 2) * (fd.time[i] - fd.time[i - 1]);
+      ampSeconds += ((amp[i] + amp[i - 1]) / 2) * Math.min(fd.time[i] - fd.time[i - 1], 1);
     }
     mahEstimate = ampSeconds / 3.6;
+  }
+
+  // Sag = pire chute TRANSITOIRE sous charge : écart max entre la tension et
+  // le max glissant des ~3 s précédentes. max-min sur tout le log confondait
+  // la décharge normale d'un long vol avec un pack fatigué.
+  let sagV = 0;
+  {
+    const win = 3; // secondes
+    let start = 0;
+    // deque monotone décroissante d'indices (max glissant en O(n))
+    const idx: number[] = [];
+    for (let i = 0; i < vb.length; i++) {
+      if (vb[i] <= 0) continue;
+      while (start < i && fd.time[i] - fd.time[start] > win) start++;
+      while (idx.length > 0 && idx[0] < start) idx.shift();
+      while (idx.length > 0 && vb[idx[idx.length - 1]] <= vb[i]) idx.pop();
+      idx.push(i);
+      const localMax = vb[idx[0]];
+      const drop = localMax - vb[i];
+      if (drop > sagV) sagV = drop;
+    }
   }
 
   return {
@@ -105,7 +131,7 @@ export function analyzePower(fd: FlightData): PowerMetrics | null {
     vbatMin,
     perCellMax: vbatMax / cells,
     perCellMin: vbatMin / cells,
-    sagV: vbatMax - vbatMin,
+    sagV,
     ampAvg,
     ampMax,
     mahEstimate,
@@ -312,10 +338,17 @@ export function analyzeGps(fd: FlightData): GpsMetrics {
 /** Phases failsafe bénignes : jamais déclenché ou valeur inconnue/vide. */
 const BENIGN_FAILSAFE_PHASES = new Set(['0', '', '?', 'IDLE']);
 
+/** L'enum failsafePhase Betaflight tient dans 0..7 — au-delà c'est une slow
+ *  frame corrompue du décodeur (ex. 4294967294 = -2 en u32), pas un failsafe. */
+function isValidFailsafePhase(phase: string): boolean {
+  const n = Number(phase);
+  return Number.isNaN(n) ? true : n >= 0 && n <= 7;
+}
+
 export function analyzeFailsafe(fd: FlightData): { phases: Record<string, number>; triggered: boolean } {
   const phases = { ...fd.failsafePhaseCounts };
   const triggered = Object.entries(phases).some(
-    ([phase, count]) => count > 0 && !BENIGN_FAILSAFE_PHASES.has(phase),
+    ([phase, count]) => count > 0 && !BENIGN_FAILSAFE_PHASES.has(phase) && isValidFailsafePhase(phase),
   );
   return { phases, triggered };
 }

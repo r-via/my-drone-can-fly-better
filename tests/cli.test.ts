@@ -188,30 +188,10 @@ describe('lintConfig cas complémentaires', () => {
     expect(ids(lintConfig(cfg, PROFILE, null))).not.toContain('dterm-lpf-low');
   });
 
-  it('cells-mismatch quand la batterie détectée ne colle pas au profil', () => {
+  it('pas de cells-mismatch dans le lint : la règle vit dans engine.ts (battery-cells-unexpected)', () => {
     const analysis = {
-      power: {
-        cells: 4,
-        vbatMax: 16.8,
-        vbatMin: 14.2,
-        perCellMax: 4.2,
-        perCellMin: 3.55,
-        sagV: 1.1,
-        ampAvg: 10,
-        ampMax: 40,
-        mahEstimate: 800,
-      },
+      power: { cells: 4, vbatMax: 16.8, vbatMin: 14.2, perCellMax: 4.2, perCellMin: 3.55, sagV: 1.1, ampAvg: 10, ampMax: 40, mahEstimate: 800 },
     } as unknown as SessionAnalysis;
-    const findings = lintConfig(parseCliText(''), PROFILE, analysis);
-    const mismatch = findings.find((f) => f.id === 'cells-mismatch');
-    expect(mismatch).toBeDefined();
-    expect(mismatch!.severity).toBe('warn');
-    expect(mismatch!.evidence).toContain('4S');
-    expect(mismatch!.evidence).toContain('6S');
-  });
-
-  it('pas de cells-mismatch quand les cellules correspondent', () => {
-    const analysis = { power: { cells: 6, vbatMax: 25.44 } } as unknown as SessionAnalysis;
     expect(ids(lintConfig(parseCliText(''), PROFILE, analysis))).not.toContain('cells-mismatch');
   });
 });

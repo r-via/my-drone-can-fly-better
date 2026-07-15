@@ -14,8 +14,33 @@ import type {
   SpectrumMetrics,
 } from '../types';
 
-/** En dessous de 2 fenêtres de 1024, la FFT moyenne n'est pas fiable. */
+/** En dessous de 2048 échantillons (une seule fenêtre Welch de 2048), la FFT
+ *  moyenne n'est pas fiable — et les magnitudes ne sont plus comparables aux
+ *  seuils calibrés sur fenêtre 4096. */
 const MIN_SAMPLES_FOR_FFT = 2 * 1024;
+
+/** Au-delà, l'échantillon gyro est une frame corrompue du décodeur WASM
+ *  (ex. 4294967040 = -256 en u32) : un seul suffit à écraser tout le spectre. */
+const GYRO_SANE_LIMIT = 5000;
+
+/** Remplace les échantillons aberrants par la dernière valeur saine (continuité FFT). */
+function sanitizeGyro(sig: Float32Array): Float32Array {
+  let dirty = false;
+  for (let i = 0; i < sig.length; i++) {
+    if (!Number.isFinite(sig[i]) || Math.abs(sig[i]) > GYRO_SANE_LIMIT) {
+      dirty = true;
+      break;
+    }
+  }
+  if (!dirty) return sig;
+  const out = sig.slice();
+  let last = 0;
+  for (let i = 0; i < out.length; i++) {
+    if (!Number.isFinite(out[i]) || Math.abs(out[i]) > GYRO_SANE_LIMIT) out[i] = last;
+    else last = out[i];
+  }
+  return out;
+}
 
 /** Bandes de fréquence caractéristiques d'un quad (cf. analyze_shimera.py). */
 const SPECTRUM_BANDS: ReadonlyArray<readonly [number, number, string]> = [
@@ -73,12 +98,15 @@ function chartArrays(spec: Spectrum): { freqs: Float32Array; mags: Float32Array 
 }
 
 function axisSpectrum(sig: Float32Array, fsHz: number): AxisSpectrum {
-  const spec = welchSpectrum(sig, fsHz);
-  const bands: SpectrumBand[] = SPECTRUM_BANDS.map(([lo, hi, label]) => ({
+  const spec = welchSpectrum(sanitizeGyro(sig), fsHz);
+  // Une bande (presque) entièrement au-delà de Nyquist n'est pas mesurable :
+  // on l'omet plutôt que de rapporter un RMS 0 trompeur (logs à faible rate).
+  const nyq = (fsHz / 2) * 0.95;
+  const bands: SpectrumBand[] = SPECTRUM_BANDS.filter(([lo]) => lo + 30 < nyq).map(([lo, hi, label]) => ({
     lo,
-    hi,
+    hi: Math.min(hi, nyq),
     label,
-    rms: bandRms(spec, lo, hi),
+    rms: bandRms(spec, lo, Math.min(hi, nyq)),
   }));
   // Bande dominante = max ; à égalité la première gagne (comme max() en python).
   let dominant = bands[0];
@@ -146,16 +174,21 @@ export function analyzeSpectrum(fd: FlightData, motorPoles: number): SpectrumMet
       }
     }
     if (bestAxis >= 0) {
-      let nearestMotor = 0;
+      let nearestMotor = -1;
       let distanceHz = Infinity;
       for (let m = 0; m < 4; m++) {
+        // Un moteur sans télémétrie eRPM (median 0) capturerait tous les pics
+        // basse fréquence (prop wash) → faux diagnostic de balourd : on l'exclut.
+        if (perMotorHz[m].median <= 0) continue;
         const d = Math.abs(bestFreq - perMotorHz[m].median);
         if (d < distanceHz) {
           distanceHz = d;
           nearestMotor = m; // index 0-based (M1 = 0)
         }
       }
-      dominantPeak = { freqHz: bestFreq, axis: bestAxis as Axis, nearestMotor, distanceHz };
+      if (nearestMotor >= 0) {
+        dominantPeak = { freqHz: bestFreq, axis: bestAxis as Axis, nearestMotor, distanceHz };
+      }
     }
   }
 
@@ -176,16 +209,23 @@ export function analyzeSpectrum(fd: FlightData, motorPoles: number): SpectrumMet
 export function analyzeFilters(fd: FlightData): FilterMetrics {
   const gu = fd.gyroUnfilt;
   if (!gu) return { available: false, axes: null };
+  // Même gate que le spectre : sous 2048 échantillons les magnitudes Welch ne
+  // sont plus comparables aux seuils calibrés (fenêtre réduite).
+  if (gu[0].length < MIN_SAMPLES_FOR_FFT) return { available: false, axes: null };
 
   const fs = fd.meta.sampleRateHz;
-  const hfHi = Math.min(500, (fs / 2) * 0.9);
+  const nyq = (fs / 2) * 0.95;
+  const hfHi = Math.min(500, nyq);
   const axes = [0, 1, 2].map((a): FilterAxisMetrics => {
-    const specUnfilt = welchSpectrum(gu[a], fs);
-    const specFilt = welchSpectrum(fd.gyro[a], fs);
-    const attenuationDb = FILTER_BANDS.map(([lo, hi]) => {
-      const u = bandRms(specUnfilt, lo, hi);
-      const f = bandRms(specFilt, lo, hi);
-      return { lo, hi, db: u > 0 && f > 0 ? 20 * Math.log10(u / f) : 0 };
+    const specUnfilt = welchSpectrum(sanitizeGyro(gu[a]), fs);
+    const specFilt = welchSpectrum(sanitizeGyro(fd.gyro[a]), fs);
+    // Bande sans couverture réelle sous Nyquist → omise (un 0 dB serait lu
+    // comme « filtres inefficaces » sur un simple log à faible sample rate).
+    const attenuationDb = FILTER_BANDS.filter(([lo]) => lo + 30 < nyq).map(([lo, hi]) => {
+      const hiEff = Math.min(hi, nyq);
+      const u = bandRms(specUnfilt, lo, hiEff);
+      const f = bandRms(specFilt, lo, hiEff);
+      return { lo, hi: hiEff, db: u > 0 && f > 0 ? 20 * Math.log10(u / f) : 0 };
     });
     return { attenuationDb, residualHfRms: bandRms(specFilt, 100, hfHi) };
   });
