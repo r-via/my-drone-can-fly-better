@@ -366,7 +366,7 @@ export const es: Dict = {
       logo: 'MY DRONE CAN FLY BETTER',
       headerTagline: 'Análisis 100 % local - tus logs no salen de tu navegador.',
       footer:
-        'Análisis determinista - cada veredicto es trazable a una regla explícita. No se envía ningún dato.',
+        'Análisis determinista - cada veredicto es trazable a una regla explícita. No se envía nada sin tu consentimiento.',
       languageLabel: 'Idioma',
       supportKofi: 'Apoyar en Ko-fi',
       footerKofi: '¿Este sitio te ahorra packs? Invita a un café:',
@@ -513,6 +513,19 @@ export const es: Dict = {
       saveWarnCode: 'save',
       saveWarnAfter:
         ' en el CLI, no con el botón Save de la GUI: en algunas versiones puede borrar toda tu config (bug conocido).',
+    },
+
+    // Switch de opt-in: comparte el .bbl bruto con el dev (final de ReportView).
+    shareLog: {
+      title: 'Ayudar a mejorar la herramienta',
+      description:
+        'Envía el/los log(s) .bbl bruto(s) de este análisis a Rémi (el dev del sitio), a un canal privado. Sirve para detectar casos reales que las reglas no pillan. No se envía nada hasta que actives este switch.',
+      toggleLabel: (count: number): string =>
+        count > 1 ? `Compartir los ${count} logs` : 'Compartir este log',
+      sending: 'Enviando…',
+      sent: '¡Log enviado, gracias!',
+      error: 'Fallo al enviar - inténtalo más tarde.',
+      tooLarge: 'Log demasiado grande para compartir automáticamente.',
     },
 
     charts: {

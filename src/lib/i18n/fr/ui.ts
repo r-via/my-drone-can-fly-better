@@ -8,7 +8,7 @@ export const ui = {
     logo: 'MY DRONE CAN FLY BETTER',
     headerTagline: 'Analyse 100 % locale - tes logs ne quittent pas ton navigateur.',
     footer:
-      'Analyse déterministe - chaque verdict est traçable à une règle explicite. Aucune donnée envoyée.',
+      "Analyse déterministe - chaque verdict est traçable à une règle explicite. Rien n'est envoyé sans ton accord.",
     languageLabel: 'Langue',
     supportKofi: 'Soutenir sur Ko-fi',
     footerKofi: 'Ce site te fait gagner des packs ? Offre un café :',
@@ -165,6 +165,19 @@ export const ui = {
     saveWarnCode: 'save',
     saveWarnAfter:
       ' dans le CLI, pas avec le bouton Save de la GUI : sur certaines versions il peut effacer toute ta config (bug connu).',
+  },
+
+  // Switch d'opt-in : partage du .bbl brut avec le dev (bas de ReportView).
+  shareLog: {
+    title: "Aider à améliorer l'outil",
+    description:
+      "Envoie le(s) log(s) .bbl brut(s) de cette analyse à Rémi (dev du site), sur un salon privé. Ça sert à repérer des cas réels que les règles ratent. Rien n'est envoyé tant que tu n'actives pas ce switch.",
+    toggleLabel: (count: number): string =>
+      count > 1 ? `Partager les ${count} logs` : 'Partager ce log',
+    sending: 'Envoi en cours…',
+    sent: 'Log envoyé - merci !',
+    error: "Échec de l'envoi - réessaie plus tard.",
+    tooLarge: 'Log trop volumineux pour être partagé automatiquement.',
   },
 
   // Graphes SVG - objets plats passés en prop `labels` (composants purs, sans hook).

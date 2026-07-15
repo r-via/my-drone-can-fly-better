@@ -25,6 +25,7 @@ import {
 import MetricTile, { type MetricTone } from '@/components/MetricTile';
 import ScoreGauge from '@/components/ScoreGauge';
 import SessionPicker, { type SessionPickerItem } from '@/components/SessionPicker';
+import ShareLogToggle from '@/components/ShareLogToggle';
 import { SpectrumChart } from '@/components/charts/SpectrumChart';
 import { StepResponseChart } from '@/components/charts/StepResponseChart';
 import { TimelineStrip } from '@/components/charts/TimelineStrip';
@@ -419,7 +420,15 @@ function FileSection({
 // Vue principale
 // ---------------------------------------------------------------------------
 
-export default function ReportView({ report, onReset }: { report: Report; onReset: () => void }) {
+export default function ReportView({
+  report,
+  onReset,
+  files,
+}: {
+  report: Report;
+  onReset: () => void;
+  files: File[];
+}) {
   const { dict } = useLocale();
   const t = dict.ui.report;
   const [selection, setSelection] = useState<Record<number, number>>({});
@@ -431,6 +440,9 @@ export default function ReportView({ report, onReset }: { report: Report; onRese
   });
 
   const configGroups = groupFindings(report.configFindings);
+  const craftNames = report.files
+    .map((f) => f.sessionReports[0]?.analysis.meta.craftName)
+    .filter((name): name is string => Boolean(name));
 
   return (
     <div className="space-y-6">
@@ -469,6 +481,8 @@ export default function ReportView({ report, onReset }: { report: Report; onRese
       ))}
 
       <CliExport findings={cliFindings} />
+
+      <ShareLogToggle files={files} craftNames={craftNames} />
     </div>
   );
 }

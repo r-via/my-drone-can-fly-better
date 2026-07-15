@@ -369,7 +369,7 @@ export const en: Dict = {
       logo: 'MY DRONE CAN FLY BETTER',
       headerTagline: '100% local analysis - your logs never leave your browser.',
       footer:
-        'Deterministic analysis - every verdict traces back to an explicit rule. No data sent.',
+        "Deterministic analysis - every verdict traces back to an explicit rule. Nothing is sent without your consent.",
       languageLabel: 'Language',
       supportKofi: 'Support on Ko-fi',
       footerKofi: 'This site saving you packs? Buy me a coffee:',
@@ -524,6 +524,19 @@ export const en: Dict = {
       saveWarnCode: 'save',
       saveWarnAfter:
         ' in the CLI, not with the GUI Save button: on some versions it can wipe your entire config (known bug).',
+    },
+
+    // Opt-in switch: share the raw .bbl with the dev (bottom of ReportView).
+    shareLog: {
+      title: 'Help improve the tool',
+      description:
+        "Sends the raw .bbl log(s) from this analysis to Rémi (the site's dev), on a private channel. Helps catch real-world cases the rules miss. Nothing is sent unless you flip this switch.",
+      toggleLabel: (count: number): string =>
+        count > 1 ? `Share the ${count} logs` : 'Share this log',
+      sending: 'Sending…',
+      sent: 'Log sent - thanks!',
+      error: 'Send failed - try again later.',
+      tooLarge: 'Log too large to share automatically.',
     },
 
     // SVG charts - flat objects passed as the `labels` prop (pure components, no hooks).

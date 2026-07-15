@@ -64,6 +64,7 @@ export default function Page() {
     return (
       <ReportView
         report={analyzer.report}
+        files={files}
         onReset={() => {
           analyzer.reset();
           setFiles([]);
