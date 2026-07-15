@@ -1,12 +1,15 @@
+'use client';
+
+import { useLocale } from '@/lib/i18n/locale';
+
 import type { Finding, Severity } from '@/lib/types';
 
 export const SEVERITY_META: Record<
   Severity,
-  { icon: string; label: string; text: string; badge: string; border: string; rank: number }
+  { icon: string; text: string; badge: string; border: string; rank: number }
 > = {
   crit: {
     icon: '❌',
-    label: 'Critique',
     text: 'text-crit',
     badge: 'bg-crit/10 text-crit',
     border: 'border-l-crit',
@@ -14,7 +17,6 @@ export const SEVERITY_META: Record<
   },
   warn: {
     icon: '⚠️',
-    label: 'Attention',
     text: 'text-warn',
     badge: 'bg-warn/10 text-warn',
     border: 'border-l-warn',
@@ -22,7 +24,6 @@ export const SEVERITY_META: Record<
   },
   info: {
     icon: 'ℹ️',
-    label: 'Info',
     text: 'text-info',
     badge: 'bg-info/10 text-info',
     border: 'border-l-info',
@@ -30,7 +31,6 @@ export const SEVERITY_META: Record<
   },
   ok: {
     icon: '✅',
-    label: 'OK',
     text: 'text-ok',
     badge: 'bg-ok/10 text-ok',
     border: 'border-l-ok',
@@ -39,6 +39,7 @@ export const SEVERITY_META: Record<
 };
 
 export default function FindingCard({ finding }: { finding: Finding }) {
+  const { dict } = useLocale();
   const sev = SEVERITY_META[finding.severity];
   return (
     <article
@@ -50,7 +51,7 @@ export default function FindingCard({ finding }: { finding: Finding }) {
           className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${sev.badge}`}
         >
           <span aria-hidden="true">{sev.icon}</span>
-          {sev.label}
+          {dict.ui.severity[finding.severity]}
         </span>
         <h4 className="text-sm font-semibold text-ink">{finding.title}</h4>
       </div>
@@ -60,7 +61,7 @@ export default function FindingCard({ finding }: { finding: Finding }) {
       {finding.evidence ? (
         <details className="mt-2 group">
           <summary className="cursor-pointer text-xs font-medium text-ink-3 hover:text-ink-2">
-            Les chiffres derrière ce verdict
+            {dict.ui.finding.evidenceSummary}
           </summary>
           <pre className="mt-2 overflow-x-auto rounded-md bg-bg/60 p-3 font-mono text-xs leading-relaxed text-ink-2 whitespace-pre-wrap">
             {finding.evidence}
@@ -71,7 +72,7 @@ export default function FindingCard({ finding }: { finding: Finding }) {
       {finding.fix ? (
         <div className="mt-3 rounded-md border border-accent/30 bg-accent/5 p-3">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">
-            Correctif
+            {dict.ui.finding.fixTitle}
           </p>
           <p className="mt-1 text-sm text-ink">{finding.fix.text}</p>
           {finding.fix.cli && finding.fix.cli.length > 0 ? (

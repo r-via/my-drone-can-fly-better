@@ -1,9 +1,13 @@
+'use client';
+
+import { useLocale } from '@/lib/i18n/locale';
+
 export type MetricTone = 'neutral' | 'ok' | 'warn' | 'crit';
 
-const TONE_DOT: Record<Exclude<MetricTone, 'neutral'>, { dot: string; sr: string }> = {
-  ok: { dot: 'bg-ok', sr: 'état : bon' },
-  warn: { dot: 'bg-warn', sr: 'état : à surveiller' },
-  crit: { dot: 'bg-crit', sr: 'état : critique' },
+const TONE_DOT: Record<Exclude<MetricTone, 'neutral'>, string> = {
+  ok: 'bg-ok',
+  warn: 'bg-warn',
+  crit: 'bg-crit',
 };
 
 export interface MetricTileProps {
@@ -18,14 +22,15 @@ export interface MetricTileProps {
 }
 
 export default function MetricTile({ label, value, unit, hint, tone = 'neutral' }: MetricTileProps) {
-  const toneMeta = tone === 'neutral' ? null : TONE_DOT[tone];
+  const { dict } = useLocale();
+  const toneMeta = tone === 'neutral' ? null : { dot: TONE_DOT[tone], sr: dict.ui.metricTone[tone] };
   return (
     <div className="rounded-lg border border-line bg-surface p-3">
       <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-3">
         {toneMeta ? (
           <>
             <span aria-hidden="true" className={`size-1.5 rounded-full ${toneMeta.dot}`} />
-            <span className="sr-only">{toneMeta.sr} — </span>
+            <span className="sr-only">{toneMeta.sr} - </span>
           </>
         ) : null}
         {label}

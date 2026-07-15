@@ -1,7 +1,23 @@
 // Chaînes système : erreurs du parseur bbl, messages de progression du worker,
-// erreurs de lecture côté client — référence FR.
+// erreurs de lecture côté client - référence FR.
 
 export const system = {
-  // TODO(agent core-i18n) : extraire les chaînes de src/lib/bbl/parse.ts,
-  // src/worker/analyze.worker.ts et src/lib/analyze-client.ts.
+  // src/lib/bbl/parse.ts - erreurs utilisateur (sessions ignorées / fatales).
+  noBlackboxHeader: 'Pas de header blackbox trouvé (fichier non .bbl ?)',
+  sessionTooShort: (frames: string) =>
+    `Session trop courte (${frames} frames) - probable blip d'armement`,
+  headersUnreadable: 'Headers illisibles (session corrompue ?)',
+  noFramesDecoded: 'Aucune frame décodée (données corrompues ?)',
+  essentialFieldsMissing: 'Champs essentiels absents (gyroADC/setpoint/motor/rcCommand)',
+
+  // src/worker/analyze.worker.ts - progression + erreur de chargement WASM.
+  wasmLoadFailed: (httpStatus: string) =>
+    `Chargement du décodeur WASM impossible (HTTP ${httpStatus})`,
+  progressLoadingDecoder: 'Chargement du décodeur…',
+  progressDecoding: (fileName: string) => `Décodage de ${fileName}…`,
+  progressAnalyzing: 'Analyse (FFT, step response, règles)…',
+
+  // src/lib/analyze-client.ts - pont UI ↔ worker.
+  progressPreparing: 'Préparation…',
+  workerUnexpectedError: 'Erreur inattendue dans le worker',
 } as const;

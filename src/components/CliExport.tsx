@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useLocale } from '@/lib/i18n/locale';
 import type { Finding } from '@/lib/types';
 
 /** Rassemble toutes les lignes fix.cli des findings, dédupliquées, ordre préservé. */
@@ -20,6 +21,8 @@ export function collectCliLines(findings: Finding[]): string[] {
 }
 
 export default function CliExport({ findings }: { findings: Finding[] }) {
+  const { dict } = useLocale();
+  const t = dict.ui.cli;
   const lines = collectCliLines(findings);
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,11 +36,9 @@ export default function CliExport({ findings }: { findings: Finding[] }) {
 
   if (lines.length === 0) {
     return (
-      <section aria-label="Commandes CLI" className="rounded-lg border border-line bg-surface p-4">
-        <h3 className="text-sm font-semibold text-ink">Commandes CLI</h3>
-        <p className="mt-1 text-sm text-ink-2">
-          Rien à corriger côté CLI — ta config tient la route.
-        </p>
+      <section aria-label={t.sectionAria} className="rounded-lg border border-line bg-surface p-4">
+        <h3 className="text-sm font-semibold text-ink">{t.title}</h3>
+        <p className="mt-1 text-sm text-ink-2">{t.nothingToFix}</p>
       </section>
     );
   }
@@ -56,20 +57,20 @@ export default function CliExport({ findings }: { findings: Finding[] }) {
   };
 
   return (
-    <section aria-label="Commandes CLI" className="rounded-lg border border-line bg-surface p-4">
+    <section aria-label={t.sectionAria} className="rounded-lg border border-line bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-ink">
-          Commandes CLI <span className="text-ink-3">({lines.length} + save)</span>
+          {t.title} <span className="text-ink-3">{t.countSuffix(lines.length)}</span>
         </h3>
         <button
           type="button"
           onClick={copy}
           className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-bg transition-opacity hover:opacity-90"
         >
-          {copied ? 'Copié !' : 'Copier tout'}
+          {copied ? t.copied : t.copyAll}
         </button>
         <span aria-live="polite" className="sr-only">
-          {copied ? 'Commandes copiées dans le presse-papiers' : ''}
+          {copied ? t.copiedSr : ''}
         </span>
       </div>
 
@@ -77,13 +78,11 @@ export default function CliExport({ findings }: { findings: Finding[] }) {
         {script}
       </pre>
 
-      <p role="note" className="mt-3 text-xs text-ink-2">
-        Vérifie chaque ligne avant de coller — c&apos;est toi qui pilotes, pas le rapport.
-      </p>
+      <p role="note" className="mt-3 text-xs text-ink-2">{t.verifyNote}</p>
       <p role="note" className="mt-1 text-xs text-warn">
-        <span aria-hidden="true">⚠️</span> Sauvegarde en tapant <code className="font-mono">save</code>{' '}
-        dans le CLI, pas avec le bouton Save de la GUI : sur certaines versions il peut effacer toute
-        ta config (bug connu).
+        <span aria-hidden="true">⚠️</span> {t.saveWarnBefore}
+        <code className="font-mono">{t.saveWarnCode}</code>
+        {t.saveWarnAfter}
       </p>
     </section>
   );

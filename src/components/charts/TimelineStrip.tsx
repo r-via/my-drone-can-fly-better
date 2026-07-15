@@ -1,4 +1,4 @@
-// TimelineStrip — bandeau des segments au sol / gaz bas / en vol,
+// TimelineStrip - bandeau des segments au sol / gaz bas / en vol,
 // avec la tension batterie (vbat) en surimpression. SVG pur, sans dépendance.
 //
 // buildTimelineRects normalise sur l'étendue temporelle des segments ; le
@@ -25,11 +25,28 @@ const STATE_COLORS: Record<string, string> = {
   low: 'var(--chart-state-low, #1c5cab)',
   flight: 'var(--chart-state-flight, #199e70)',
 };
-const STATE_LABELS: Record<string, string> = {
-  idle: 'au sol',
-  low: 'gaz bas',
-  flight: 'en vol',
+export interface TimelineLabels {
+  ariaLabel: (duration: string, segmentCount: string) => string;
+  stateIdle: string;
+  stateLow: string;
+  stateFlight: string;
+  vbat: string;
+  noSegments: string;
+}
+
+const DEFAULT_LABELS: TimelineLabels = {
+  ariaLabel: (duration, segmentCount) =>
+    `Timeline du log : ${duration}, ${segmentCount} segments (au sol / gaz bas / en vol)`,
+  stateIdle: 'au sol',
+  stateLow: 'gaz bas',
+  stateFlight: 'en vol',
+  vbat: 'vbat',
+  noSegments: 'Aucun segment détecté.',
 };
+
+function stateLabels(L: TimelineLabels): Record<string, string> {
+  return { idle: L.stateIdle, low: L.stateLow, flight: L.stateFlight };
+}
 const STATE_ORDER = ['idle', 'low', 'flight'] as const;
 
 function fmt(n: number): string {
@@ -70,7 +87,10 @@ export function buildTimelineRects(
 export function TimelineStrip(props: {
   segments: TimelineSegment[];
   durationS: number;
+  labels?: TimelineLabels;
 }): JSX.Element {
+  const L = props.labels ?? DEFAULT_LABELS;
+  const STATE_LABELS = stateLabels(L);
   const W = 640;
   const H = 96;
   const pad = { left: 12, right: 12 };
@@ -125,7 +145,7 @@ export function TimelineStrip(props: {
   const legendItems: Array<{ label: string; color: string; line: boolean }> = presentStates.map(
     (st) => ({ label: STATE_LABELS[st], color: STATE_COLORS[st], line: false }),
   );
-  if (vbatPts.length >= 2) legendItems.push({ label: 'vbat', color: VBAT_COLOR, line: true });
+  if (vbatPts.length >= 2) legendItems.push({ label: L.vbat, color: VBAT_COLOR, line: true });
 
   const vFirst = vbatPts.length >= 2 ? vbatPts[0].v : null;
   const vLast = vbatPts.length >= 2 ? vbatPts[vbatPts.length - 1].v : null;
@@ -135,7 +155,7 @@ export function TimelineStrip(props: {
       viewBox={`0 0 ${W} ${H}`}
       style={{ width: '100%', height: 'auto', display: 'block' }}
       role="img"
-      aria-label={`Timeline du log : ${fmtTime(durationS)}, ${segments.length} segments (au sol / gaz bas / en vol)`}
+      aria-label={L.ariaLabel(fmtTime(durationS), String(segments.length))}
       fontFamily={FONT}
     >
       {/* Légende des états + vbat */}
@@ -163,7 +183,7 @@ export function TimelineStrip(props: {
       {/* Segments : le blanc/surface fait la séparation (retrait 1 px de chaque côté) */}
       {segments.length === 0 ? (
         <text x={W / 2} y={stripTop + stripH / 2 + 4} fontSize={11} fill={INK_AXIS} textAnchor="middle">
-          Aucun segment détecté.
+          {L.noSegments}
         </text>
       ) : (
         rects.map((r, i) => {

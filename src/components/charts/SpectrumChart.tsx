@@ -1,4 +1,4 @@
-// SpectrumChart — spectre gyro 3 axes superposés, SVG pur (aucune dépendance).
+// SpectrumChart - spectre gyro 3 axes superposés, SVG pur (aucune dépendance).
 //
 // Échelle Y : RACINE CARRÉE de l'amplitude. Compromis lisibilité assumé :
 // le linéaire écrase les pics secondaires (résonance châssis à côté du pic
@@ -117,18 +117,40 @@ export function buildSpectrumPaths(
   return { paths, ticksX, bands };
 }
 
+export interface SpectrumChartLabels {
+  title: string;
+  scaleNote: string;
+  ariaLabel: (title: string) => string;
+  bandResonance: string;
+  bandMotors: string;
+  xAxis: string;
+  motorLine: (hz: string) => string;
+}
+
+const DEFAULT_LABELS: SpectrumChartLabels = {
+  title: 'Spectre gyro (0–1 kHz)',
+  scaleNote: 'amplitude gyro - échelle √ (les pics dominants restent comparables)',
+  ariaLabel: (title) => `${title} - axes Roll, Pitch et Yaw superposés`,
+  bandResonance: 'résonance',
+  bandMotors: 'moteurs',
+  xAxis: 'Fréquence (Hz)',
+  motorLine: (hz) => `moteurs ~${hz} Hz`,
+};
+
 export function SpectrumChart(props: {
   axes: [AxisSpectrum, AxisSpectrum, AxisSpectrum];
   motorFundamentalHz?: number | null;
   title?: string;
+  labels?: SpectrumChartLabels;
 }): JSX.Element {
+  const L = props.labels ?? DEFAULT_LABELS;
   const W = 640;
   const H = 300;
   const pad = { top: 46, right: 12, bottom: 34, left: 14 };
   const plotW = W - pad.left - pad.right;
   const plotH = H - pad.top - pad.bottom;
   const { paths, ticksX, bands } = buildSpectrumPaths(props.axes, plotW, plotH);
-  const title = props.title ?? 'Spectre gyro (0–1 kHz)';
+  const title = props.title ?? L.title;
   const fMotor = props.motorFundamentalHz;
   const motorX =
     fMotor != null && fMotor > 0 && fMotor <= FREQ_MAX_HZ
@@ -144,14 +166,14 @@ export function SpectrumChart(props: {
       viewBox={`0 0 ${W} ${H}`}
       style={{ width: '100%', height: 'auto', display: 'block' }}
       role="img"
-      aria-label={`${title} — axes Roll, Pitch et Yaw superposés`}
+      aria-label={L.ariaLabel(title)}
       fontFamily={FONT}
     >
       <text x={pad.left} y={18} fontSize={13} fontWeight={600} fill={INK}>
         {title}
       </text>
       <text x={pad.left} y={32} fontSize={9} fill={INK_AXIS}>
-        amplitude gyro — échelle √ (les pics dominants restent comparables)
+        {L.scaleNote}
       </text>
 
       {/* Légende (identité jamais portée par la couleur seule) */}
@@ -184,7 +206,7 @@ export function SpectrumChart(props: {
             fill={INK_AXIS}
             textAnchor="middle"
           >
-            {b.label}
+            {b.label === 'résonance' ? L.bandResonance : L.bandMotors}
           </text>
         </g>
       ))}
@@ -222,10 +244,10 @@ export function SpectrumChart(props: {
         strokeWidth={1}
       />
       <text x={pad.left + plotW / 2} y={H - 4} fontSize={9} fill={INK_AXIS} textAnchor="middle">
-        Fréquence (Hz)
+        {L.xAxis}
       </text>
 
-      {/* Fondamentale moteur (médiane eRPM) — ligne en retrait derrière les traces */}
+      {/* Fondamentale moteur (médiane eRPM) - ligne en retrait derrière les traces */}
       {motorX != null && (
         <line
           x1={motorX}
@@ -265,7 +287,7 @@ export function SpectrumChart(props: {
           strokeWidth={3}
           paintOrder="stroke"
         >
-          {`moteurs ~${Math.round(fMotor as number)} Hz`}
+          {L.motorLine(String(Math.round(fMotor as number)))}
         </text>
       )}
     </svg>

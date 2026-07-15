@@ -2,11 +2,13 @@
 
 import { useState, type ChangeEvent, type DragEvent } from 'react';
 
+import { useLocale } from '@/lib/i18n/locale';
+
 const ACCEPTED = /\.(bbl|bfl)$/i;
 
-function fmtBytes(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace('.', ',')} Mo`;
-  return `${Math.max(1, Math.round(n / 1000))} Ko`;
+function fmtBytes(n: number, mega: string, kilo: string): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} ${mega}`;
+  return `${Math.max(1, Math.round(n / 1000))} ${kilo}`;
 }
 
 export interface UploadZoneProps {
@@ -24,6 +26,8 @@ export default function UploadZone({
   onCliTextChange,
   disabled = false,
 }: UploadZoneProps) {
+  const { dict } = useLocale();
+  const t = dict.ui.upload;
   const [dragOver, setDragOver] = useState(false);
   const [rejected, setRejected] = useState<string[]>([]);
 
@@ -75,22 +79,22 @@ export default function UploadZone({
           aria-describedby="bbl-help"
         />
         <p className="text-base font-medium text-ink">
-          Glisse tes logs blackbox ici
-          <span className="text-ink-3"> — ou clique pour parcourir</span>
+          {t.dropTitle}
+          <span className="text-ink-3">{t.dropBrowse}</span>
         </p>
         <p id="bbl-help" className="mt-1 font-mono text-xs text-ink-3">
-          .bbl / .bfl · plusieurs fichiers acceptés · rien ne quitte ton navigateur
+          {t.dropHelp}
         </p>
       </label>
 
       {rejected.length > 0 ? (
         <p role="status" className="text-xs text-warn">
-          <span aria-hidden="true">⚠️</span> Ignoré (ni .bbl ni .bfl) : {rejected.join(', ')}
+          <span aria-hidden="true">⚠️</span> {t.rejected(rejected.join(', '))}
         </p>
       ) : null}
 
       {files.length > 0 ? (
-        <ul aria-label="Fichiers sélectionnés" className="space-y-1.5">
+        <ul aria-label={t.selectedFilesAria} className="space-y-1.5">
           {files.map((f) => (
             <li
               key={`${f.name}:${f.size}`}
@@ -98,10 +102,12 @@ export default function UploadZone({
             >
               <span className="min-w-0 truncate font-mono text-sm text-ink">{f.name}</span>
               <span className="flex shrink-0 items-center gap-3">
-                <span className="font-mono text-xs text-ink-3">{fmtBytes(f.size)}</span>
+                <span className="font-mono text-xs text-ink-3">
+                  {fmtBytes(f.size, dict.ui.units.mega, dict.ui.units.kilo)}
+                </span>
                 <button
                   type="button"
-                  aria-label={`Retirer ${f.name}`}
+                  aria-label={t.removeFile(f.name)}
                   disabled={disabled}
                   onClick={() => onFilesChange(files.filter((x) => x !== f))}
                   className="rounded px-1.5 text-sm text-ink-3 hover:text-crit"
@@ -116,12 +122,13 @@ export default function UploadZone({
 
       <details className="rounded-lg border border-line bg-surface">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-ink-2 hover:text-ink">
-          Colle ton <code className="font-mono">diff all</code> (optionnel — sinon je lis la config
-          depuis le log)
+          {t.pasteSummaryBefore}
+          <code className="font-mono">{t.pasteSummaryCode}</code>
+          {t.pasteSummaryAfter}
         </summary>
         <div className="border-t border-line p-4">
           <label htmlFor="cli-paste" className="sr-only">
-            Sortie de la commande diff all de Betaflight
+            {t.pasteLabel}
           </label>
           <textarea
             id="cli-paste"
@@ -130,12 +137,10 @@ export default function UploadZone({
             onChange={(e) => onCliTextChange(e.target.value)}
             rows={8}
             spellCheck={false}
-            placeholder={'# diff all\n# version\n# Betaflight / …\nset gyro_lpf1_static_hz = 250\n…'}
+            placeholder={t.pastePlaceholder}
             className="w-full resize-y rounded-md border border-line bg-bg/60 p-3 font-mono text-xs text-ink placeholder:text-ink-3"
           />
-          <p className="mt-2 text-xs text-ink-3">
-            Le diff collé prime sur les headers du log pour l&apos;analyse de config.
-          </p>
+          <p className="mt-2 text-xs text-ink-3">{t.pasteNote}</p>
         </div>
       </details>
     </div>

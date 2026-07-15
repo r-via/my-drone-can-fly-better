@@ -1,4 +1,4 @@
-// Spectre vibrations (jello) + performance des filtres gyro — portage fidèle
+// Spectre vibrations (jello) + performance des filtres gyro - portage fidèle
 // de la partie FFT de analyze_shimera.py : Welch simplifié sur le gyro brut,
 // bandes RMS caractéristiques, pics dominants et attribution du pic global au
 // moteur le plus proche via l'eRPM. Tout est déterministe, aucune IA.
@@ -15,7 +15,7 @@ import type {
 } from '../types';
 
 /** En dessous de 2048 échantillons (une seule fenêtre Welch de 2048), la FFT
- *  moyenne n'est pas fiable — et les magnitudes ne sont plus comparables aux
+ *  moyenne n'est pas fiable - et les magnitudes ne sont plus comparables aux
  *  seuils calibrés sur fenêtre 4096. */
 const MIN_SAMPLES_FOR_FFT = 2 * 1024;
 
@@ -159,7 +159,7 @@ export function analyzeSpectrum(fd: FlightData, motorPoles: number): SpectrumMet
   }
 
   // Pic global dominant (tous axes, fMin 15) attribué au moteur le plus proche
-  // en Hz — en hover les 4 moteurs tournent à des régimes distincts.
+  // en Hz - en hover les 4 moteurs tournent à des régimes distincts.
   let dominantPeak: SpectrumMetrics['dominantPeak'] = null;
   if (motorFundamentalHz !== null && perMotorHz) {
     let bestAxis = -1;

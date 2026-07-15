@@ -5,7 +5,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { getDict } from './i18n';
+
 import type { WorkerRequest, WorkerResponse } from '../worker/analyze.worker';
+import type { Locale } from './i18n';
 import type { Report } from './types';
 
 export type AnalyzerState = {
@@ -16,7 +19,7 @@ export type AnalyzerState = {
 };
 
 export function useAnalyzer(): AnalyzerState & {
-  analyze(files: Array<{ name: string; bytes: Uint8Array }>, cliText: string): void;
+  analyze(files: Array<{ name: string; bytes: Uint8Array }>, cliText: string, locale: Locale): void;
   reset(): void;
 } {
   const [state, setState] = useState<AnalyzerState>({ status: 'idle', report: null });
@@ -30,14 +33,14 @@ export function useAnalyzer(): AnalyzerState & {
     [],
   );
 
-  const analyze = useCallback((files: Array<{ name: string; bytes: Uint8Array }>, cliText: string) => {
+  const analyze = useCallback((files: Array<{ name: string; bytes: Uint8Array }>, cliText: string, locale: Locale) => {
     // Worker frais par analyse : état WASM propre, et un run précédent
     // éventuellement bloqué est tué au lieu de faire la queue.
     workerRef.current?.terminate();
     const worker = new Worker(new URL('../worker/analyze.worker.ts', import.meta.url));
     workerRef.current = worker;
 
-    setState({ status: 'working', step: 'Préparation…', report: null });
+    setState({ status: 'working', step: getDict(locale).system.progressPreparing, report: null });
 
     worker.onmessage = (ev: MessageEvent<WorkerResponse>) => {
       const msg = ev.data;
@@ -54,7 +57,7 @@ export function useAnalyzer(): AnalyzerState & {
       }
     };
     worker.onerror = (ev) => {
-      setState({ status: 'error', report: null, error: ev.message || 'Erreur inattendue dans le worker' });
+      setState({ status: 'error', report: null, error: ev.message || getDict(locale).system.workerUnexpectedError });
       worker.terminate();
       if (workerRef.current === worker) workerRef.current = null;
     };
@@ -68,6 +71,7 @@ export function useAnalyzer(): AnalyzerState & {
         return { name: f.name, bytes: ab };
       }),
       cliText,
+      locale,
     };
     worker.postMessage(
       payload,

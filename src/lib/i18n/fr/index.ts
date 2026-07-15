@@ -1,5 +1,5 @@
 // Locale de référence : le français. Toutes les autres langues sont typées
-// `Dict` (= typeof fr) — une clé manquante ou en trop ne compile pas.
+// `Dict` (= typeof fr) - une clé manquante ou en trop ne compile pas.
 import { lint } from './lint';
 import { rules } from './rules';
 import { system } from './system';

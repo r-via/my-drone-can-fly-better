@@ -3,7 +3,10 @@
 import { readFile } from 'node:fs/promises';
 
 import { initWasm, parseFile } from '../src/lib/bbl/parse.ts';
+import { getDict } from '../src/lib/i18n/index.ts';
 import { buildReport } from '../src/lib/report.ts';
+
+const dict = getDict('fr');
 
 const ICONS = { crit: '❌', warn: '⚠️ ', info: 'ℹ️ ', ok: '✅' };
 
@@ -32,7 +35,7 @@ for (const file of report.files) {
   }
   for (const sr of file.sessionReports) {
     const m = sr.analysis.meta;
-    console.log(`\n▶ session ${m.index + 1} — ${m.craftName ?? '?'} [profil ${sr.profile.label}] — ${m.durationS.toFixed(0)}s @ ${m.sampleRateHz.toFixed(0)} Hz — ${m.firmware.split(' (')[0]}`);
+    console.log(`\n▶ session ${m.index + 1} - ${m.craftName ?? '?'} [profil ${dict.rules.profiles[sr.profile.id]}] - ${m.durationS.toFixed(0)}s @ ${m.sampleRateHz.toFixed(0)} Hz - ${m.firmware.split(' (')[0]}`);
     const p = sr.analysis.power;
     if (p) console.log(`  ${p.cells}S ${p.vbatMax.toFixed(2)}→${p.vbatMin.toFixed(2)} V (sag ${p.sagV.toFixed(2)} V)  courant max ${p.ampMax?.toFixed(1) ?? '?'} A`);
     for (const f of sr.findings) {
@@ -48,5 +51,5 @@ for (const file of report.files) {
 
 if (report.configFindings.length > 0) {
   console.log('\n━━━ Lint config (diff collé) ━━━');
-  for (const f of report.configFindings) console.log(`  ${ICONS[f.severity]} ${f.title} — ${f.evidence}`);
+  for (const f of report.configFindings) console.log(`  ${ICONS[f.severity]} ${f.title} - ${f.evidence}`);
 }

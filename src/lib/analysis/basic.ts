@@ -1,4 +1,4 @@
-// Analyses de base d'une session blackbox — portage fidèle des stats de
+// Analyses de base d'une session blackbox - portage fidèle des stats de
 // analyze_shimera.py / analyze_pico.py (puissance, moteurs, bruit, suivi,
 // timeline, GPS, failsafe). Tout est déterministe, aucune IA.
 import type {
@@ -338,7 +338,7 @@ export function analyzeGps(fd: FlightData): GpsMetrics {
 /** Phases failsafe bénignes : jamais déclenché ou valeur inconnue/vide. */
 const BENIGN_FAILSAFE_PHASES = new Set(['0', '', '?', 'IDLE']);
 
-/** L'enum failsafePhase Betaflight tient dans 0..7 — au-delà c'est une slow
+/** L'enum failsafePhase Betaflight tient dans 0..7 - au-delà c'est une slow
  *  frame corrompue du décodeur (ex. 4294967294 = -2 en u32), pas un failsafe. */
 function isValidFailsafePhase(phase: string): boolean {
   const n = Number(phase);

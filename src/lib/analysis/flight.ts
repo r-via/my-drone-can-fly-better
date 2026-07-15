@@ -1,4 +1,4 @@
-// Analyses "comportement en vol" — yoyo (oscillation de poussée basse
+// Analyses "comportement en vol" - yoyo (oscillation de poussée basse
 // fréquence, portage fidèle de analyze_pico.py) et prop wash (perte de
 // contrôle dans les descentes). 100 % déterministe, aucune IA.
 import { mean, std } from '../dsp/dsp';
@@ -93,13 +93,13 @@ function movingAverage(x: Float64Array, w: number): Float64Array {
 }
 
 // ---------------------------------------------------------------------------
-// YOYO — oscillation de poussée basse fréquence (cf. analyze_pico.py)
+// YOYO - oscillation de poussée basse fréquence (cf. analyze_pico.py)
 // ---------------------------------------------------------------------------
 
 /**
  * Frame moteur saine : les 4 valeurs brutes dans [0, motorOutputHigh].
  * Le parseur WASM laisse passer quelques frames corrompues (valeurs 2^32…)
- * que orangebox droppait — on les exclut, sinon std(poussée) explose.
+ * que orangebox droppait - on les exclut, sinon std(poussée) explose.
  */
 function motorsValidFn(fd: FlightData): (i: number) => boolean {
   const hi = fd.meta.motorOutputHigh > 0 ? fd.meta.motorOutputHigh : 2047;
@@ -166,7 +166,7 @@ export function analyzeYoyo(fd: FlightData): YoyoMetrics {
 }
 
 // ---------------------------------------------------------------------------
-// PROP WASH — sévérité de l'erreur gyro pendant les descentes
+// PROP WASH - sévérité de l'erreur gyro pendant les descentes
 // ---------------------------------------------------------------------------
 
 /** Vitesse verticale lissée : différence centrée d'altitude sur ~VZ_SMOOTH_S. */

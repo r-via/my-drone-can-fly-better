@@ -1,5 +1,7 @@
 'use client';
 
+import { useLocale } from '@/lib/i18n/locale';
+
 export interface SessionPickerItem {
   /** Valeur opaque renvoyée à onSelect (index dans la liste des sessions valides). */
   value: number;
@@ -17,8 +19,9 @@ export interface SessionPickerProps {
 
 /** Sélecteur de session (affiché seulement quand un fichier en contient plusieurs). */
 export default function SessionPicker({ items, selected, onSelect }: SessionPickerProps) {
+  const { dict } = useLocale();
   return (
-    <div role="tablist" aria-label="Sessions du fichier" className="flex flex-wrap gap-2">
+    <div role="tablist" aria-label={dict.ui.sessionPicker.listAria} className="flex flex-wrap gap-2">
       {items.map((item) => {
         const active = item.value === selected;
         return (

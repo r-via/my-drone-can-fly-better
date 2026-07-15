@@ -1,10 +1,10 @@
-// Réponse indicielle (step response) par déconvolution de Wiener — méthode
+// Réponse indicielle (step response) par déconvolution de Wiener - méthode
 // Plasmatree PID-Analyzer (github.com/Plasmatree/PID-Analyzer), adaptée en
 // fenêtres de Hann de 2 s avec overlap 50 % :
 //   G(f) = Y·conj(X) / (X·conj(X) + λ),  λ = 1e-4·max(X·conj(X))
 //   h = Re(ifft(G)),  step = cumsum(h)
 // La courbe est la réponse à un échelon unitaire de setpoint : AUCUNE
-// normalisation — settleValue ≈ 1 signifie que le PID suit la consigne.
+// normalisation - settleValue ≈ 1 signifie que le PID suit la consigne.
 import { fft, ifft, nextPow2 } from '../dsp/dsp';
 
 import type { AxisStepResponse, FlightData, StepResponseMetrics } from '../types';
@@ -15,13 +15,13 @@ const MIN_DURATION_S = 20;
 const WINDOW_S = 2;
 /** Durée de la réponse indicielle retournée (s). */
 const RESPONSE_S = 0.5;
-/** Début de la zone de plateau pour settleValue (s) — fin = RESPONSE_S. */
+/** Début de la zone de plateau pour settleValue (s) - fin = RESPONSE_S. */
 const SETTLE_START_S = 0.2;
 /** Excitation stick minimale max|setpoint| (deg/s) pour garder une fenêtre. */
 const MIN_EXCITATION_DEGS: [number, number, number] = [20, 20, 10];
 /**
  * Vol doux (cruise) : si AUCUNE fenêtre ne passe le seuil nominal, on retente
- * à seuil réduit de moitié — la boucle fermée étant ~linéaire, une excitation
+ * à seuil réduit de moitié - la boucle fermée étant ~linéaire, une excitation
  * modérée suffit encore à estimer la réponse (SNR moindre, quality le reflète).
  */
 const EXCITATION_FALLBACK_FACTOR = 0.5;
@@ -37,7 +37,7 @@ const LAMBDA_FLOOR_HZ = 2;
 /**
  * Filtre de robustesse façon PIDtoolbox : une fenêtre dont le plateau
  * individuel (200-500 ms) sort de cette bande est un artefact de
- * déconvolution (SNR insuffisant), pas une réponse physique — elle est
+ * déconvolution (SNR insuffisant), pas une réponse physique - elle est
  * écartée de la moyenne. Si TOUTES les fenêtres sortent de la bande
  * (quad vraiment cassé), on les garde toutes : la règle « pathologique »
  * s'applique alors à la courbe finale.
@@ -158,7 +158,7 @@ function deconvolveAxis(
     }
     const lambda = WIENER_REG_FACTOR * maxPow;
 
-    // G = Y·conj(X) / (|X|² + λ) — écrit en place dans (xr, xi).
+    // G = Y·conj(X) / (|X|² + λ) - écrit en place dans (xr, xi).
     for (let b = 0; b < nfft; b++) {
       const denom = xr[b] * xr[b] + xi[b] * xi[b] + lambda;
       const gRe = (yr[b] * xr[b] + yi[b] * xi[b]) / denom;

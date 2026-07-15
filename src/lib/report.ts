@@ -12,9 +12,11 @@ import {
 import { analyzeSpectrum, analyzeFilters } from './analysis/spectrum';
 import { analyzeStepResponse } from './analysis/step';
 import { configFromHeaders, lintConfig, parseCliText } from './cli/config';
+import { fr } from './i18n/fr';
 import { evaluateSession } from './rules/engine';
 import { pickProfile } from './rules/profiles';
 
+import type { Dict } from './i18n/fr';
 import type {
   CliConfig,
   FileReport,
@@ -53,13 +55,13 @@ export function analyzeFlightData(fd: FlightData, motorPoles: number): SessionAn
   };
 }
 
-export function buildSessionReport(fd: FlightData, pasteConfig: CliConfig | null): SessionReport {
+export function buildSessionReport(fd: FlightData, pasteConfig: CliConfig | null, dict: Dict = fr): SessionReport {
   const profile = pickProfile(fd.meta.craftName);
   const analysis = analyzeFlightData(fd, profile.motorPoles);
   const config = pasteConfig ?? configFromHeaders(fd.meta.headers);
   let findings = sortFindings([
-    ...evaluateSession(analysis, profile),
-    ...lintConfig(config, profile, analysis),
+    ...evaluateSession(analysis, profile, dict),
+    ...lintConfig(config, profile, analysis, dict),
   ]);
   // « Tout est propre » (émis par le moteur, qui ne voit pas le lint config)
   // n'a plus sa place si le lint a trouvé des warn/crit dans le même rapport.
@@ -69,12 +71,12 @@ export function buildSessionReport(fd: FlightData, pasteConfig: CliConfig | null
   return { analysis, profile, findings };
 }
 
-export function buildReport(files: ParsedFile[], cliText: string): Report {
+export function buildReport(files: ParsedFile[], cliText: string, dict: Dict = fr): Report {
   const pasteConfig = cliText.trim().length > 0 ? parseCliText(cliText) : null;
 
   const fileReports: FileReport[] = files.map((pf) => ({
     fileName: pf.fileName,
-    sessionReports: pf.sessions.map((fd) => buildSessionReport(fd, pasteConfig)),
+    sessionReports: pf.sessions.map((fd) => buildSessionReport(fd, pasteConfig, dict)),
     skipped: pf.skipped,
   }));
 
@@ -82,7 +84,7 @@ export function buildReport(files: ParsedFile[], cliText: string): Report {
   // ou pour les règles indépendantes du vol).
   const configFindings =
     pasteConfig && files.every((f) => f.sessions.length === 0)
-      ? sortFindings(lintConfig(pasteConfig, pickProfile(undefined), null))
+      ? sortFindings(lintConfig(pasteConfig, pickProfile(undefined), null, dict))
       : [];
 
   return { files: fileReports, config: pasteConfig, configFindings };

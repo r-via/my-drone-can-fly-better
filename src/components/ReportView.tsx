@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useLocale } from '@/lib/i18n/locale';
 import type {
   FileReport,
   Finding,
@@ -17,51 +18,50 @@ import { SpectrumChart } from '@/components/charts/SpectrumChart';
 import { StepResponseChart } from '@/components/charts/StepResponseChart';
 import { TimelineStrip } from '@/components/charts/TimelineStrip';
 
+import type { Dict, Locale } from '@/lib/i18n';
+
 // ---------------------------------------------------------------------------
-// Formatage (décimales à la française)
+// Formatage - séparateur décimal selon la langue
 // ---------------------------------------------------------------------------
 
-function frFixed(v: number, digits: number): string {
-  return v.toFixed(digits).replace('.', ',');
+interface Formatters {
+  fixed: (v: number, digits: number) => string;
+  duration: (s: number) => string;
+  clock: (s: number) => string;
+  hz: (hz: number) => string;
+  bytes: (n: number) => string;
 }
 
-function fmtDuration(s: number): string {
-  if (!Number.isFinite(s) || s < 0) return '—';
-  if (s < 60) return `${frFixed(s, 1)} s`;
-  let m = Math.floor(s / 60);
-  let r = Math.round(s - m * 60);
-  if (r === 60) {
-    m += 1;
-    r = 0;
-  }
-  return `${m} min ${String(r).padStart(2, '0')} s`;
-}
-
-function fmtClock(s: number): string {
-  const m = Math.floor(s / 60);
-  const r = Math.floor(s % 60);
-  return `${m}:${String(r).padStart(2, '0')}`;
-}
-
-function fmtHz(hz: number): string {
-  return hz >= 1000 ? `${frFixed(hz / 1000, 2)} kHz` : `${Math.round(hz)} Hz`;
-}
-
-function fmtBytes(n: number): string {
-  if (n >= 1_000_000) return `${frFixed(n / 1_000_000, 1)} Mo`;
-  return `${Math.max(1, Math.round(n / 1000))} Ko`;
+function makeFormatters(locale: Locale, dict: Dict): Formatters {
+  const sep = locale === 'fr' ? ',' : '.';
+  const fixed = (v: number, digits: number) => v.toFixed(digits).replace('.', sep);
+  const duration = (s: number): string => {
+    if (!Number.isFinite(s) || s < 0) return 'n/a';
+    if (s < 60) return `${fixed(s, 1)} s`;
+    let m = Math.floor(s / 60);
+    let r = Math.round(s - m * 60);
+    if (r === 60) {
+      m += 1;
+      r = 0;
+    }
+    return `${m} min ${String(r).padStart(2, '0')} s`;
+  };
+  const clock = (s: number): string => {
+    const m = Math.floor(s / 60);
+    const r = Math.floor(s % 60);
+    return `${m}:${String(r).padStart(2, '0')}`;
+  };
+  const hz = (v: number): string => (v >= 1000 ? `${fixed(v / 1000, 2)} kHz` : `${Math.round(v)} Hz`);
+  const bytes = (n: number): string =>
+    n >= 1_000_000
+      ? `${fixed(n / 1_000_000, 1)} ${dict.ui.units.mega}`
+      : `${Math.max(1, Math.round(n / 1000))} ${dict.ui.units.kilo}`;
+  return { fixed, duration, clock, hz, bytes };
 }
 
 // ---------------------------------------------------------------------------
 // Verdicts & catégories
 // ---------------------------------------------------------------------------
-
-const VERDICT_TEXT: Record<Severity, string> = {
-  ok: 'Nickel — rien à signaler',
-  info: 'Propre — quelques observations',
-  warn: 'À surveiller — des points à corriger',
-  crit: 'Critique — corrige avant de revoler',
-};
 
 const CATEGORY_ORDER: FindingCategory[] = [
   'securite',
@@ -74,18 +74,6 @@ const CATEGORY_ORDER: FindingCategory[] = [
   'gps',
   'log',
 ];
-
-const CATEGORY_LABELS: Record<FindingCategory, string> = {
-  securite: 'Sécurité',
-  vibrations: 'Vibrations',
-  filtres: 'Filtres',
-  pid: 'PID',
-  moteurs: 'Moteurs',
-  batterie: 'Batterie',
-  config: 'Config',
-  gps: 'GPS',
-  log: 'Log',
-};
 
 function worstSeverity(findings: Finding[]): Severity {
   let worst: Severity = 'ok';
@@ -124,10 +112,14 @@ function groupFindings(
 // ---------------------------------------------------------------------------
 
 function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
+  const { locale, dict } = useLocale();
+  const t = dict.ui.report;
+  const fmt = makeFormatters(locale, dict);
   const { analysis, profile, findings } = sessionReport;
   const meta = analysis.meta;
   const power = analysis.power;
   const th = profile.thresholds;
+  const profileText = dict.rules.profiles[profile.id];
 
   const worst = worstSeverity(findings);
   const sev = SEVERITY_META[worst];
@@ -153,16 +145,18 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface-2 p-4">
         <div className="min-w-0">
           <p className="text-base font-semibold text-ink">
-            {meta.craftName || profile.label}
-            <span className="ml-2 text-sm font-normal text-ink-3">profil {profile.label}</span>
+            {meta.craftName || profileText.label}
+            <span className="ml-2 text-sm font-normal text-ink-3">
+              {t.profileTag(profileText.label)}
+            </span>
           </p>
           <p className="mt-0.5 font-mono text-xs text-ink-3">
             {meta.firmware}
             {meta.boardInfo ? ` · ${meta.boardInfo}` : ''}
           </p>
-          {profile.notes && profile.notes.length > 0 ? (
+          {profileText.notes.length > 0 ? (
             <ul className="mt-1 space-y-0.5 text-xs text-ink-2">
-              {profile.notes.map((note) => (
+              {profileText.notes.map((note) => (
                 <li key={note}>• {note}</li>
               ))}
             </ul>
@@ -172,52 +166,51 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
           className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${sev.badge}`}
         >
           <span aria-hidden="true">{sev.icon}</span>
-          {VERDICT_TEXT[worst]}
+          {dict.ui.verdict[worst]}
         </p>
       </div>
 
       {/* Tuiles chiffrées */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <MetricTile label="Durée de session" value={fmtDuration(meta.durationS)} />
-        <MetricTile label="Échantillonnage" value={fmtHz(meta.sampleRateHz)} />
+        <MetricTile label={t.tileDuration} value={fmt.duration(meta.durationS)} />
+        <MetricTile label={t.tileSampleRate} value={fmt.hz(meta.sampleRateHz)} />
         <MetricTile
-          label="Batterie"
-          value={power ? `${power.cells}S` : '—'}
+          label={t.tileBattery}
+          value={power ? `${power.cells}S` : 'n/a'}
           hint={
             power && sagPerCell != null
-              ? `sag ${frFixed(power.sagV, 2)} V (${frFixed(sagPerCell, 2)} V/cell)`
+              ? t.batterySag(fmt.fixed(power.sagV, 2), fmt.fixed(sagPerCell, 2))
               : power
-                ? `${frFixed(power.vbatMin, 2)}–${frFixed(power.vbatMax, 2)} V`
-                : 'pas de mesure vbat'
+                ? t.batteryRange(fmt.fixed(power.vbatMin, 2), fmt.fixed(power.vbatMax, 2))
+                : t.batteryNoVbat
           }
           tone={sagTone}
         />
         <MetricTile
-          label="Courant max"
-          value={power && power.ampMax != null ? frFixed(power.ampMax, 1) : '—'}
+          label={t.tileMaxCurrent}
+          value={power && power.ampMax != null ? fmt.fixed(power.ampMax, 1) : 'n/a'}
           unit={power && power.ampMax != null ? 'A' : undefined}
-          hint={
-            power && power.ampAvg != null ? `moyenne ${frFixed(power.ampAvg, 1)} A` : undefined
-          }
+          hint={power && power.ampAvg != null ? t.currentAvg(fmt.fixed(power.ampAvg, 1)) : undefined}
         />
+        <MetricTile label={t.tileSaturation} value={fmt.fixed(satPct, 1)} unit="%" tone={satTone} />
         <MetricTile
-          label="Saturation moteurs"
-          value={frFixed(satPct, 1)}
-          unit="%"
-          tone={satTone}
-        />
-        <MetricTile
-          label="Temps de vol"
-          value={fmtDuration(analysis.timeline.flightTimeS)}
-          hint="throttle réellement en l'air"
+          label={t.tileFlightTime}
+          value={fmt.duration(analysis.timeline.flightTimeS)}
+          hint={t.flightTimeHint}
         />
       </div>
 
       {/* Graphes (chaque SVG porte son propre titre) */}
       {analysis.timeline.segments.length > 0 ? (
         <figure className="rounded-lg border border-line bg-surface p-4">
-          <figcaption className="mb-2 text-sm font-semibold text-ink">Timeline du vol</figcaption>
-          <TimelineStrip segments={analysis.timeline.segments} durationS={meta.durationS} />
+          <figcaption className="mb-2 text-sm font-semibold text-ink">
+            {t.timelineCaption}
+          </figcaption>
+          <TimelineStrip
+            segments={analysis.timeline.segments}
+            durationS={meta.durationS}
+            labels={dict.ui.charts.timeline}
+          />
         </figure>
       ) : null}
       {analysis.spectrum ? (
@@ -225,25 +218,26 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
           <SpectrumChart
             axes={analysis.spectrum.axes}
             motorFundamentalHz={analysis.spectrum.motorFundamentalHz}
+            labels={dict.ui.charts.spectrum}
           />
         </div>
       ) : null}
       {analysis.step ? (
         <div className="rounded-lg border border-line bg-surface p-4">
-          <StepResponseChart axes={analysis.step.axes} />
+          <StepResponseChart axes={analysis.step.axes} labels={dict.ui.charts.step} />
         </div>
       ) : null}
 
       {/* Verdicts par catégorie */}
       {groups.length === 0 ? (
         <p className="rounded-lg border border-line bg-surface p-4 text-sm text-ink-2">
-          <span aria-hidden="true">✅</span> Aucune règle déclenchée sur cette session.
+          <span aria-hidden="true">✅</span> {t.noFindings}
         </p>
       ) : (
         groups.map((group) => (
-          <section key={group.category} aria-label={CATEGORY_LABELS[group.category]}>
+          <section key={group.category} aria-label={dict.ui.categories[group.category]}>
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-3">
-              {CATEGORY_LABELS[group.category]}
+              {dict.ui.categories[group.category]}
             </h4>
             <div className="space-y-2">
               {group.findings.map((finding, i) => (
@@ -266,6 +260,9 @@ function FileSection({
   selected: number;
   onSelect: (i: number) => void;
 }) {
+  const { locale, dict } = useLocale();
+  const t = dict.ui.report;
+  const fmt = makeFormatters(locale, dict);
   const valid = file.sessionReports.length;
   const skipped = file.skipped.length;
 
@@ -275,8 +272,8 @@ function FileSection({
     const dur = sr.analysis.meta.durationS;
     const item: SessionPickerItem = {
       value: i,
-      label: `Session ${sr.analysis.meta.index + 1}`,
-      sublabel: `${fmtDuration(dur)} · t+${fmtClock(offset)}`,
+      label: t.sessionLabel(String(sr.analysis.meta.index + 1)),
+      sublabel: t.sessionSublabel(fmt.duration(dur), fmt.clock(offset)),
     };
     offset += dur;
     return item;
@@ -285,28 +282,23 @@ function FileSection({
   const current = file.sessionReports[selected] ?? file.sessionReports[0];
 
   return (
-    <section aria-label={`Rapport ${file.fileName}`} className="space-y-4">
+    <section aria-label={t.fileAria(file.fileName)} className="space-y-4">
       <div className="rounded-lg border border-line bg-surface p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="min-w-0 truncate font-mono text-base font-semibold text-ink">
             {file.fileName}
           </h2>
           <p className="text-xs text-ink-2">
-            {valid} {valid > 1 ? 'sessions valides' : 'session valide'}
-            {skipped > 0 ? (
-              <span className="text-warn">
-                {' '}
-                · {skipped} {skipped > 1 ? 'ignorées' : 'ignorée'}
-              </span>
-            ) : null}
+            {t.validSessions(valid)}
+            {skipped > 0 ? <span className="text-warn"> · {t.skippedSessions(skipped)}</span> : null}
           </p>
         </div>
         {skipped > 0 ? (
           <ul className="mt-2 space-y-1 text-xs text-ink-2">
             {file.skipped.map((s) => (
               <li key={s.index}>
-                <span aria-hidden="true">⚠️</span> Session {s.index + 1} ignorée — {s.error} (
-                {fmtBytes(s.sizeBytes)})
+                <span aria-hidden="true">⚠️</span>{' '}
+                {t.skippedSession(String(s.index + 1), s.error, fmt.bytes(s.sizeBytes))}
               </li>
             ))}
           </ul>
@@ -322,7 +314,7 @@ function FileSection({
         <SessionBlock sessionReport={current} />
       ) : (
         <p className="rounded-lg border border-line bg-surface p-4 text-sm text-ink-2">
-          Aucune session exploitable dans ce fichier — voir les raisons ci-dessus.
+          {t.noUsableSession}
         </p>
       )}
     </section>
@@ -334,6 +326,8 @@ function FileSection({
 // ---------------------------------------------------------------------------
 
 export default function ReportView({ report, onReset }: { report: Report; onReset: () => void }) {
+  const { dict } = useLocale();
+  const t = dict.ui.report;
   const [selection, setSelection] = useState<Record<number, number>>({});
 
   const cliFindings: Finding[] = [...report.configFindings];
@@ -347,21 +341,21 @@ export default function ReportView({ report, onReset }: { report: Report; onRese
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-ink">Rapport de vol</h1>
+        <h1 className="text-xl font-bold text-ink">{t.title}</h1>
         <button
           type="button"
           onClick={onReset}
           className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink-2 hover:border-ink-3 hover:text-ink"
         >
-          Nouvelle analyse
+          {t.newAnalysis}
         </button>
       </div>
 
       {report.configFindings.length > 0 ? (
-        <section aria-label="Analyse de la config" className="space-y-2">
+        <section aria-label={t.configAria} className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">
-            Config{' '}
-            {report.config?.source === 'paste' ? '(diff all collé)' : '(headers du log)'}
+            {t.configTitle}{' '}
+            {report.config?.source === 'paste' ? t.configSourcePaste : t.configSourceHeaders}
           </h3>
           {configGroups.flatMap((group) =>
             group.findings.map((finding, i) => (

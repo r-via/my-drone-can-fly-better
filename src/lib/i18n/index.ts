@@ -1,5 +1,5 @@
 // Registre des locales. en/es/de/zh pointent sur fr tant que les traductions
-// ne sont pas livrées (fallback sans trou) — chaque traduction est un fichier
+// ne sont pas livrées (fallback sans trou) - chaque traduction est un fichier
 // `const xx: Dict = {...}` : le compilateur garantit la complétude.
 import { fr } from './fr';
 

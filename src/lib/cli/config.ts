@@ -2,6 +2,9 @@
 // Deux sources : un `diff all`/`dump` collé par l'utilisateur, ou le snapshot
 // config embarqué dans les headers du .bbl. Le lint applique des règles
 // déterministes et retourne des Finding (catégorie 'config') chiffrés.
+import { fr } from '../i18n/fr';
+
+import type { Dict } from '../i18n/fr';
 import type { CliConfig, DroneProfile, Finding, SessionAnalysis } from '../types';
 
 // Enum Betaflight 4.x pour motor_pwm_protocol (headers = valeur numérique).
@@ -19,7 +22,7 @@ const MOTOR_PROTOCOLS = [
 ] as const;
 
 // ---------------------------------------------------------------------------
-// parseCliText — diff all / dump collé
+// parseCliText - diff all / dump collé
 // ---------------------------------------------------------------------------
 
 const SET_RE = /^set\s+([A-Za-z0-9_]+)\s*=\s*(.+)$/i;
@@ -53,7 +56,7 @@ export function parseCliText(text: string): CliConfig {
 }
 
 // ---------------------------------------------------------------------------
-// configFromHeaders — snapshot config embarqué dans le .bbl
+// configFromHeaders - snapshot config embarqué dans le .bbl
 // ---------------------------------------------------------------------------
 
 /** Headers en minuscules qui ne correspondent PAS à un paramètre CLI utile. */
@@ -127,7 +130,7 @@ export function configFromHeaders(headers: Record<string, string>): CliConfig {
 }
 
 // ---------------------------------------------------------------------------
-// lintConfig — règles déterministes
+// lintConfig - règles déterministes
 // ---------------------------------------------------------------------------
 
 /** Lit une valeur numérique ; ON/OFF → 1/0 ; listes "a,b,c" → premier élément. */
@@ -159,7 +162,9 @@ export function lintConfig(
   config: CliConfig,
   profile: DroneProfile,
   analysis: SessionAnalysis | null,
+  dict: Dict = fr,
 ): Finding[] {
+  const L = dict.lint;
   const v = config.values;
   const findings: Finding[] = [];
   const num = (key: string): number | null => parseNum(v[key]);
@@ -169,76 +174,72 @@ export function lintConfig(
   const notchCount = num('dyn_notch_count');
   const dshot = isDshotProtocol(v['motor_pwm_protocol']);
 
-  // rpm-filter-off-bidir — le retour eRPM est là mais le filtre RPM est coupé.
+  // rpm-filter-off-bidir - le retour eRPM est là mais le filtre RPM est coupé.
   if (bidir === 1 && rpmHarmonics === 0) {
     findings.push({
       id: 'rpm-filter-off-bidir',
       severity: 'warn',
       category: 'config',
-      title: 'Filtre RPM désactivé alors que le DShot bidirectionnel est actif',
-      detail:
-        "Tu as le retour eRPM (dshot_bidir = ON) mais le filtre RPM est coupé. Tu paies le coût du DShot bidir sans profiter du meilleur filtre anti-bruit moteur disponible.",
-      evidence: `dshot_bidir = ON, rpm_filter_harmonics = 0`,
+      title: L.rpmFilterOffBidir.title,
+      detail: L.rpmFilterOffBidir.detail,
+      evidence: L.rpmFilterOffBidir.evidence,
       fix: {
-        text: 'Réactive le filtre RPM (3 harmoniques = valeur par défaut).',
+        text: L.rpmFilterOffBidir.fix,
         cli: ['set rpm_filter_harmonics = 3'],
       },
     });
   }
 
-  // no-bidir — protocole DSHOT mais pas de retour eRPM.
+  // no-bidir - protocole DSHOT mais pas de retour eRPM.
   if (dshot === true && bidir !== 1) {
     findings.push({
       id: 'no-bidir',
       severity: 'info',
       category: 'config',
-      title: 'DShot bidirectionnel désactivé',
-      detail:
-        "Ton protocole moteur est DShot mais sans retour eRPM. Active le bidir pour débloquer le filtre RPM : bruit moteur nettoyé à la source, LPF gyro/D-term plus hauts, moins de latence (firmware ESC BLHeli_32, Bluejay ou AM32 requis).",
-      evidence: `motor_pwm_protocol = ${v['motor_pwm_protocol']}, dshot_bidir = ${bidir === 0 ? 'OFF' : 'absent'}`,
+      title: L.noBidir.title,
+      detail: L.noBidir.detail,
+      evidence: L.noBidir.evidence(v['motor_pwm_protocol'], bidir === 0),
       fix: {
-        text: 'Active le DShot bidirectionnel puis le filtre RPM.',
+        text: L.noBidir.fix,
         cli: ['set dshot_bidir = ON', 'set rpm_filter_harmonics = 3'],
       },
     });
   }
 
-  // no-notch-no-rpm — plus aucun filtrage adaptatif.
+  // no-notch-no-rpm - plus aucun filtrage adaptatif.
   if (notchCount === 0 && rpmHarmonics === 0) {
     findings.push({
       id: 'no-notch-no-rpm',
       severity: 'crit',
       category: 'config',
-      title: 'Aucun filtrage adaptatif actif',
-      detail:
-        "Dynamic notch ET filtre RPM désactivés : seuls les LPF statiques protègent tes PID du bruit moteur. Risque réel de moteurs chauds, de D-term saturé et d'oscillations à haut régime.",
-      evidence: `dyn_notch_count = 0, rpm_filter_harmonics = 0`,
+      title: L.noNotchNoRpm.title,
+      detail: L.noNotchNoRpm.detail,
+      evidence: L.noNotchNoRpm.evidence,
       fix: {
-        text: 'Réactive au moins un des deux (filtre RPM si DShot bidir dispo, sinon dynamic notch).',
+        text: L.noNotchNoRpm.fix,
         cli: ['set dyn_notch_count = 3', 'set rpm_filter_harmonics = 3'],
       },
     });
   }
 
-  // dterm-lpf-low — LPF1 D-term statique très bas = latence D élevée.
+  // dterm-lpf-low - LPF1 D-term statique très bas = latence D élevée.
   const dtermLpf = num('dterm_lpf1_static_hz');
   if (dtermLpf !== null && dtermLpf > 0 && dtermLpf < 70) {
     findings.push({
       id: 'dterm-lpf-low',
       severity: 'warn',
       category: 'config',
-      title: 'LPF1 D-term très bas',
-      detail:
-        `Un LPF1 D-term à ${dtermLpf} Hz ajoute beaucoup de latence sur le D : amortissement mou et prop wash amplifié. Sous 70 Hz, c'est rarement justifié sur un quad sain.`,
-      evidence: `dterm_lpf1_static_hz = ${dtermLpf}`,
+      title: L.dtermLpfLow.title,
+      detail: L.dtermLpfLow.detail(String(dtermLpf)),
+      evidence: L.dtermLpfLow.evidence(String(dtermLpf)),
       fix: {
-        text: 'Remonte le LPF1 D-term vers 75-90 Hz (ou repasse en mode dynamique).',
+        text: L.dtermLpfLow.fix,
         cli: ['set dterm_lpf1_static_hz = 75'],
       },
     });
   }
 
-  // gyro-lpf-low — LPF gyro statique bas alors que le filtre RPM fait déjà le travail.
+  // gyro-lpf-low - LPF gyro statique bas alors que le filtre RPM fait déjà le travail.
   const gyroLpfKey = v['gyro_lpf1_static_hz'] !== undefined ? 'gyro_lpf1_static_hz' : 'gyro_lowpass_hz';
   const gyroLpf = num(gyroLpfKey);
   if (gyroLpf !== null && gyroLpf > 0 && gyroLpf < 150 && rpmHarmonics !== null && rpmHarmonics > 0) {
@@ -246,18 +247,17 @@ export function lintConfig(
       id: 'gyro-lpf-low',
       severity: 'info',
       category: 'config',
-      title: 'LPF gyro conservateur malgré le filtre RPM',
-      detail:
-        `Avec le filtre RPM actif (${rpmHarmonics} harmoniques), un LPF1 gyro statique à ${gyroLpf} Hz est probablement trop bas : tu ajoutes de la latence pour du bruit déjà traité.`,
-      evidence: `${gyroLpfKey} = ${gyroLpf}, rpm_filter_harmonics = ${rpmHarmonics}`,
+      title: L.gyroLpfLow.title,
+      detail: L.gyroLpfLow.detail(String(rpmHarmonics), String(gyroLpf)),
+      evidence: L.gyroLpfLow.evidence(gyroLpfKey, String(gyroLpf), String(rpmHarmonics)),
       fix: {
-        text: 'Essaie de remonter le LPF1 gyro (250 Hz par défaut) et vérifie le bruit résiduel au vol suivant.',
+        text: L.gyroLpfLow.fix,
         cli: [`set ${gyroLpfKey} = 250`],
       },
     });
   }
 
-  // ff-zero — feedforward coupé sur tous les axes renseignés.
+  // ff-zero - feedforward coupé sur tous les axes renseignés.
   const ffKeys = ['f_roll', 'f_pitch', 'f_yaw', 'ff_weight'];
   const ffPresent = ffKeys.filter((k) => v[k] !== undefined);
   if (ffPresent.length > 0 && ffPresent.every((k) => num(k) === 0)) {
@@ -265,43 +265,40 @@ export function lintConfig(
       id: 'ff-zero',
       severity: 'info',
       category: 'config',
-      title: 'Feedforward à zéro',
-      detail:
-        "Sans feedforward, le quad ne réagit qu'à l'erreur déjà installée : la réponse stick est retardée. Ok pour du cinématique très lisse, pénalisant en freestyle/race.",
+      title: L.ffZero.title,
+      detail: L.ffZero.detail,
       evidence: ffPresent.map((k) => `${k} = ${v[k]}`).join(', '),
-      fix: { text: 'Remets du feedforward (≈100-125 en 4.5) si tu veux une réponse stick directe.' },
+      fix: { text: L.ffZero.fix },
     });
   }
 
-  // antigravity-off — I-term non boosté sur les coups de gaz.
+  // antigravity-off - I-term non boosté sur les coups de gaz.
   if (num('anti_gravity_gain') === 0) {
     findings.push({
       id: 'antigravity-off',
       severity: 'info',
       category: 'config',
-      title: 'Anti-gravity désactivé',
-      detail:
-        "anti_gravity_gain = 0 : l'I-term n'est pas boosté pendant les variations rapides de gaz, le nez peut plonger ou pomper sur les punchs.",
-      evidence: 'anti_gravity_gain = 0',
-      fix: { text: 'Remets la valeur par défaut si ce n\'est pas un choix délibéré.', cli: ['set anti_gravity_gain = 80'] },
+      title: L.antigravityOff.title,
+      detail: L.antigravityOff.detail,
+      evidence: L.antigravityOff.evidence,
+      fix: { text: L.antigravityOff.fix, cli: ['set anti_gravity_gain = 80'] },
     });
   }
 
-  // motor-limit — une limite de sortie moteur est active.
+  // motor-limit - une limite de sortie moteur est active.
   const motorLimit = num('motor_output_limit');
   if (motorLimit !== null && motorLimit < 100) {
     findings.push({
       id: 'motor-limit',
       severity: 'info',
       category: 'config',
-      title: 'Limite de sortie moteur active',
-      detail:
-        `motor_output_limit = ${motorLimit}% : la poussée max est bridée. Simple rappel au cas où ce n'est pas voulu (souvent utilisé pour voler avec une batterie de voltage supérieur).`,
-      evidence: `motor_output_limit = ${motorLimit}`,
+      title: L.motorLimit.title,
+      detail: L.motorLimit.detail(String(motorLimit)),
+      evidence: L.motorLimit.evidence(String(motorLimit)),
     });
   }
 
-  // vbat-warning — seuil d'alerte batterie hors plage usuelle.
+  // vbat-warning - seuil d'alerte batterie hors plage usuelle.
   const vbatWarnRaw = num('vbat_warning_cell_voltage');
   if (vbatWarnRaw !== null) {
     const volts = vbatWarnRaw > 10 ? vbatWarnRaw / 100 : vbatWarnRaw; // CLI en centivolts (350 = 3.50 V)
@@ -310,17 +307,16 @@ export function lintConfig(
         id: 'vbat-warning',
         severity: 'info',
         category: 'config',
-        title: "Seuil d'alerte batterie inhabituel",
-        detail:
-          `Alerte batterie réglée à ${volts.toFixed(2)} V/cellule, hors de la plage usuelle 3.2-3.6 V : tu seras prévenu trop tôt ou trop tard.`,
-        evidence: `vbat_warning_cell_voltage = ${v['vbat_warning_cell_voltage']} (${volts.toFixed(2)} V/cellule)`,
-        fix: { text: 'Vise 3.4-3.5 V/cellule pour un usage LiPo classique.', cli: ['set vbat_warning_cell_voltage = 350'] },
+        title: L.vbatWarning.title,
+        detail: L.vbatWarning.detail(volts.toFixed(2)),
+        evidence: L.vbatWarning.evidence(v['vbat_warning_cell_voltage'], volts.toFixed(2)),
+        fix: { text: L.vbatWarning.fix, cli: ['set vbat_warning_cell_voltage = 350'] },
       });
     }
   }
 
   // NB : le contrôle du nombre de cellules vs profil vit dans le moteur de
-  // règles (battery-cells-unexpected, engine.ts) — le dupliquer ici produisait
+  // règles (battery-cells-unexpected, engine.ts) - le dupliquer ici produisait
   // deux findings pour la même anomalie dans chaque rapport.
 
   return findings.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);

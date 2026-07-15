@@ -1,4 +1,4 @@
-// Contrats partagés de Debrief — analyse blackbox Betaflight 100 % déterministe.
+// Contrats partagés de My Drone Can Fly Better - analyse blackbox Betaflight 100 % déterministe.
 // Unités normalisées dans FlightData : temps en s, gyro/setpoint en deg/s,
 // vbat en V, courant en A, altitude en m. motor/erpm restent bruts (voir meta).
 
@@ -299,16 +299,17 @@ export interface ProfileThresholds {
   residualHfWarn: number;
 }
 
+export type DroneProfileId = 'pico' | 'lr4' | 'chimera7' | 'generic';
+
+// Le label et les notes affichés (particularités du drone) vivent dans le
+// dictionnaire i18n : dict.rules.profiles[id].{label, notes}.
 export interface DroneProfile {
-  id: string; // 'pico' | 'lr4' | 'chimera7' | 'generic'
-  label: string;
-  /** Détection auto par craft name (headers) — insensible à la casse. */
+  id: DroneProfileId;
+  /** Détection auto par craft name (headers) - insensible à la casse. */
   craftMatch: RegExp;
   motorPoles: number; // pour eRPM → Hz
   expectedCells: number | null;
   thresholds: ProfileThresholds;
-  /** Notes affichées dans le rapport (particularités du drone). */
-  notes?: string[];
 }
 
 // ---------------------------------------------------------------------------

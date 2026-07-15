@@ -8,6 +8,9 @@
 //  - les sessions tronquées (coupure d'alim) sont signalées, pas fatales.
 import { Parser } from 'blackbox-log/slim';
 
+import { fr } from '../i18n/fr';
+
+import type { Dict } from '../i18n/fr';
 import type { F32x3, F32x4, FlightData, ParsedFile, SessionMeta, SkippedSession } from '../types';
 
 const MAGIC = 'H Product:Blackbox flight data recorder';
@@ -105,7 +108,7 @@ function toF32(rows: Row[], col: number): Float32Array {
 }
 
 /** Parse toutes les sessions d'un fichier .bbl. */
-export async function parseFile(fileName: string, buf: Uint8Array): Promise<ParsedFile> {
+export async function parseFile(fileName: string, buf: Uint8Array, dict: Dict = fr): Promise<ParsedFile> {
   if (!wasmModule) throw new Error('initWasm() doit être appelé avant parseFile()');
   const { data: spoofed, original } = spoofFirmware(buf);
   const chunks = splitSessions(spoofed);
@@ -113,7 +116,7 @@ export async function parseFile(fileName: string, buf: Uint8Array): Promise<Pars
     return {
       fileName,
       sessions: [],
-      skipped: [{ index: 0, fileName, sizeBytes: buf.length, error: 'Pas de header blackbox trouvé (fichier non .bbl ?)' }],
+      skipped: [{ index: 0, fileName, sizeBytes: buf.length, error: dict.system.noBlackboxHeader }],
     };
   }
 
@@ -123,13 +126,13 @@ export async function parseFile(fileName: string, buf: Uint8Array): Promise<Pars
   for (let si = 0; si < chunks.length; si++) {
     const chunk = chunks[si];
     try {
-      const fd = await parseSession(fileName, si, chunk.bytes, original);
+      const fd = await parseSession(fileName, si, chunk.bytes, original, dict);
       if (fd.meta.frameCount < 100) {
         skipped.push({
           index: si,
           fileName,
           sizeBytes: chunk.bytes.length,
-          error: `Session trop courte (${fd.meta.frameCount} frames) — probable blip d'armement`,
+          error: dict.system.sessionTooShort(String(fd.meta.frameCount)),
         });
       } else {
         sessions.push(fd);
@@ -152,12 +155,13 @@ async function parseSession(
   index: number,
   chunk: Uint8Array,
   originalFirmware: string | null,
+  dict: Dict,
 ): Promise<FlightData> {
   // Parser frais par session : contourne le bug d'ArrayBuffer détaché du wrapper.
   const parser = await Parser.init(wasmModule!);
   const file = parser.loadFile(chunk);
   const h = file.parseHeaders(0);
-  if (!h) throw new Error('Headers illisibles (session corrompue ?)');
+  if (!h) throw new Error(dict.system.headersUnreadable);
 
   const rawHeaders = extractHeaderText(chunk);
   const fieldNames = [...h.mainFrameDef.keys()];
@@ -189,7 +193,7 @@ async function parseSession(
     }
   }
 
-  if (rows.length === 0) throw new Error('Aucune frame décodée (données corrompues ?)');
+  if (rows.length === 0) throw new Error(dict.system.noFramesDecoded);
 
   const dts: number[] = [];
   const step = Math.max(1, Math.floor(times.length / 2000));
@@ -260,7 +264,7 @@ async function parseSession(
   const setpoint = triple('setpoint');
   const motor = quad('motor');
   if (!gyro || !setpoint || !motor || !has('rcCommand[3]')) {
-    throw new Error('Champs essentiels absents (gyroADC/setpoint/motor/rcCommand)');
+    throw new Error(dict.system.essentialFieldsMissing);
   }
 
   return {

@@ -1,4 +1,4 @@
-// StepResponseChart — réponses indicielles 3 axes (déconvolution Wiener),
+// StepResponseChart - réponses indicielles 3 axes (déconvolution Wiener),
 // ligne cible 1.0 pointillée + zone d'overshoot teintée. SVG pur, sans dépendance.
 //
 // X : 0 → 500 ms. Y : 0 → max(1.5, pic observé) ; les valeurs négatives
@@ -96,9 +96,31 @@ export function buildStepPaths(
   return { paths, targetY, ticksX, ticksY };
 }
 
+export interface StepChartLabels {
+  title: string;
+  ariaLabel: string;
+  overshootZone: string;
+  targetLine: string;
+  xAxis: string;
+  axisMissing: (axis: string) => string;
+  noData: string;
+}
+
+const DEFAULT_LABELS: StepChartLabels = {
+  title: 'Réponse indicielle (0–500 ms)',
+  ariaLabel: 'Réponse indicielle Roll, Pitch, Yaw - cible 1.0, fenêtre 0 à 500 ms',
+  overshootZone: "zone d'overshoot",
+  targetLine: 'cible 1.0',
+  xAxis: 'Temps (ms)',
+  axisMissing: (axis) => `${axis} (n/a)`,
+  noData: "Pas assez d'excitation stick pour estimer la réponse.",
+};
+
 export function StepResponseChart(props: {
   axes: [AxisStepResponse | null, AxisStepResponse | null, AxisStepResponse | null];
+  labels?: StepChartLabels;
 }): JSX.Element {
+  const L = props.labels ?? DEFAULT_LABELS;
   const W = 640;
   const H = 300;
   const pad = { top: 40, right: 14, bottom: 34, left: 38 };
@@ -112,14 +134,14 @@ export function StepResponseChart(props: {
       viewBox={`0 0 ${W} ${H}`}
       style={{ width: '100%', height: 'auto', display: 'block' }}
       role="img"
-      aria-label="Réponse indicielle Roll, Pitch, Yaw — cible 1.0, fenêtre 0 à 500 ms"
+      aria-label={L.ariaLabel}
       fontFamily={FONT}
     >
       <text x={pad.left} y={18} fontSize={13} fontWeight={600} fill={INK}>
-        Réponse indicielle (0–500 ms)
+        {L.title}
       </text>
 
-      {/* Légende — les axes sans données restent listés, en retrait */}
+      {/* Légende - les axes sans données restent listés, en retrait */}
       {AXIS_NAMES.map((name, i) => {
         const x = W - pad.right - (3 - i) * 78;
         const present = paths[i] !== null;
@@ -134,7 +156,7 @@ export function StepResponseChart(props: {
               fill={present ? SERIES_COLORS[i] : GRID}
             />
             <text x={x + 18} y={18} fontSize={10} fill={present ? INK_DIM : INK_AXIS}>
-              {present ? name : `${name} (n/a)`}
+              {present ? name : L.axisMissing(name)}
             </text>
           </g>
         );
@@ -155,7 +177,7 @@ export function StepResponseChart(props: {
         fill={INK_AXIS}
         textAnchor="end"
       >
-        zone d&apos;overshoot
+        {L.overshootZone}
       </text>
 
       {/* Grille horizontale + ticks Y */}
@@ -216,7 +238,7 @@ export function StepResponseChart(props: {
         strokeWidth={1}
       />
       <text x={pad.left + plotW / 2} y={H - 4} fontSize={9} fill={INK_AXIS} textAnchor="middle">
-        Temps (ms)
+        {L.xAxis}
       </text>
 
       {/* Ligne cible 1.0 pointillée */}
@@ -236,7 +258,7 @@ export function StepResponseChart(props: {
         fill={INK_DIM}
         textAnchor="end"
       >
-        cible 1.0
+        {L.targetLine}
       </text>
 
       {/* Traces */}
@@ -264,7 +286,7 @@ export function StepResponseChart(props: {
           fill={INK_AXIS}
           textAnchor="middle"
         >
-          Pas assez d&apos;excitation stick pour estimer la réponse.
+          {L.noData}
         </text>
       )}
     </svg>

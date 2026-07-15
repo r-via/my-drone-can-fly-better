@@ -9,7 +9,6 @@ const CHIMERA = '/home/rviau/projects/drones/chimera/blackbox/btfl_016.bbl';
 
 const PROFILE: DroneProfile = {
   id: 'chimera7',
-  label: 'Chimera 7',
   craftMatch: /shimera|chimera/i,
   motorPoles: 14,
   expectedCells: 6,

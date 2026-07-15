@@ -1,4 +1,4 @@
-// Bibliothèque DSP de Debrief — zéro dépendance, 100 % déterministe.
+// Bibliothèque DSP de My Drone Can Fly Better - zéro dépendance, 100 % déterministe.
 // Porte fidèlement les maths de analyze_shimera.py (spectrum, band_rms,
 // top_peaks, rmsdiff) : mêmes conventions que numpy (std population ddof=0,
 // percentile à interpolation linéaire, fenêtre de Hann symétrique np.hanning).
@@ -222,7 +222,7 @@ export function bandRms(spec: Spectrum, lo: number, hi: number): number {
 
 /**
  * k pics dominants au-dessus de fMin, avec exclusion de ±exclusionHz (strict)
- * autour de chaque pic retenu — cf. analyze_shimera.top_peaks.
+ * autour de chaque pic retenu - cf. analyze_shimera.top_peaks.
  * Défauts : fMin=15 Hz, k=5, exclusionHz=8.
  */
 export function topPeaks(
