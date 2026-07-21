@@ -1,5 +1,6 @@
 // Orchestrateur : ParsedFile[] + diff CLI éventuel → Report complet.
 import { analyzeYoyo, analyzePropwash } from './analysis/flight';
+import { analyzeOscillation } from './analysis/oscillation';
 import {
   analyzeFailsafe,
   analyzeGps,
@@ -19,6 +20,7 @@ import { pickProfile } from './rules/profiles';
 import type { Dict } from './i18n/fr';
 import type {
   CliConfig,
+  DroneProfile,
   FileReport,
   Finding,
   FlightData,
@@ -48,6 +50,7 @@ export function analyzeFlightData(fd: FlightData, motorPoles: number): SessionAn
     step: analyzeStepResponse(fd),
     yoyo: analyzeYoyo(fd),
     propwash: analyzePropwash(fd),
+    oscillation: analyzeOscillation(fd),
     filters: analyzeFilters(fd),
     timeline: analyzeTimeline(fd),
     gps: analyzeGps(fd),
@@ -55,20 +58,34 @@ export function analyzeFlightData(fd: FlightData, motorPoles: number): SessionAn
   };
 }
 
-export function buildSessionReport(fd: FlightData, pasteConfig: CliConfig | null, dict: Dict = fr): SessionReport {
-  const profile = pickProfile(fd.meta.craftName);
-  const analysis = analyzeFlightData(fd, profile.motorPoles);
-  const config = pasteConfig ?? configFromHeaders(fd.meta.headers);
-  let findings = sortFindings([
+/**
+ * Verdicts d'une session à partir de ses seules métriques. Isolé de
+ * buildSessionReport pour que le décodage d'un lien partagé (share/codec.ts)
+ * rejoue exactement le même pipeline, sans avoir besoin du FlightData.
+ */
+export function composeFindings(
+  analysis: SessionAnalysis,
+  profile: DroneProfile,
+  config: CliConfig,
+  dict: Dict = fr,
+): Finding[] {
+  const findings = sortFindings([
     ...evaluateSession(analysis, profile, dict),
     ...lintConfig(config, profile, analysis, dict),
   ]);
   // « Tout est propre » (émis par le moteur, qui ne voit pas le lint config)
   // n'a plus sa place si le lint a trouvé des warn/crit dans le même rapport.
   if (findings.some((f) => f.severity === 'warn' || f.severity === 'crit')) {
-    findings = findings.filter((f) => f.id !== 'all-good');
+    return findings.filter((f) => f.id !== 'all-good');
   }
-  return { analysis, profile, findings };
+  return findings;
+}
+
+export function buildSessionReport(fd: FlightData, pasteConfig: CliConfig | null, dict: Dict = fr): SessionReport {
+  const profile = pickProfile(fd.meta.craftName);
+  const analysis = analyzeFlightData(fd, profile.motorPoles);
+  const config = pasteConfig ?? configFromHeaders(fd.meta.headers);
+  return { analysis, profile, findings: composeFindings(analysis, profile, config, dict) };
 }
 
 export function buildReport(files: ParsedFile[], cliText: string, dict: Dict = fr): Report {

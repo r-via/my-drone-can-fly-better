@@ -30,6 +30,9 @@ const PROFILE: DroneProfile = {
     yoyoRatioWarn: 1.5,
     propwashWarn: 30,
     residualHfWarn: 3,
+    oscRatioWarn: 6,
+    oscRatioCrit: 12,
+    oscMinAmpPct: 15,
   },
 };
 

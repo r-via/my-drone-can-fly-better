@@ -58,6 +58,53 @@ function isMotorSampleValid(v: number, motorOutputHigh: number): boolean {
   return v >= 0 && v <= motorOutputHigh + MOTOR_OVER_RANGE_MARGIN;
 }
 
+/** Courant (A) au-dessus de la médiane à partir duquel on parle de "sous charge". */
+const IMPLAUSIBLE_AMP_MARGIN_A = 10;
+/** Marge de bruit ADC tolérée au-dessus de la référence locale (V par cellule). */
+const IMPLAUSIBLE_MARGIN_V_PER_CELL = 0.05;
+/** Largeur de la fenêtre où la tension basse doit tenir pour compter (s). */
+const SUSTAINED_WINDOW_S = 1;
+/** Pas d'avance de cette fenêtre (s). */
+const SUSTAINED_STEP_S = 0.25;
+
+/** Médiane des valeurs retenues par `keep` ; null si aucune. */
+function medianOf(x: ArrayLike<number>, keep: (v: number) => boolean): number | null {
+  const buf: number[] = [];
+  for (let i = 0; i < x.length; i++) if (keep(x[i])) buf.push(x[i]);
+  if (buf.length === 0) return null;
+  buf.sort((a, b) => a - b);
+  const mid = buf.length >> 1;
+  return buf.length % 2 ? buf[mid] : (buf[mid - 1] + buf[mid]) / 2;
+}
+
+/**
+ * Médianes de vbat sur une grille de fenêtres glissantes de SUSTAINED_WINDOW_S,
+ * avancées par pas de SUSTAINED_STEP_S. Sert de référence LOCALE : la médiane
+ * globale ne convient pas, un pack est légitimement au-dessus d'elle en début
+ * de vol et en dessous à la fin.
+ */
+function windowMedians(vb: Float32Array, time: Float64Array): { at: number[]; med: number[] } {
+  const n = vb.length;
+  const at: number[] = [];
+  const med: number[] = [];
+  if (n === 0) return { at, med };
+  let lo = 0;
+  const tEnd = time[n - 1];
+  for (let tw = time[0]; tw <= tEnd; tw += SUSTAINED_STEP_S) {
+    while (lo < n && time[lo] < tw - SUSTAINED_WINDOW_S / 2) lo++;
+    const buf: number[] = [];
+    for (let i = lo; i < n && time[i] <= tw + SUSTAINED_WINDOW_S / 2; i++) {
+      if (vb[i] > 0) buf.push(vb[i]);
+    }
+    if (buf.length === 0) continue;
+    buf.sort((a, b) => a - b);
+    const mid = buf.length >> 1;
+    at.push(tw);
+    med.push(buf.length % 2 ? buf[mid] : (buf[mid - 1] + buf[mid]) / 2);
+  }
+  return { at, med };
+}
+
 // ---------------------------------------------------------------------------
 // Puissance : batterie + courant
 // ---------------------------------------------------------------------------
@@ -125,8 +172,36 @@ export function analyzePower(fd: FlightData): PowerMetrics | null {
     }
   }
 
+  // --- Plausibilité du canal vbat ------------------------------------------
+  // Sous charge, une batterie ne peut que descendre SOUS son niveau du moment.
+  // La comparaison doit donc être LOCALE : un pack plein est normalement
+  // au-dessus de sa médiane globale pendant toute la première moitié du vol,
+  // et une pointe de courant à ce moment-là n'a rien d'anormal.
+  const grid = windowMedians(vb, fd.time);
+  let implausibleSamples = 0;
+  if (amp && amp.length === vb.length && grid.at.length > 0) {
+    const ampMedian = medianOf(amp, () => true);
+    if (ampMedian !== null) {
+      const ampLimit = ampMedian + IMPLAUSIBLE_AMP_MARGIN_A;
+      const margin = IMPLAUSIBLE_MARGIN_V_PER_CELL * cells;
+      let g = 0;
+      for (let i = 0; i < vb.length; i++) {
+        if (vb[i] <= 0 || amp[i] <= ampLimit) continue;
+        while (g + 1 < grid.at.length && grid.at[g + 1] <= fd.time[i]) g++;
+        if (vb[i] > grid.med[g] + margin) implausibleSamples++;
+      }
+    }
+  }
+
+  // Minimum SOUTENU : plus basse médiane glissante sur SUSTAINED_WINDOW_S.
+  // Un pack n'est pas vide parce qu'un échantillon isolé a plongé.
+  const perCellMinSustained =
+    (grid.med.length > 0 ? Math.min(...grid.med) : (medianOf(vb, (v) => v > 0) ?? 0)) / cells;
+
   return {
     cells,
+    perCellMinSustained,
+    implausibleSamples,
     vbatMax,
     vbatMin,
     perCellMax: vbatMax / cells,
@@ -310,7 +385,11 @@ export function analyzeTimeline(fd: FlightData): TimelineMetrics {
       vbat: b.vbCount > 0 ? b.vbSum / b.vbCount : null,
     });
   }
-  return { segments, flightTimeS };
+  let throttleMaxUs = 0;
+  for (let i = 0; i < fd.throttle.length; i++) {
+    if (fd.throttle[i] > throttleMaxUs) throttleMaxUs = fd.throttle[i];
+  }
+  return { segments, flightTimeS, throttleMaxUs };
 }
 
 // ---------------------------------------------------------------------------

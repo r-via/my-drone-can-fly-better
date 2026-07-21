@@ -1,7 +1,7 @@
 // Analyses "comportement en vol" - yoyo (oscillation de poussée basse
 // fréquence, portage fidèle de analyze_pico.py) et prop wash (perte de
 // contrôle dans les descentes). 100 % déterministe, aucune IA.
-import { mean, std } from '../dsp/dsp';
+import { mean, movingAverage, std } from '../dsp/dsp';
 import type { FlightData, PropwashEvent, PropwashMetrics, YoyoMetrics } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -72,22 +72,6 @@ function dftPower(sig: ArrayLike<number>, freqs: number[], fsHz: number): number
       im -= sig[k] * Math.sin(w * k);
     }
     out.push(n > 0 ? Math.hypot(re, im) / n : 0);
-  }
-  return out;
-}
-
-/** Moyenne glissante centrée de largeur w (>=1), via somme cumulée. */
-function movingAverage(x: Float64Array, w: number): Float64Array {
-  const n = x.length;
-  if (w <= 1 || n === 0) return x;
-  const cum = new Float64Array(n + 1);
-  for (let i = 0; i < n; i++) cum[i + 1] = cum[i] + x[i];
-  const half = Math.floor(w / 2);
-  const out = new Float64Array(n);
-  for (let i = 0; i < n; i++) {
-    const lo = Math.max(0, i - half);
-    const hi = Math.min(n, i + half + 1);
-    out[i] = (cum[hi] - cum[lo]) / (hi - lo);
   }
   return out;
 }

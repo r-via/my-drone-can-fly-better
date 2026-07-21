@@ -74,6 +74,20 @@ export interface PowerMetrics {
   ampAvg: number | null;
   ampMax: number | null;
   mahEstimate: number | null; // intégrale du courant
+  /**
+   * Tension par cellule mini SOUTENUE (min d'une médiane glissante 1 s), par
+   * opposition à perCellMin qui est l'échantillon isolé le plus bas. Un pack
+   * n'est pas "vide" parce que l'ADC a plongé pendant 300 µs.
+   */
+  perCellMinSustained: number;
+  /**
+   * Échantillons vbat physiquement impossibles : tension AU-DESSUS de la
+   * référence à vide alors que le courant est bien supérieur à la médiane.
+   * Sous charge la tension ne peut que descendre ; au-dessus de zéro, le
+   * canal vbat de ce log n'est pas mesurable et les verdicts batterie
+   * n'ont pas de valeur.
+   */
+  implausibleSamples: number;
 }
 
 export interface MotorMetrics {
@@ -172,6 +186,39 @@ export interface PropwashMetrics {
   avgSeverity: number | null;
 }
 
+/**
+ * Oscillation en boucle fermée isolée dans le temps. Un incident violent de
+ * 0,5 s se dilue à néant dans une moyenne sur tout le log : on le date, et sa
+ * gravité ne dépend plus de la durée du vol.
+ */
+export interface OscillationEvent {
+  tStart: number;
+  tEnd: number;
+  /** Fréquence dominante du différentiel moteur (Hz). */
+  freqHz: number;
+  /** Part de l'énergie de bande dans le pic : proche de 1 = sinusoïde pure. */
+  concentration: number;
+  /** Crête de l'enveloppe différentielle, en unités moteur brutes. */
+  peakAmp: number;
+  /** Idem en % de la plage moteur : comparable d'une carte à l'autre. */
+  peakAmpPct: number;
+  /** peakAmp / baselineAmp : combien de fois au-dessus du régime normal. */
+  ratio: number;
+  /** % d'échantillons de la fenêtre où au moins un moteur touche une butée. */
+  saturationPct: number;
+  /** Moteurs (1-based) ayant touché une butée pendant l'événement. */
+  motorsAtStop: number[];
+  severity: 'warn' | 'crit';
+}
+
+export interface OscillationMetrics {
+  applicable: boolean; // assez d'échantillons en vol
+  /** Médiane de l'enveloppe différentielle en vol : la référence "normal". */
+  baselineAmp: number;
+  events: OscillationEvent[]; // triés par sévérité décroissante
+  worst: OscillationEvent | null;
+}
+
 export interface FilterAxisMetrics {
   /** Atténuation (dB) unfilt→filt par bande de fréquence. */
   attenuationDb: Array<{ lo: number; hi: number; db: number }>;
@@ -196,6 +243,8 @@ export interface TimelineSegment {
 export interface TimelineMetrics {
   segments: TimelineSegment[];
   flightTimeS: number; // temps réellement en vol
+  /** Throttle stick max atteint sur la session (µs) : sert à situer TPA. */
+  throttleMaxUs: number;
 }
 
 export interface GpsMetrics {
@@ -215,6 +264,7 @@ export interface SessionAnalysis {
   step: StepResponseMetrics | null;
   yoyo: YoyoMetrics | null;
   propwash: PropwashMetrics | null;
+  oscillation: OscillationMetrics | null;
   filters: FilterMetrics;
   timeline: TimelineMetrics;
   gps: GpsMetrics;
@@ -295,6 +345,11 @@ export interface ProfileThresholds {
   yoyoRatioWarn: number;
   /** Sévérité prop wash (RMS erreur deg/s). */
   propwashWarn: number;
+  /** Oscillation : crête de l'enveloppe différentielle / médiane en vol. */
+  oscRatioWarn: number;
+  oscRatioCrit: number;
+  /** Plancher d'amplitude d'oscillation, en % de la plage moteur de la carte. */
+  oscMinAmpPct: number;
   /** RMS résiduel >100 Hz dans le gyro filtré. */
   residualHfWarn: number;
 }
@@ -332,4 +387,10 @@ export interface Report {
   files: FileReport[];
   config: CliConfig | null;
   configFindings: Finding[];
+  /**
+   * Présent uniquement pour un rapport reconstruit depuis un lien partagé.
+   * `trimmed` : les courbes n'ont pas tenu dans l'URL, l'affichage doit le dire
+   * plutôt que de montrer des graphes vides.
+   */
+  shared?: { trimmed: boolean };
 }

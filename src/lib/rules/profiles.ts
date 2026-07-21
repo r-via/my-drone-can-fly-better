@@ -23,6 +23,9 @@ const GENERIC_THRESHOLDS: ProfileThresholds = {
   riseTimeSlowMs: 60, // 10→90 % au-delà de 60 ms : réponse molle
   yoyoRatioWarn: 2.2, // sd(poussée)/sd(stick) - ATTENTION unités différentes (pas moteur vs µs stick) : ~1.8-2.0 = réponse proportionnelle normale, mesuré 1.47-1.98 sur vols sains du parc
   propwashWarn: 15, // RMS erreur <40 Hz en descente : >15 deg/s = wobble bien visible
+  oscRatioWarn: 6, // enveloppe différentielle 6x la médiane en vol : la boucle décroche
+  oscRatioCrit: 12, // au-delà le mixer part en butée, perte d'autorité
+  oscMinAmpPct: 15, // sous 15 % de la plage moteur, l'oscillation ne coûte pas d'autorité
   residualHfWarn: 150, // amplitude spectrale Welch >100 Hz ; sain mesuré 20-130 sur le parc, ~2× le pire
 };
 

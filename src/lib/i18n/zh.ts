@@ -204,6 +204,37 @@ export const zh: Dict = {
       fix: '加 D（或者有 RPM filter 的话启用/加强 dynamic idle），并且用状态良好的桨飞。',
     },
 
+    oscillationEvent: {
+      title: (freq: string | null) =>
+        freq !== null ? `飞行中出现 ${freq} Hz 振荡` : '飞行中出现振荡',
+      detail:
+        'PID 环路进入了振荡：电机之间互相较劲，频率远高于打杆能产生的范围。它会自己越振越大，最后打到上下限，一个电机满油而对角的那个被切掉。常见原因：D（或 P）过大、滤波不足让电机噪声窜进 D-term、或者动态陷波没有覆盖到电机基频。',
+      evidence: (
+        tStart: string,
+        duration: string,
+        freq: string | null,
+        ratio: string,
+        satPct: string,
+        motors: string | null,
+        others: number,
+      ) =>
+        `在 t=${tStart} s 持续 ${duration} s` +
+        (freq !== null ? `，${freq} Hz` : '') +
+        `，幅度为正常水平的 ${ratio} 倍，${satPct} % 的采样打到限位` +
+        (motors !== null ? `（${motors}）` : '') +
+        (others > 1 ? ` - 共 ${others} 段` : ''),
+      fix: '把 PID master 调到 0.7 再飞一次同样的动作，确认是不是 tune 的问题。检查 dyn_notch_count 是否为 3，以及 dyn_notch_min_hz 是否低于你最低的电机基频，否则噪声会进入 D-term。',
+    },
+
+    batteryReadingsImplausible: {
+      title: '电池读数不合理',
+      detail:
+        '日志里出现了物理上不可能的电压：在大电流放电时读数却高于空载电压。带载时电池只可能往下掉。这是 vbat 的 ADC 在电流瞬变时失准，而不是电池自己回升。只要存在这种情况，本次飞行的电压跌落和最低电压都无法测量，因此电池相关判定被撤下，而不是错误地告诉你电池已经报废。',
+      evidence: (count: number, vmax: string, vmin: string) =>
+        `${count} 个采样在大负载下高于静置电压；读到的范围 ${vmin} 到 ${vmax} V`,
+      fix: '检查 vbat 采样的滤波（输入端电容）、电源线焊点，以及 vbat_scale 设置。在对电池下任何结论之前，再飞一次确认。',
+    },
+
     gpsLowSats: {
       title: '飞行中 GPS 覆盖不足',
       detail:
@@ -300,6 +331,25 @@ export const zh: Dict = {
       evidence: 'dyn_notch_count = 0, rpm_filter_harmonics = 0',
       fix: '至少开回一个（有双向 DShot 就用 RPM 滤波器，否则用 dynamic notch）。',
     },
+    tpaNeverReached: {
+      title: '本次飞行从未触及 TPA',
+      detail:
+        '油门全程没有超过 TPA 断点，因此增益衰减整个飞行中都没有起作用，PID 一直按满值运行。在把 tune 问题归咎于 TPA 之前值得先知道这一点。',
+      evidence: (thrMax: string, bp: string) => `最大油门 ${thrMax} µs，tpa_breakpoint ${bp} µs`,
+    },
+    filterCoverageSuspect: {
+      title: '滤波覆盖存在缺口',
+      detail:
+        '本次飞行已经出现振荡或噪声进入控制环，而滤波留下的缺口可能正是原因。单看这些设置本身很普通，健康的机子上也常见：这里报出来只是因为本条日志里测到了症状。Betaflight 会在 rpm_filter_min_hz + fade_range 以下淡出 RPM 滤波的陷波，而单个动态陷波无法跟住四个逐渐拉开的电机。',
+      evidence: (motors: string | null, fadeTop: string | null, notch: string | null, def: number) =>
+        [
+          motors !== null ? `低于 ${fadeTop} Hz 淡出上限的基频：${motors}` : null,
+          notch !== null ? `dyn_notch_count = ${notch}（默认 ${def}）` : null,
+        ]
+          .filter((x) => x !== null)
+          .join('；'),
+      fix: '先扩大覆盖再动 PID：把 rpm_filter_min_hz 降到最低基频以下，收紧 fade_range，并改回 3 个动态陷波。再飞一次同样的动作对比。',
+    },
     dtermLpfLow: {
       title: 'D-term LPF1 设得非常低',
       detail: (hz: string) =>
@@ -350,11 +400,18 @@ export const zh: Dict = {
     noBlackboxHeader: '没有找到 blackbox 头（文件不是 .bbl？）',
     sessionTooShort: (frames: string) =>
       `会话太短（${frames} 帧）- 八成只是一次解锁抖动`,
+    cliSessionSkipped: (n: string, kb: string) => `跳过 session ${n}（${kb} kB）`,
+    cliProfile: (label: string) => `配置 ${label}`,
+    cliVbatUnusable: (cells: string, count: string) =>
+      `${cells}S vbat 无法测量（${count} 个不合理采样）`,
+    cliVbatRange: (cells: string, max: string, min: string, sag: string) =>
+      `${cells}S ${max}→${min} V（电压跌落 ${sag} V）`,
+    cliCurrentMax: (amps: string) => `最大电流 ${amps} A`,
     headersUnreadable: '头部无法读取（会话损坏？）',
-    noFramesDecoded: '没有解码出任何帧（数据损坏？）',
-    essentialFieldsMissing: '缺少关键字段（gyroADC/setpoint/motor/rcCommand）',
     dataVersionUnsupported: '解码器无法识别的数据版本（日志片段损坏？）',
     decoderRejected: (raw: string) => `无法解码：${raw}`,
+    noFramesDecoded: '没有解码出任何帧（数据损坏？）',
+    essentialFieldsMissing: '缺少关键字段（gyroADC/setpoint/motor/rcCommand）',
     firmwareTooOld: (version: string, minimum: string) =>
       `固件太旧（Betaflight ${version}）- 解码器最低需要 ${minimum}`,
     firmwareNotSupported: (flavour: string) =>

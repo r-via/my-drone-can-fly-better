@@ -27,6 +27,25 @@ export const lint = {
     evidence: 'dyn_notch_count = 0, rpm_filter_harmonics = 0',
     fix: 'Réactive au moins un des deux (filtre RPM si DShot bidir dispo, sinon dynamic notch).',
   },
+  tpaNeverReached: {
+    title: 'TPA jamais atteint sur ce vol',
+    detail:
+      "Le throttle n'a jamais dépassé le breakpoint TPA : l'atténuation des gains n'a donc jamais agi de tout le vol, les PID ont tourné à pleine valeur en permanence. Utile à savoir avant de chercher un problème de tune du côté de TPA.",
+    evidence: (thrMax: string, bp: string) => `throttle max ${thrMax} µs, tpa_breakpoint ${bp} µs`,
+  },
+  filterCoverageSuspect: {
+    title: 'Couverture de filtrage insuffisante',
+    detail:
+      "Le vol montre déjà une oscillation ou du bruit qui atteint la boucle, et le filtrage laisse un trou qui peut l'expliquer. Pris isolément, ces réglages sont banals et se rencontrent sur des machines parfaitement saines : ils ne sont signalés ici que parce qu'un symptôme est mesuré dans ce log. Betaflight estompe les notches du filtre RPM sous rpm_filter_min_hz + fade_range, et une seule notch dynamique ne peut pas suivre quatre moteurs qui s'écartent.",
+    evidence: (motors: string | null, fadeTop: string | null, notch: string | null, def: number) =>
+      [
+        motors !== null ? `fondamentales sous le plafond de fade ${fadeTop} Hz : ${motors}` : null,
+        notch !== null ? `dyn_notch_count = ${notch} (défaut ${def})` : null,
+      ]
+        .filter((x) => x !== null)
+        .join(' ; '),
+    fix: "Élargis la couverture avant de toucher aux PID : descends rpm_filter_min_hz sous ta fondamentale la plus basse, resserre fade_range, et remets 3 notches dynamiques. Refais le même vol pour comparer.",
+  },
   dtermLpfLow: {
     title: 'LPF1 D-term très bas',
     detail: (hz: string) =>

@@ -202,6 +202,37 @@ export const de: Dict = {
       fix: 'Heb D an (oder aktiviere/verstärke Dynamic Idle, wenn du den RPM-Filter hast) und flieg mit Props in gutem Zustand.',
     },
 
+    oscillationEvent: {
+      title: (freq: string | null) =>
+        freq !== null ? `${freq} Hz Oszillation im Flug` : 'Oszillation im Flug',
+      detail:
+        'Der PID-Loop ist in Schwingung geraten: die Motoren arbeiten gegeneinander, viel zu schnell um vom Knüppel zu kommen. Das schaukelt sich von selbst auf und endet an den Anschlägen, ein Motor voll auf, der gegenüberliegende aus. Übliche Ursachen: zu viel D (oder P), Motorrauschen das mangels Filterung in den D-Term durchschlägt, oder ein Dynamic Notch der die Motorgrundfrequenzen nicht abdeckt.',
+      evidence: (
+        tStart: string,
+        duration: string,
+        freq: string | null,
+        ratio: string,
+        satPct: string,
+        motors: string | null,
+        others: number,
+      ) =>
+        `Bei t=${tStart} s für ${duration} s` +
+        (freq !== null ? `, ${freq} Hz` : '') +
+        `, Amplitude ${ratio}x des Normalniveaus, ${satPct} % der Samples am Anschlag` +
+        (motors !== null ? ` (${motors})` : '') +
+        (others > 1 ? ` - ${others} Episoden insgesamt` : ''),
+      fix: 'Flieg denselben Flug nochmal mit dem PID-Master-Multiplikator auf 0.7, um zu bestätigen dass es am Tune liegt. Prüf ob dyn_notch_count auf 3 steht und dyn_notch_min_hz unter deine niedrigste Motorgrundfrequenz reicht, sonst kommt das Rauschen in den D-Term.',
+    },
+
+    batteryReadingsImplausible: {
+      title: 'Unplausible Akkumesswerte',
+      detail:
+        'Das Log enthält physikalisch unmögliche Spannungen: über der Leerlaufspannung, während der Quad viel Strom zieht. Unter Last kann ein Akku nur fallen. Das ist der vbat-ADC, der bei Stromtransienten aussteigt, nicht der Akku, der sich erholt. Solange das so ist, sind weder Sag noch Minimalspannung in diesem Flug messbar, deshalb wurden die Akku-Urteile zurückgehalten statt dir fälschlich einen toten Akku zu melden.',
+      evidence: (count: number, vmax: string, vmin: string) =>
+        `${count} Sample(s) über der Ruhespannung unter hoher Last; gelesener Bereich ${vmin} bis ${vmax} V`,
+      fix: 'Prüf die Filterung der vbat-Messung (Kondensator am Eingang), die Lötstellen der Stromzuleitung und die Einstellung vbat_scale. Flieg nochmal, bevor du irgendetwas über den Akku schließt.',
+    },
+
     gpsLowSats: {
       title: 'Schwache GPS-Abdeckung im Flug',
       detail:
@@ -297,6 +328,25 @@ export const de: Dict = {
       evidence: 'dyn_notch_count = 0, rpm_filter_harmonics = 0',
       fix: 'Aktiviere mindestens einen von beiden wieder (RPM-Filter, wenn DShot Bidir verfügbar, sonst Dynamic Notch).',
     },
+    tpaNeverReached: {
+      title: 'TPA in diesem Flug nie erreicht',
+      detail:
+        'Der Throttle kam nie über den TPA-Breakpoint, die Gain-Absenkung hat also im ganzen Flug nie gegriffen und die PIDs liefen durchgehend auf vollem Wert. Gut zu wissen, bevor man ein Tune-Problem bei TPA sucht.',
+      evidence: (thrMax: string, bp: string) => `max. Throttle ${thrMax} µs, tpa_breakpoint ${bp} µs`,
+    },
+    filterCoverageSuspect: {
+      title: 'Lücke in der Filterabdeckung',
+      detail:
+        'Dieser Flug zeigt bereits eine Oszillation oder Rauschen, das den Loop erreicht, und die Filterung lässt eine Lücke, die das erklären könnte. Für sich genommen sind diese Einstellungen unauffällig und finden sich auf völlig gesunden Maschinen: sie werden hier nur gemeldet, weil in diesem Log ein Symptom gemessen wird. Betaflight blendet die Notches des RPM-Filters unterhalb von rpm_filter_min_hz + fade_range aus, und ein einzelner dynamischer Notch kann vier auseinanderlaufenden Motoren nicht folgen.',
+      evidence: (motors: string | null, fadeTop: string | null, notch: string | null, def: number) =>
+        [
+          motors !== null ? `Grundfrequenzen unter der Fade-Grenze ${fadeTop} Hz: ${motors}` : null,
+          notch !== null ? `dyn_notch_count = ${notch} (Standard ${def})` : null,
+        ]
+          .filter((x) => x !== null)
+          .join('; '),
+      fix: 'Erweitere die Abdeckung, bevor du an die PIDs gehst: senk rpm_filter_min_hz unter deine niedrigste Grundfrequenz, zieh fade_range enger und geh zurück auf 3 dynamische Notches. Flieg denselben Flug nochmal zum Vergleich.',
+    },
     dtermLpfLow: {
       title: 'D-Term-LPF1 sehr niedrig',
       detail: (hz: string) =>
@@ -346,11 +396,18 @@ export const de: Dict = {
     noBlackboxHeader: 'Kein Blackbox-Header gefunden (Datei keine .bbl?)',
     sessionTooShort: (frames: string) =>
       `Session zu kurz (${frames} Frames) - vermutlich ein Arming-Blip`,
+    cliSessionSkipped: (n: string, kb: string) => `Session ${n} übersprungen (${kb} kB)`,
+    cliProfile: (label: string) => `Profil ${label}`,
+    cliVbatUnusable: (cells: string, count: string) =>
+      `${cells}S vbat nicht messbar (${count} unplausible Samples)`,
+    cliVbatRange: (cells: string, max: string, min: string, sag: string) =>
+      `${cells}S ${max}→${min} V (Sag ${sag} V)`,
+    cliCurrentMax: (amps: string) => `max. Strom ${amps} A`,
     headersUnreadable: 'Header unlesbar (Session beschädigt?)',
-    noFramesDecoded: 'Keine Frames dekodiert (Daten beschädigt?)',
-    essentialFieldsMissing: 'Essenzielle Felder fehlen (gyroADC/setpoint/motor/rcCommand)',
     dataVersionUnsupported: 'Datenversion dem Decoder unbekannt (beschädigtes Log-Fragment?)',
     decoderRejected: (raw: string) => `Dekodierung nicht möglich: ${raw}`,
+    noFramesDecoded: 'Keine Frames dekodiert (Daten beschädigt?)',
+    essentialFieldsMissing: 'Essenzielle Felder fehlen (gyroADC/setpoint/motor/rcCommand)',
     firmwareTooOld: (version: string, minimum: string) =>
       `Firmware zu alt (Betaflight ${version}) - der Decoder braucht mindestens ${minimum}`,
     firmwareNotSupported: (flavour: string) =>

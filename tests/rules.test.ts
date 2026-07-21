@@ -76,6 +76,8 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
       ampAvg: 10,
       ampMax: 40,
       mahEstimate: 800,
+      perCellMinSustained: 3.8,
+      implausibleSamples: 0,
     },
     motors: {
       avgPct: 30,
@@ -115,6 +117,7 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
     step: { axes: [makeStep(), makeStep(), makeStep()] },
     yoyo: { applicable: true, ratio: 0.8, verdict: 'stable', peaks: [] },
     propwash: { applicable: true, events: [], worstSeverity: 5, avgSeverity: 4 },
+    oscillation: { applicable: true, baselineAmp: 20, events: [], worst: null },
     filters: {
       available: true,
       axes: [
@@ -123,7 +126,7 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
         { attenuationDb: [{ lo: 120, hi: 350, db: 26 }], residualHfRms: 0.4 },
       ],
     },
-    timeline: { segments: [], flightTimeS: 110 },
+    timeline: { segments: [], flightTimeS: 110, throttleMaxUs: 1600 },
     gps: { available: true, numSatMax: 14, numSatMin: 9, speedMaxMps: 20 },
     failsafe: { phases: { '0': 240_000 }, triggered: false },
   };
@@ -297,7 +300,8 @@ describe('evaluateSession', () => {
       x.tracking.axes[0] = { meanAbsErr: 25, maxErr: 200, setpointMax: 600 };
       if (x.power) {
         x.power.sagV = 4.8; // 0.8 V/cellule → crit
-        x.power.perCellMin = 3.1; // sous 3.3 → battery-empty
+        x.power.perCellMin = 3.1;
+        x.power.perCellMinSustained = 3.1; // TENU sous 3.3 → battery-empty
       }
       x.failsafe = { phases: { '0': 900, '4': 12 }, triggered: true };
     });

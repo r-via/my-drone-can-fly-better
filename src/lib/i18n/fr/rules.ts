@@ -204,6 +204,37 @@ export const rules = {
     fix: 'Monte D (ou active/renforce dynamic idle si tu as le RPM filter), et vole avec des hélices en bon état.',
   },
 
+  oscillationEvent: {
+    title: (freq: string | null) =>
+      freq !== null ? `Oscillation ${freq} Hz en vol` : 'Oscillation en vol',
+    detail:
+      "La boucle PID est partie en oscillation : les moteurs se battent entre eux à une fréquence trop rapide pour venir du pilotage. Ça monte en amplitude tout seul et ça finit en butée, moteur à fond d'un côté et coupé de l'autre. Causes classiques : trop de D (ou de P), du bruit moteur qui fuit dans le D-term par manque de filtrage, ou une notch dynamique qui ne couvre pas les fondamentales.",
+    evidence: (
+      tStart: string,
+      duration: string,
+      freq: string | null,
+      ratio: string,
+      satPct: string,
+      motors: string | null,
+      others: number,
+    ) =>
+      `À t=${tStart} s pendant ${duration} s` +
+      (freq !== null ? `, ${freq} Hz` : '') +
+      `, amplitude ${ratio}x le régime normal, ${satPct} % des échantillons en butée` +
+      (motors !== null ? ` (${motors})` : '') +
+      (others > 1 ? ` - ${others} épisodes au total` : ''),
+    fix: "Refais le vol avec le master PID à 0.7 pour confirmer que ça vient du tune. Vérifie que dyn_notch_count est à 3 et que dyn_notch_min_hz descend sous ta fondamentale moteur la plus basse, sinon le bruit passe dans le D-term.",
+  },
+
+  batteryReadingsImplausible: {
+    title: 'Mesures batterie incohérentes',
+    detail:
+      "Le log contient des tensions physiquement impossibles : au-dessus de la tension à vide alors que le drone tire beaucoup de courant. Sous charge une batterie ne peut que descendre. C'est l'ADC vbat qui décroche pendant les transitoires de courant, pas le pack qui remonte. Tant que c'est le cas, ni le sag ni la tension mini ne sont mesurables sur ce vol, et les verdicts batterie ont été retirés plutôt que de t'annoncer un pack mort à tort.",
+    evidence: (count: number, vmax: string, vmin: string) =>
+      `${count} échantillon(s) au-dessus de la tension de repos sous forte charge ; plage lue ${vmin} à ${vmax} V`,
+    fix: "Vérifie le filtrage de la mesure vbat (condensateur sur l'entrée), les soudures du fil de puissance et le réglage vbat_scale. Refais un vol pour confirmer avant de conclure quoi que ce soit sur le pack.",
+  },
+
   gpsLowSats: {
     title: 'Couverture GPS faible en vol',
     detail:

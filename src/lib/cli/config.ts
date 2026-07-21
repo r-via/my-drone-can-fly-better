@@ -143,6 +143,20 @@ function parseNum(raw: string | undefined): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Valeur par défaut Betaflight de dyn_notch_count. */
+const DEFAULT_NOTCH_COUNT = 3;
+
+/**
+ * Fréquence sous laquelle les notches du filtre RPM ne sont plus à pleine
+ * force. Betaflight les estompe linéairement de min_hz + fade_range (pleine
+ * puissance) jusqu'à min_hz (éteintes). Une fondamentale moteur située sous
+ * ce plafond n'est donc que partiellement filtrée.
+ */
+function rpmFadeTopHz(minHz: number | null, fadeRangeHz: number | null): number | null {
+  if (minHz === null || minHz <= 0) return null;
+  return minHz + (fadeRangeHz ?? 0);
+}
+
 /** true/false si motor_pwm_protocol est présent, null sinon. */
 function isDshotProtocol(raw: string | undefined): boolean | null {
   if (raw === undefined) return null;
@@ -220,6 +234,79 @@ export function lintConfig(
         cli: ['set dyn_notch_count = 3', 'set rpm_filter_harmonics = 3'],
       },
     });
+  }
+
+  // filter-coverage-suspect - couverture de filtrage insuffisante AU REGARD
+  // d'un symptôme observé. Ni un dyn_notch_count bas ni des fondamentales dans
+  // la zone de fade du filtre RPM ne sont des défauts en soi : count=1 avec le
+  // filtre RPM actif est un choix courant, et le fade est le comportement par
+  // défaut de Betaflight. Mesurés sur des drones sains du parc, les deux sont
+  // présents sans aucune conséquence. Ils ne deviennent une piste que pour
+  // EXPLIQUER une oscillation ou un bruit qui atteint déjà la boucle.
+  {
+    const osc = analysis?.oscillation?.worst ?? null;
+    const oscConfirmed =
+      osc !== null &&
+      osc.ratio >= profile.thresholds.oscRatioWarn &&
+      osc.peakAmpPct >= profile.thresholds.oscMinAmpPct;
+    const noisy = (analysis?.noise?.axes ?? []).some(
+      (a) => a.filtRms >= profile.thresholds.filtNoiseWarn,
+    );
+
+    const fadeTop = rpmFadeTopHz(num('rpm_filter_min_hz'), num('rpm_filter_fade_range_hz'));
+    const perMotor = analysis?.spectrum?.perMotorHz ?? null;
+    const faded =
+      fadeTop !== null && perMotor && rpmHarmonics !== 0
+        ? perMotor
+            .map((m, i) => ({ motor: i + 1, hz: m.median }))
+            .filter((m) => m.hz > 0 && m.hz < fadeTop)
+        : [];
+    const notchLow =
+      notchCount !== null && notchCount > 0 && notchCount < DEFAULT_NOTCH_COUNT ? notchCount : null;
+
+    if ((oscConfirmed || noisy) && (faded.length > 0 || notchLow !== null)) {
+      const cli: string[] = [];
+      if (notchLow !== null) cli.push(`set dyn_notch_count = ${DEFAULT_NOTCH_COUNT}`);
+      if (faded.length > 0) {
+        const lowest = Math.min(...faded.map((m) => m.hz));
+        cli.push(`set rpm_filter_min_hz = ${Math.max(0, Math.floor((lowest - 10) / 10) * 10)}`);
+        cli.push('set rpm_filter_fade_range_hz = 20');
+      }
+      findings.push({
+        id: 'filter-coverage-suspect',
+        severity: 'warn',
+        category: 'config',
+        title: L.filterCoverageSuspect.title,
+        detail: L.filterCoverageSuspect.detail,
+        evidence: L.filterCoverageSuspect.evidence(
+          faded.length > 0
+            ? faded.map((m) => `M${m.motor} ${m.hz.toFixed(0)} Hz`).join(', ')
+            : null,
+          fadeTop !== null ? fadeTop.toFixed(0) : null,
+          notchLow !== null ? String(notchLow) : null,
+          DEFAULT_NOTCH_COUNT,
+        ),
+        fix: { text: L.filterCoverageSuspect.fix, cli },
+      });
+    }
+  }
+
+  // tpa-never-reached - le vol s'est fait entièrement sous le breakpoint : TPA
+  // n'a jamais rien atténué, inutile d'y chercher la cause d'une oscillation.
+  {
+    const breakpoint = num('tpa_breakpoint');
+    const thrMax = analysis?.timeline?.throttleMaxUs ?? null;
+    // thrMax === 0 : lien partagé émis avant que la métrique existe, on se tait.
+    if (breakpoint !== null && breakpoint > 1000 && thrMax !== null && thrMax > 0 && thrMax < breakpoint) {
+      findings.push({
+        id: 'tpa-never-reached',
+        severity: 'info',
+        category: 'config',
+        title: L.tpaNeverReached.title,
+        detail: L.tpaNeverReached.detail,
+        evidence: L.tpaNeverReached.evidence(thrMax.toFixed(0), breakpoint.toFixed(0)),
+      });
+    }
   }
 
   // dterm-lpf-low - LPF1 D-term statique très bas = latence D élevée.

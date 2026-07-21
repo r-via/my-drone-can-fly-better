@@ -8,11 +8,19 @@ export const system = {
   noBlackboxHeader: 'Pas de header blackbox trouvé (fichier non .bbl ?)',
   sessionTooShort: (frames: string) =>
     `Session trop courte (${frames} frames) - probable blip d'armement`,
+  // scripts/analyze-node.mjs - libellés du rapport terminal.
+  cliSessionSkipped: (n: string, kb: string) => `session ${n} ignorée (${kb} ko)`,
+  cliProfile: (label: string) => `profil ${label}`,
+  cliVbatUnusable: (cells: string, count: string) =>
+    `${cells}S vbat non mesurable (${count} échantillons incohérents)`,
+  cliVbatRange: (cells: string, max: string, min: string, sag: string) =>
+    `${cells}S ${max}→${min} V (sag ${sag} V)`,
+  cliCurrentMax: (amps: string) => `courant max ${amps} A`,
   headersUnreadable: 'Headers illisibles (session corrompue ?)',
-  noFramesDecoded: 'Aucune frame décodée (données corrompues ?)',
-  essentialFieldsMissing: 'Champs essentiels absents (gyroADC/setpoint/motor/rcCommand)',
   dataVersionUnsupported: 'Version de données inconnue du décodeur (fragment de log corrompu ?)',
   decoderRejected: (raw: string) => `Décodage impossible : ${raw}`,
+  noFramesDecoded: 'Aucune frame décodée (données corrompues ?)',
+  essentialFieldsMissing: 'Champs essentiels absents (gyroADC/setpoint/motor/rcCommand)',
   firmwareTooOld: (version: string, minimum: string) =>
     `Firmware trop ancien (Betaflight ${version}) - le décodeur demande ${minimum} au minimum`,
   firmwareNotSupported: (flavour: string) =>

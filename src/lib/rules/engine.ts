@@ -21,6 +21,9 @@ const f2 = (x: number): string => x.toFixed(2);
 
 const SEVERITY_RANK: Record<Severity, number> = { crit: 0, warn: 1, info: 2, ok: 3 };
 
+/** Part d'échantillons en butée dans un événement au-delà de laquelle il est critique. */
+const SATURATION_CRIT_PCT = 25;
+
 interface WorstAxis {
   axis: Axis;
   value: number;
@@ -408,8 +411,27 @@ export function evaluateSession(
   // --- batterie ----------------------------------------------------------------
   if (analysis.power && analysis.power.cells > 0) {
     const p = analysis.power;
+    // Canal vbat prouvé incohérent : on ne publie pas un verdict tiré d'une
+    // mesure impossible. Sag et tension mini viennent tous les deux du même
+    // ADC, ils tombent ensemble.
+    const vbatUsable = p.implausibleSamples === 0;
+    if (!vbatUsable) {
+      findings.push({
+        id: 'battery-readings-implausible',
+        severity: 'warn',
+        category: 'batterie',
+        title: r.batteryReadingsImplausible.title,
+        detail: r.batteryReadingsImplausible.detail,
+        evidence: r.batteryReadingsImplausible.evidence(
+          p.implausibleSamples,
+          f2(p.vbatMax),
+          f2(p.vbatMin),
+        ),
+        fix: { text: r.batteryReadingsImplausible.fix },
+      });
+    }
     const sagPerCell = p.sagV / p.cells;
-    const sagSev = sevAbove(sagPerCell, t.sagPerCellWarn, t.sagPerCellCrit);
+    const sagSev = vbatUsable ? sevAbove(sagPerCell, t.sagPerCellWarn, t.sagPerCellCrit) : null;
     if (sagSev) {
       findings.push({
         id: 'battery-sag',
@@ -427,14 +449,16 @@ export function evaluateSession(
         fix: { text: r.batterySag.fix },
       });
     }
-    if (p.perCellMin < t.perCellMinCrit) {
+    // Tension SOUTENUE, pas l'échantillon isolé le plus bas : un pack n'est pas
+    // vide parce que l'ADC a plongé pendant un transitoire de courant.
+    if (vbatUsable && p.perCellMinSustained < t.perCellMinCrit) {
       findings.push({
         id: 'battery-empty',
         severity: 'crit',
         category: 'batterie',
         title: r.batteryEmpty.title,
         detail: r.batteryEmpty.detail(f2(t.perCellMinCrit)),
-        evidence: r.batteryEmpty.evidence(f2(p.perCellMin), f2(t.perCellMinCrit)),
+        evidence: r.batteryEmpty.evidence(f2(p.perCellMinSustained), f2(t.perCellMinCrit)),
         fix: { text: r.batteryEmpty.fix },
       });
     }
@@ -511,6 +535,36 @@ export function evaluateSession(
           analysis.propwash.avgSeverity !== null ? f1(analysis.propwash.avgSeverity) : null,
         ),
         fix: { text: r.propwashSevere.fix },
+      });
+    }
+  }
+
+  // --- oscillation-event ------------------------------------------------------------
+  // Évalué par ÉVÉNEMENT, jamais en moyenne sur le log : un incident de 0,5 s
+  // qui sature le mixer garde la même gravité dans un log de 15 s et de 3 min.
+  if (analysis.oscillation?.applicable && analysis.oscillation.worst) {
+    const osc = analysis.oscillation;
+    const w = osc.worst!;
+    if (w.ratio >= t.oscRatioWarn && w.peakAmpPct >= t.oscMinAmpPct) {
+      const severity: Severity =
+        w.ratio >= t.oscRatioCrit || w.saturationPct >= SATURATION_CRIT_PCT ? 'crit' : 'warn';
+      const others = osc.events.filter((e) => e.ratio >= t.oscRatioWarn && e.peakAmpPct >= t.oscMinAmpPct);
+      findings.push({
+        id: 'oscillation-event',
+        severity,
+        category: 'pid',
+        title: r.oscillationEvent.title(f0(w.freqHz)),
+        detail: r.oscillationEvent.detail,
+        evidence: r.oscillationEvent.evidence(
+          f1(w.tStart),
+          f1(w.tEnd - w.tStart),
+          f0(w.freqHz),
+          f0(w.ratio),
+          f0(w.saturationPct),
+          w.motorsAtStop.map((m) => `M${m}`).join(', ') || null,
+          others.length,
+        ),
+        fix: { text: r.oscillationEvent.fix },
       });
     }
   }

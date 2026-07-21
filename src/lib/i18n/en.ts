@@ -205,6 +205,37 @@ export const en: Dict = {
       fix: 'Raise D (or enable/strengthen dynamic idle if you have the RPM filter), and fly with props in good shape.',
     },
 
+    oscillationEvent: {
+      title: (freq: string | null) =>
+        freq !== null ? `${freq} Hz oscillation in flight` : 'Oscillation in flight',
+      detail:
+        'The PID loop went into oscillation: the motors are fighting each other at a rate far too fast to come from stick input. It builds up on its own and ends against the stops, one motor flat out while the opposite one is cut. Usual suspects: too much D (or P), motor noise leaking into the D-term through weak filtering, or a dynamic notch that does not cover the motor fundamentals.',
+      evidence: (
+        tStart: string,
+        duration: string,
+        freq: string | null,
+        ratio: string,
+        satPct: string,
+        motors: string | null,
+        others: number,
+      ) =>
+        `At t=${tStart} s for ${duration} s` +
+        (freq !== null ? `, ${freq} Hz` : '') +
+        `, amplitude ${ratio}x the normal level, ${satPct} % of samples against the stops` +
+        (motors !== null ? ` (${motors})` : '') +
+        (others > 1 ? ` - ${others} episodes in total` : ''),
+      fix: 'Fly the same pattern again with the PID master multiplier at 0.7 to confirm it comes from the tune. Check that dyn_notch_count is 3 and that dyn_notch_min_hz sits below your lowest motor fundamental, otherwise the noise reaches the D-term.',
+    },
+
+    batteryReadingsImplausible: {
+      title: 'Implausible battery readings',
+      detail:
+        'The log contains physically impossible voltages: above the no-load voltage while the quad is drawing heavy current. Under load a battery can only go down. That is the vbat ADC breaking up during current transients, not the pack recovering. While that is the case neither sag nor minimum voltage is measurable on this flight, so the battery verdicts were withheld rather than wrongly telling you the pack is dead.',
+      evidence: (count: number, vmax: string, vmin: string) =>
+        `${count} sample(s) above the resting voltage under heavy load; range read ${vmin} to ${vmax} V`,
+      fix: 'Check the vbat sensing filter (capacitor on the input), the power lead solder joints and the vbat_scale setting. Fly again to confirm before concluding anything about the pack.',
+    },
+
     gpsLowSats: {
       title: 'Weak GPS coverage in flight',
       detail:
@@ -300,6 +331,25 @@ export const en: Dict = {
       evidence: 'dyn_notch_count = 0, rpm_filter_harmonics = 0',
       fix: 'Re-enable at least one of the two (RPM filter if bidirectional DShot is available, otherwise dynamic notch).',
     },
+    tpaNeverReached: {
+      title: 'TPA never reached on this flight',
+      detail:
+        'Throttle never went above the TPA breakpoint, so gain attenuation never kicked in during the whole flight and the PIDs ran at full value throughout. Worth knowing before blaming TPA for a tune problem.',
+      evidence: (thrMax: string, bp: string) => `max throttle ${thrMax} µs, tpa_breakpoint ${bp} µs`,
+    },
+    filterCoverageSuspect: {
+      title: 'Filtering coverage leaves a gap',
+      detail:
+        'This flight already shows an oscillation or noise reaching the loop, and the filtering leaves a gap that could explain it. On their own these settings are unremarkable and appear on perfectly healthy machines: they are flagged here only because a symptom is measured in this log. Betaflight fades out the RPM filter notches below rpm_filter_min_hz + fade_range, and a single dynamic notch cannot track four motors as they drift apart.',
+      evidence: (motors: string | null, fadeTop: string | null, notch: string | null, def: number) =>
+        [
+          motors !== null ? `fundamentals below the ${fadeTop} Hz fade ceiling: ${motors}` : null,
+          notch !== null ? `dyn_notch_count = ${notch} (default ${def})` : null,
+        ]
+          .filter((x) => x !== null)
+          .join('; '),
+      fix: 'Widen the coverage before touching the PIDs: lower rpm_filter_min_hz below your lowest fundamental, tighten fade_range, and go back to 3 dynamic notches. Fly the same pattern again to compare.',
+    },
     dtermLpfLow: {
       title: 'Very low D-term LPF1',
       detail: (hz: string) =>
@@ -349,11 +399,18 @@ export const en: Dict = {
     noBlackboxHeader: 'No blackbox header found (not a .bbl file?)',
     sessionTooShort: (frames: string) =>
       `Session too short (${frames} frames) - probably an arming blip`,
+    cliSessionSkipped: (n: string, kb: string) => `session ${n} skipped (${kb} kB)`,
+    cliProfile: (label: string) => `profile ${label}`,
+    cliVbatUnusable: (cells: string, count: string) =>
+      `${cells}S vbat not measurable (${count} implausible samples)`,
+    cliVbatRange: (cells: string, max: string, min: string, sag: string) =>
+      `${cells}S ${max}→${min} V (sag ${sag} V)`,
+    cliCurrentMax: (amps: string) => `max current ${amps} A`,
     headersUnreadable: 'Unreadable headers (corrupted session?)',
-    noFramesDecoded: 'No frames decoded (corrupted data?)',
-    essentialFieldsMissing: 'Essential fields missing (gyroADC/setpoint/motor/rcCommand)',
     dataVersionUnsupported: 'Data version unknown to the decoder (corrupted log fragment?)',
     decoderRejected: (raw: string) => `Cannot decode: ${raw}`,
+    noFramesDecoded: 'No frames decoded (corrupted data?)',
+    essentialFieldsMissing: 'Essential fields missing (gyroADC/setpoint/motor/rcCommand)',
     firmwareTooOld: (version: string, minimum: string) =>
       `Firmware too old (Betaflight ${version}) - the decoder needs ${minimum} or newer`,
     firmwareNotSupported: (flavour: string) =>
