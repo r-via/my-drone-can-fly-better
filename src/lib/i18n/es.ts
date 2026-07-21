@@ -370,6 +370,7 @@ export const es: Dict = {
       languageLabel: 'Idioma',
       supportKofi: 'Apoyar en Ko-fi',
       footerKofi: '¿Este sitio te ahorra packs? Invita a un café:',
+      joinDiscord: 'Discord',
     },
 
     units: {

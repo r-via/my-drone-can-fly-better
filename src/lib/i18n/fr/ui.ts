@@ -12,6 +12,7 @@ export const ui = {
     languageLabel: 'Langue',
     supportKofi: 'Soutenir sur Ko-fi',
     footerKofi: 'Ce site te fait gagner des packs ? Offre un café :',
+    joinDiscord: 'Discord',
   },
 
   // Unités dépendantes de la langue (Mo/Ko ↔ MB/KB).
