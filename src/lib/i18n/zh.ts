@@ -378,6 +378,7 @@ export const zh: Dict = {
       supportKofi: '在 Ko-fi 上支持',
       footerKofi: '这个网站帮你省下了电池？请杯咖啡吧：',
       joinDiscord: 'Discord',
+    viewSource: 'GitHub 源码',
     },
 
     // 随语言变化的单位（Mo/Ko ↔ MB/KB）。
@@ -535,8 +536,8 @@ export const zh: Dict = {
     shareLog: {
       title: '帮忙改进这个工具',
       description:
-        '把这次分析用到的原始 .bbl 日志发给 Rémi（本站开发者），发到一个私密频道。这能帮他发现规则漏掉的真实案例。除非你打开这个开关，否则什么都不会发送。',
-      toggleLabel: (count: number): string => (count > 1 ? `分享这 ${count} 个日志` : '分享这个日志'),
+        '把这次分析用到的原始 .bbl 日志发给 Rémi（本站开发者），发到一个私密频道。这能帮他发现规则漏掉的真实案例。点击按钮之前不会发送任何内容。',
+      buttonLabel: (count: number): string => (count > 1 ? `分享这 ${count} 个日志` : '分享这个日志'),
       sending: '发送中…',
       sent: '日志已发送，谢谢！',
       error: '发送失败 - 请稍后重试。',

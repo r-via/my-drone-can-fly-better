@@ -1,27 +1,271 @@
 # My Drone Can Fly Better
 
-**Ton vol, décodé.** Analyse de logs blackbox Betaflight 100 % dans le navigateur : tu glisses tes `.bbl` (et optionnellement ton `diff all`), le site te dit ce qui ne va pas et quoi corriger - verdicts chiffrés, commandes CLI prêtes à coller. Aucune donnée envoyée, aucun serveur, aucun réseau de neurones : uniquement du DSP (FFT, déconvolution) et des règles déterministes, lisibles et ajustables dans `src/lib/rules/`.
+**Your flight, decoded.** Drop a Betaflight blackbox log in the browser and get
+back numbered verdicts and ready-to-paste CLI commands: vibrations, filters,
+PID, motors, battery, GPS, safety.
 
-## Lancer
+Nothing is uploaded. The `.bbl` is decoded, analysed and judged inside the tab,
+by DSP (FFT, Welch, Wiener deconvolution) and a deterministic rule engine. No
+model, no inference, no server round trip: every verdict comes from a threshold
+comparison you can read in `src/lib/rules/` and cites the numbers it fired on.
+
+Live: <https://mydronecanflybetter.netlify.app>
+
+![Flight report header: a 76/100 gauge, the detected craft and drone profile, the
+score breakdown per category, then metric tiles for session duration, sample
+rate, battery, max current, motor saturation and flight time, above a row of
+per-category status chips.](docs/screenshots/report-warn.png)
+
+---
+
+## Quick start
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000
-npm run build        # export statique dans out/
-npm test             # tests (dont goldens vs scripts Python de référence)
-npm run analyze -- chemin/vol.bbl          # pipeline complet en CLI Node
+npm run dev        # http://localhost:3000
+npm run build      # static export to out/
+npm test           # 125 tests, including goldens vs the reference Python scripts
 ```
 
-## Architecture
+Node 20 or newer (Next 15 and the WASM parser both need it).
 
-- `src/lib/bbl/parse.ts` - décodage `.bbl` via [blackbox-log](https://github.com/blackbox-log/blackbox-log) (Rust→WASM, MIT, vendored dans `public/`). Deux contournements documentés : spoof de la chaîne de version firmware (le format est auto-décrit ; validé contre orangebox), et parser ré-instancié par session (bug d'ArrayBuffer détaché du wrapper 0.2.2).
-- `src/lib/dsp/` - FFT radix-2, Welch, bandes, pics. Zéro dépendance.
-- `src/lib/analysis/` - métriques : puissance, moteurs (saturation/équilibre/desync), bruit, spectre + attribution moteur via eRPM, suivi, step response (déconvolution de Wiener, méthode Plasmatree), yoyo, prop wash, atténuation des filtres, timeline.
-- `src/lib/rules/` - profils par drone (Pavo Pico, LR4, Chimera7 Pro, générique - détection auto par craft name) + moteur de règles → `Finding[]`.
-- `src/lib/cli/` - parsing `diff all` / headers du log + lint de config.
-- `src/worker/` - tout tourne dans un Web Worker.
-- `tests/golden/` - sorties des scripts Python historiques (`analyze_*.py`, parser orangebox) qui servent de référence de non-régression.
+The "share this log" opt-in at the bottom of a report calls a Netlify Function
+(`netlify/functions/submit-log.ts`), which `next dev` alone does not run. To
+exercise it locally, use the
+[Netlify CLI](https://docs.netlify.com/cli/get-started/):
 
-## Ajouter une règle ou un drone
+```bash
+netlify dev        # proxies next dev and runs the functions locally
+```
 
-Une règle = une fonction pure dans `src/lib/rules/engine.ts` qui lit `SessionAnalysis` et rend un `Finding` (id stable, evidence chiffrée, fix CLI éventuel). Un drone = une entrée `DroneProfile` dans `src/lib/rules/profiles.ts` (regex de craft name + seuils).
+### Command line
+
+The exact same pipeline, in a terminal, without a browser:
+
+```bash
+npm run analyze -- flight.bbl                       # single log
+npm run analyze -- log1.bbl log2.bbl                # several at once
+npm run analyze -- flight.bbl --cli diff-all.txt    # with a pasted `diff all`
+npm run analyze -- flight.bbl --lang fr             # en | fr | es | de | zh
+```
+
+Without `--lang`, the CLI reads `LC_ALL` / `LC_MESSAGES` / `LANG` / `LANGUAGE`
+and falls back to English.
+
+There is also a raw decode probe, useful when a log refuses to parse:
+
+```bash
+npx tsx scripts/smoke.mjs flight.bbl   # sessions, fields, sample rate, headers
+```
+
+---
+
+## How it works
+
+```
+.bbl bytes
+  -> src/lib/bbl/parse.ts     decode via blackbox-log (Rust -> WASM) into FlightData
+  -> src/lib/analysis/*       metrics: power, motors, noise, spectrum, tracking,
+                              step response, yoyo, prop wash, filters, timeline, GPS
+  -> src/lib/rules/profiles   pick the drone profile from the craft name
+  -> src/lib/rules/engine.ts  thresholds -> Finding[] (id, severity, evidence, fix)
+  -> src/lib/cli/config.ts    `diff all` or log headers -> config lint -> Finding[]
+  -> src/lib/report.ts        one Report, sorted worst first
+```
+
+Everything after the file read happens in a Web Worker (`src/worker/`), so a
+large multi-session log never freezes the UI. The report screen renders the
+metrics, three SVG charts (gyro spectrum, step response, flight timeline), the
+findings, and a copy-paste CLI block.
+
+### Units and contracts
+
+`FlightData` normalises what the parser hands over: time in seconds, gyro and
+setpoint in deg/s, vbat in volts, current in amps, altitude in metres. Motor
+and eRPM values stay raw, because their scale depends on headers carried in
+`meta` (`motorOutputLow` / `motorOutputHigh`, motor poles from the profile).
+All types live in `src/lib/types.ts`.
+
+### Signal processing
+
+Zero DSP dependency, `src/lib/dsp/dsp.ts` is 260 lines: radix-2 FFT, Welch
+periodogram, band RMS, peak picking, all matching numpy conventions
+(population std, linear-interpolation percentiles, symmetric Hann window) so
+the outputs stay comparable to the Python reference scripts.
+
+- **Spectrum**: Welch on unfiltered gyro when the log has it, otherwise on
+  filtered gyro. Bands are prop wash / piloting (<40 Hz), frame resonance
+  (40-120 Hz), motor range (120-350 Hz), harmonics (>350 Hz). The dominant peak
+  is attributed to the nearest motor through eRPM, which is what turns "there
+  is a peak at 137 Hz" into "motor 3 is the one shaking".
+- **Step response**: Wiener deconvolution of setpoint against gyro
+  ([Plasmatree PID-Analyzer](https://github.com/Plasmatree/PID-Analyzer)
+  method), 2 s Hann windows with 50 % overlap. No normalisation, so a settle
+  value near 1 genuinely means the PID reaches its setpoint. A `quality` score
+  reports how much of the log had enough stick excitation to be usable.
+- **Filter attenuation**: unfiltered against filtered, per band, in dB. Weak
+  attenuation in the motor range and leftover high-frequency content each get
+  their own rule.
+
+---
+
+## What it checks
+
+Findings carry a stable `id`, a severity (`ok` / `info` / `warn` / `crit`), a
+category, the numbers behind the call, and often a CLI fix.
+
+![Two finding cards. A warning under Filters, "Weak filtering in the motor
+range", explains that the 120-350 Hz band is only attenuated by 13.6 dB on roll
+and suggests checking the RPM filter. An info card under Vibrations, "Noise peak
+at the fundamental of M4", points at that motor or its prop. Each card has a
+collapsible "the numbers behind this verdict" section and a FIX
+block.](docs/screenshots/findings.png)
+
+| Category | Rules |
+| --- | --- |
+| Vibrations | `noise-mech-high`, `chassis-resonance`, `motor-noise-peak`, `propwash-severe`, `propwash-untested` |
+| Filters | `noise-filtered-leak`, `filters-weak`, `filters-residual-hf` |
+| PID | `tracking-poor`, `step-overshoot`, `step-slow`, `step-settle-off`, `yoyo-detected` |
+| Motors | `motors-saturation`, `motors-imbalance`, `motors-desync` |
+| Battery | `battery-sag`, `battery-empty`, `battery-cells-unexpected` |
+| GPS / safety / log | `gps-low-sats`, `failsafe-triggered`, `log-quality`, `all-good` |
+
+The config lint runs on a pasted `diff all` or, when nothing is pasted, on the
+configuration snapshot the blackbox writes into its own headers, so it works
+from a log alone: `rpm-filter-off-bidir`, `no-bidir`, `no-notch-no-rpm`,
+`dterm-lpf-low`, `gyro-lpf-low`, `ff-zero`, `antigravity-off`, `motor-limit`,
+`vbat-warning`. A pasted diff always wins over the headers.
+
+### Flight score
+
+The report opens on a score out of 100: 100 minus 25 per critical finding, 12
+per warning, 4 per info, floored at 0, with the per-category breakdown shown
+next to the gauge. It is a rendering of the findings, not an extra rule, and it
+is deliberately traceable rather than clever.
+
+### Drone profiles
+
+Thresholds are per machine, picked automatically from the craft name in the log
+headers (`src/lib/rules/profiles.ts`):
+
+| Profile | Craft name match | Tuned for |
+| --- | --- | --- |
+| `pico` | `pavo pico` | ducted 2S whoop: high raw noise and prop wash tolerated, yoyo caught early |
+| `lr4` | `lr4` | long range 4S: strict tracking and sag, rear-heavy CG tolerated |
+| `chimera7` | `chimera` / `shimera` | 7 inch 6S: strict on raw vibration (jello), slower rise time accepted |
+| `generic` | anything else | median values for a healthy 5 inch freestyle |
+
+Adding a drone is one `DroneProfile` entry (craft-name regex, motor poles, cell
+count, threshold overrides). Its display label and notes live in the
+dictionaries under `dict.rules.profiles.<id>`, not in the profile itself.
+
+Adding a rule is one pure function in `src/lib/rules/engine.ts` that reads a
+`SessionAnalysis` and returns a `Finding`: stable id, numeric evidence,
+optional CLI fix. Rules never write their own prose, all user-facing strings
+come from the dictionary.
+
+---
+
+## Internationalisation
+
+Five locales: English, French, Spanish, German, Chinese. The French directory
+`src/lib/i18n/fr/` (`ui`, `rules`, `lint`, `system`) is the reference shape;
+every other locale is a single `const xx: Dict = {...}` file, so `tsc` fails if
+a translation is missing a key. Locale selection is localStorage
+(`mdcfb.locale`), then `navigator.language`, then English. The worker receives
+the locale and generates the findings in that language, which is why switching
+languages re-runs the analysis on the files still selected.
+
+---
+
+## Layout
+
+```
+src/app/          Next.js app router, fonts, manifest, icons
+src/components/   UI, including charts/ (dependency-free SVG)
+src/lib/bbl/      WASM parser adapter
+src/lib/dsp/      FFT, Welch, bands, peaks
+src/lib/analysis/ metric modules
+src/lib/rules/    drone profiles + rule engine
+src/lib/cli/      `diff all` parsing and config lint
+src/lib/i18n/     locale registry and dictionaries
+src/worker/       analysis worker
+scripts/          Node CLI runner and decode probe
+tests/            vitest suites + golden/ reference outputs
+netlify/          opt-in log sharing function
+docs/screenshots/ images used by this README
+```
+
+Brand assets and their usage rules are documented in
+[`public/brand/README.md`](public/brand/README.md).
+
+---
+
+## Tests
+
+`npm test` runs 125 vitest cases in Node. Several of them compare the
+TypeScript pipeline against `tests/golden/*.txt`, captured outputs of the older
+Python scripts (`analyze_pico.py`, `analyze_lr4.py`, `analyze_shimera.py`, on
+top of the orangebox parser), with tolerances around 2 % on RMS and averages.
+That is the safety net: the browser must keep agreeing with the reference
+implementation.
+
+Those golden tests read real `.bbl` files by absolute path from the developer
+machine (constants at the top of `tests/basic.test.ts` and friends). Clone the
+repo elsewhere and they fail on a missing file. The synthetic suites (`dsp`,
+`rules`, `step` fixtures, `charts`, `ui-shell`) run anywhere.
+
+---
+
+## Deployment
+
+Static export, no server needed for the analysis itself. `netlify.toml` holds
+the whole config: `npm run build`, publish `out/`, functions in
+`netlify/functions`.
+
+The one server-side piece is optional. `netlify/functions/submit-log.ts` is a
+proxy behind the "help improve the tool" opt-in at the bottom of a report: it
+relays the raw `.bbl` to a private Discord webhook, caps the payload at 7.5 MB,
+and reads `DISCORD_WEBHOOK_URL` from the environment so the webhook never
+reaches the client bundle. The client calls the native function path
+(`/.netlify/functions/submit-log`), which works in production and under
+`netlify dev` without a redirect rule. Without the environment variable the
+endpoint answers `not_configured` and the rest of the site is unaffected.
+Nothing leaves the browser unless the user explicitly asks for it.
+
+---
+
+## Known limitations
+
+- **Parser.** The npm `blackbox-log` wrapper (0.2.2, MIT, unmaintained) refuses
+  firmware newer than 4.4, so `parse.ts` rewrites the version string in the
+  headers to 4.4.2, at constant length. The frame format is self-describing,
+  and the result was cross-checked against orangebox on real logs from three
+  drones. A second workaround instantiates a fresh `Parser` per session,
+  because a large log detaches the WASM `ArrayBuffer`.
+- **Upstream P-frame drift.** The decoder shows a 1 to 3 deg/s drift that
+  resets on I-frames, which inflates the 5-40 Hz band, mostly on yaw. Corrupt
+  frames (a motor value of 4294967040, for instance) are filtered out by
+  explicit sanity limits in the analysis modules.
+- **Yoyo metric.** The ratio compares standard deviations in different units
+  (motor steps against stick microseconds), so 1.8 to 2.0 is normal response,
+  not oscillation. Only the Pico profile trips at 1.3, from field calibration.
+  Spectral discrimination would be the real fix.
+- **Truncated sessions.** A power cut mid-log leaves a session that cannot be
+  decoded. It is reported as skipped, with its size and reason, and the other
+  sessions in the file are still analysed.
+- **Step response** needs at least 20 s of log and enough stick movement. A
+  pure cruise flight retries at half the excitation threshold and reports the
+  lower confidence through `quality`.
+
+---
+
+## Credits
+
+- [blackbox-log](https://github.com/blackbox-log/blackbox-log) for the Rust to
+  WASM decoder.
+- [Plasmatree PID-Analyzer](https://github.com/Plasmatree/PID-Analyzer) for the
+  step response method.
+- Betaflight, for logging all of this in the first place.
+
+If the tool saves you a pack or two: <https://ko-fi.com/rvia>.

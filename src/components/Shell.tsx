@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 
 const KOFI_URL = 'https://ko-fi.com/rvia';
 const DISCORD_URL = 'https://discord.gg/6tsHPedrzZ';
+const GITHUB_URL = 'https://github.com/r-via/my-drone-can-fly-better';
 
 function KofiIcon({ className }: { className?: string }) {
   // Tasse stylisée (esprit Ko-fi), monochrome.
@@ -49,11 +50,11 @@ export default function Shell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3">
             <p className="hidden text-xs text-ink-3 xl:block">{dict.ui.app.headerTagline}</p>
             <a
-              href="https://github.com/r-via"
+              href={GITHUB_URL}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="GitHub"
-              title="GitHub"
+              aria-label={dict.ui.app.viewSource}
+              title={dict.ui.app.viewSource}
               className="inline-flex size-8 items-center justify-center rounded-full bg-surface-2 text-ink-2 transition-all hover:-translate-y-px hover:bg-surface-3 hover:text-ink"
             >
               <GitHubIcon className="size-4" />

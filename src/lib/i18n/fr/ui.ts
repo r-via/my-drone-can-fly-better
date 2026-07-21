@@ -13,6 +13,7 @@ export const ui = {
     supportKofi: 'Soutenir sur Ko-fi',
     footerKofi: 'Ce site te fait gagner des packs ? Offre un café :',
     joinDiscord: 'Discord',
+    viewSource: 'Le code sur GitHub',
   },
 
   // Unités dépendantes de la langue (Mo/Ko ↔ MB/KB).
@@ -168,12 +169,12 @@ export const ui = {
       ' dans le CLI, pas avec le bouton Save de la GUI : sur certaines versions il peut effacer toute ta config (bug connu).',
   },
 
-  // Switch d'opt-in : partage du .bbl brut avec le dev (bas de ReportView).
+  // Bouton d'opt-in : partage du .bbl brut avec le dev (bas de ReportView).
   shareLog: {
     title: "Aider à améliorer l'outil",
     description:
-      "Envoie le(s) log(s) .bbl brut(s) de cette analyse à Rémi (dev du site), sur un salon privé. Ça sert à repérer des cas réels que les règles ratent. Rien n'est envoyé tant que tu n'actives pas ce switch.",
-    toggleLabel: (count: number): string =>
+      "Envoie le(s) log(s) .bbl brut(s) de cette analyse à Rémi (dev du site), sur un salon privé. Ça sert à repérer des cas réels que les règles ratent. Rien n'est envoyé tant que tu n'as pas cliqué sur le bouton.",
+    buttonLabel: (count: number): string =>
       count > 1 ? `Partager les ${count} logs` : 'Partager ce log',
     sending: 'Envoi en cours…',
     sent: 'Log envoyé - merci !',
