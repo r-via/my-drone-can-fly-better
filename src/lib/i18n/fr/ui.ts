@@ -150,6 +150,17 @@ export const ui = {
     tileFlightTime: 'Temps de vol',
     flightTimeHint: "throttle réellement en l'air",
     timelineCaption: 'Timeline du vol',
+    timelineEventLine: (
+      tStart: string,
+      duration: string,
+      freq: string,
+      ratio: string,
+      satPct: string,
+      motors: string | null,
+    ): string =>
+      `Oscillation mesurée à ${tStart} s, pendant ${duration} s : ${freq} Hz sur le différentiel moteur, amplitude ${ratio} fois le régime normal du vol, ${satPct} % des échantillons avec au moins un moteur en butée` +
+      (motors !== null ? ` (${motors}).` : '.'),
+    timelineEventIntro: 'Ce que la mesure dit, sans interprétation :',
     noFindings: 'Aucune règle déclenchée sur cette session.',
   },
 
@@ -210,6 +221,9 @@ export const ui = {
       stateFlight: 'en vol',
       vbat: 'vbat',
       noSegments: 'Aucun segment détecté.',
+      eventsAria: (count: string, times: string): string =>
+        `${count} événement(s) signalé(s) à ${times}`,
+      eventsLegend: 'oscillation détectée',
     },
   },
 };

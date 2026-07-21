@@ -4,7 +4,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import { buildSpectrumPaths, SpectrumChart } from '../src/components/charts/SpectrumChart';
 import { buildStepPaths, StepResponseChart } from '../src/components/charts/StepResponseChart';
-import { buildTimelineRects, TimelineStrip } from '../src/components/charts/TimelineStrip';
+import {
+  buildEventMarks,
+  buildTimelineRects,
+  legendPositions,
+  TimelineStrip,
+} from '../src/components/charts/TimelineStrip';
 import type { AxisSpectrum, AxisStepResponse, TimelineSegment } from '../src/lib/types';
 
 const W = 600;
@@ -281,5 +286,103 @@ describe('composants React (rendu sans DOM : appel direct, structure élément)'
         );
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Marqueurs d'événements sur la frise
+// ---------------------------------------------------------------------------
+
+describe('buildEventMarks', () => {
+  const ev = (tStart: number, tEnd: number, label = '36 Hz') =>
+    ({ tStart, tEnd, severity: 'crit' as const, label });
+
+  it('place le marqueur proportionnellement à la durée', () => {
+    const [m] = buildEventMarks([ev(30, 45)], 60, 600);
+    expect(m.x).toBeCloseTo(300, 5);
+    expect(m.width).toBeCloseTo(150, 5);
+  });
+
+  it('garde une largeur visible pour un incident très court', () => {
+    // 0.8 s sur 130 s = 3.7 px sur 600 : sans plancher ce serait illisible.
+    const [m] = buildEventMarks([ev(100, 100.05)], 130, 600);
+    expect(m.width).toBeGreaterThanOrEqual(3);
+  });
+
+  it('ne déborde jamais du cadre', () => {
+    const [m] = buildEventMarks([ev(59.9, 500)], 60, 600);
+    expect(m.x + m.width).toBeLessThanOrEqual(600 + 1e-9);
+  });
+
+  it('borne un tStart hors plage au lieu de sortir du graphe', () => {
+    expect(buildEventMarks([ev(-5, 1)], 60, 600)[0].x).toBe(0);
+    const late = buildEventMarks([ev(999, 1000)], 60, 600)[0];
+    expect(late.x + late.width).toBeLessThanOrEqual(600);
+    expect(late.width).toBeGreaterThanOrEqual(3); // reste visible
+  });
+
+  it('retourne une liste vide sur les cas dégénérés', () => {
+    expect(buildEventMarks([], 60, 600)).toEqual([]);
+    expect(buildEventMarks([ev(1, 2)], 0, 600)).toEqual([]);
+    expect(buildEventMarks([ev(1, 2)], 60, 0)).toEqual([]);
+  });
+
+  it('conserve sévérité et étiquette', () => {
+    const [m] = buildEventMarks([ev(10, 11, '42 Hz')], 60, 600);
+    expect(m.severity).toBe('crit');
+    expect(m.label).toBe('42 Hz');
+  });
+});
+
+describe('TimelineStrip avec événements', () => {
+  const segments = [
+    { tStart: 0, tEnd: 30, state: 'flight' as const, stickAvg: 1400, thrustPct: 40, vbat: 16.0 },
+    { tStart: 30, tEnd: 60, state: 'flight' as const, stickAvg: 1450, thrustPct: 45, vbat: 15.2 },
+  ];
+  const events = [{ tStart: 40, tEnd: 41, severity: 'crit' as const, label: '36 Hz' }];
+
+  it('reste un <svg> et grandit seulement quand il y a des événements', () => {
+    const without = TimelineStrip({ segments, durationS: 60 });
+    const with_ = TimelineStrip({ segments, durationS: 60, events });
+    expect(with_.type).toBe('svg');
+    expect(without.props.viewBox).not.toBe(with_.props.viewBox);
+  });
+
+  it("mentionne les événements dans l'aria-label, pour les lecteurs d'écran", () => {
+    const el = TimelineStrip({ segments, durationS: 60, events });
+    expect(el.props['aria-label']).toContain('36 Hz');
+    expect(el.props['aria-label']).toContain('40');
+  });
+
+  it("n'altère pas l'aria-label quand il n'y a aucun événement", () => {
+    const el = TimelineStrip({ segments, durationS: 60, events: [] });
+    expect(el.props['aria-label']).not.toContain('événement');
+  });
+});
+
+describe('legendPositions', () => {
+  it('espace les entrées selon la longueur du libellé', () => {
+    // Le pas fixe de 76 px faisait chevaucher "on the ground" et "in flight".
+    const pos = legendPositions(['on the ground', 'in flight', 'vbat']);
+    expect(pos[0]).toBe(0);
+    expect(pos[1]).toBeGreaterThan(76);
+    expect(pos[2]).toBeGreaterThan(pos[1]);
+  });
+
+  it('reste croissant et tient dans le cadre pour les libellés du parc', () => {
+    for (const labels of [
+      ['au sol', 'gaz bas', 'en vol', 'vbat'],
+      ['on the ground', 'low throttle', 'in flight', 'vbat'],
+      ['am Boden', 'Throttle niedrig', 'im Flug', 'vbat'],
+    ]) {
+      const pos = legendPositions(labels);
+      for (let i = 1; i < pos.length; i++) expect(pos[i]).toBeGreaterThan(pos[i - 1]);
+      const last = pos[pos.length - 1] + labels[labels.length - 1].length * 5.2 + 15;
+      expect(last).toBeLessThan(616); // plotW du composant
+    }
+  });
+
+  it('retourne une liste vide sans libellé', () => {
+    expect(legendPositions([])).toEqual([]);
   });
 });

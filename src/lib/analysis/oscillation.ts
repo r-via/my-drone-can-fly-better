@@ -10,7 +10,12 @@
 // 100 % déterministe, aucune IA.
 import { median, movingAverage, topPeaks, welchSpectrum } from '../dsp/dsp';
 
-import type { FlightData, OscillationEvent, OscillationMetrics } from '../types';
+import type {
+  FlightData,
+  OscillationEvent,
+  OscillationMetrics,
+  ProfileThresholds,
+} from '../types';
 
 // ---------------------------------------------------------------------------
 // Constantes
@@ -323,4 +328,23 @@ function dominantFreq(
     if (Math.abs(freqs[k] - freqHz) <= half) inPeak += p;
   }
   return { freqHz, concentration: total > 0 ? inPeak / total : 0 };
+}
+
+/**
+ * Événements qui méritent d'être signalés, selon les seuils du profil.
+ * Exporté pour que le moteur de règles et la frise appliquent EXACTEMENT le
+ * même filtre : un marqueur sur la frise sans verdict correspondant (ou
+ * l'inverse) serait un bug d'interprétation pour le pilote.
+ */
+export function qualifyingEvents(
+  metrics: OscillationMetrics | null,
+  t: ProfileThresholds,
+): OscillationEvent[] {
+  if (!metrics?.applicable) return [];
+  return metrics.events.filter((e) => e.ratio >= t.oscRatioWarn && e.peakAmpPct >= t.oscMinAmpPct);
+}
+
+/** Sévérité d'un événement selon le profil (identique côté règles et frise). */
+export function eventSeverity(e: OscillationEvent, t: ProfileThresholds): 'warn' | 'crit' {
+  return e.ratio >= t.oscRatioCrit || e.saturationPct >= SATURATION_CRIT_PCT ? 'crit' : 'warn';
 }

@@ -111,3 +111,32 @@ describe('libellés du rapport terminal', () => {
     expect(getDict('en').ui.categories.moteurs).not.toBe('moteurs');
   });
 });
+
+describe('phrase déterministe sous la frise', () => {
+  it('existe dans les 5 langues et cite toutes les grandeurs mesurées', () => {
+    for (const { code } of LOCALES) {
+      const r = getDict(code).ui.report;
+      expect(r.timelineEventIntro.length).toBeGreaterThan(0);
+      const line = r.timelineEventLine('13.7', '0.80', '36', '43', '71', 'M1, M2');
+      // Aucun chiffre mesuré ne doit être perdu par une traduction.
+      for (const v of ['13.7', '0.80', '36', '43', '71', 'M1, M2']) {
+        expect(line, `${code} / ${v}`).toContain(v);
+      }
+    }
+  });
+
+  it('reste correct quand aucun moteur n’a touché de butée', () => {
+    const line = getDict('fr').ui.report.timelineEventLine('5.0', '0.30', '52', '9', '0', null);
+    expect(line).not.toContain('null');
+    expect(line.trim().endsWith('.')).toBe(true);
+  });
+
+  it('est bien traduite et pas recopiée du français', () => {
+    const fr = getDict('fr').ui.report;
+    const en = getDict('en').ui.report;
+    expect(en.timelineEventIntro).not.toBe(fr.timelineEventIntro);
+    expect(en.timelineEventLine('1', '1', '1', '1', '1', null)).not.toBe(
+      fr.timelineEventLine('1', '1', '1', '1', '1', null),
+    );
+  });
+});

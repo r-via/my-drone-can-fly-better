@@ -561,6 +561,17 @@ export const de: Dict = {
       tileFlightTime: 'Flugzeit',
       flightTimeHint: 'Throttle tatsächlich in der Luft',
       timelineCaption: 'Flug-Timeline',
+      timelineEventLine: (
+        tStart: string,
+        duration: string,
+        freq: string,
+        ratio: string,
+        satPct: string,
+        motors: string | null,
+      ): string =>
+        `Oszillation gemessen bei ${tStart} s, über ${duration} s: ${freq} Hz auf dem Motordifferential, Amplitude ${ratio} mal das normale Niveau dieses Flugs, ${satPct} % der Samples mit mindestens einem Motor am Anschlag` +
+        (motors !== null ? ` (${motors}).` : '.'),
+      timelineEventIntro: 'Was die Messung sagt, ohne Interpretation:',
       noFindings: 'Keine Regel hat in dieser Session ausgelöst.',
     },
 
@@ -619,6 +630,9 @@ export const de: Dict = {
         stateFlight: 'im Flug',
         vbat: 'vbat',
         noSegments: 'Keine Segmente erkannt.',
+        eventsAria: (count: string, times: string): string =>
+          `${count} Event(s) markiert bei ${times}`,
+        eventsLegend: 'Oszillation erkannt',
       },
     },
   },

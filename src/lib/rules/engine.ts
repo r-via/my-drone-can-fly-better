@@ -4,6 +4,7 @@
 // Toutes les chaînes utilisateur viennent du dictionnaire i18n (dict.rules) ;
 // sans dict explicite, la référence française est utilisée (comportement legacy).
 
+import { eventSeverity, qualifyingEvents } from '../analysis/oscillation';
 import { fr } from '../i18n/fr';
 import { AXIS_NAMES } from '../types';
 import type { Dict } from '../i18n/fr';
@@ -20,9 +21,6 @@ const f1 = (x: number): string => x.toFixed(1);
 const f2 = (x: number): string => x.toFixed(2);
 
 const SEVERITY_RANK: Record<Severity, number> = { crit: 0, warn: 1, info: 2, ok: 3 };
-
-/** Part d'échantillons en butée dans un événement au-delà de laquelle il est critique. */
-const SATURATION_CRIT_PCT = 25;
 
 interface WorstAxis {
   axis: Axis;
@@ -542,16 +540,13 @@ export function evaluateSession(
   // --- oscillation-event ------------------------------------------------------------
   // Évalué par ÉVÉNEMENT, jamais en moyenne sur le log : un incident de 0,5 s
   // qui sature le mixer garde la même gravité dans un log de 15 s et de 3 min.
-  if (analysis.oscillation?.applicable && analysis.oscillation.worst) {
-    const osc = analysis.oscillation;
-    const w = osc.worst!;
-    if (w.ratio >= t.oscRatioWarn && w.peakAmpPct >= t.oscMinAmpPct) {
-      const severity: Severity =
-        w.ratio >= t.oscRatioCrit || w.saturationPct >= SATURATION_CRIT_PCT ? 'crit' : 'warn';
-      const others = osc.events.filter((e) => e.ratio >= t.oscRatioWarn && e.peakAmpPct >= t.oscMinAmpPct);
+  {
+    const qualifying = qualifyingEvents(analysis.oscillation, t);
+    const w = qualifying[0]; // events est trié par ratio décroissant
+    if (w) {
       findings.push({
         id: 'oscillation-event',
-        severity,
+        severity: eventSeverity(w, t),
         category: 'pid',
         title: r.oscillationEvent.title(f0(w.freqHz)),
         detail: r.oscillationEvent.detail,
@@ -562,7 +557,7 @@ export function evaluateSession(
           f0(w.ratio),
           f0(w.saturationPct),
           w.motorsAtStop.map((m) => `M${m}`).join(', ') || null,
-          others.length,
+          qualifying.length,
         ),
         fix: { text: r.oscillationEvent.fix },
       });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { eventSeverity, qualifyingEvents } from '@/lib/analysis/oscillation';
 import { useLocale } from '@/lib/i18n/locale';
 import type {
   FileReport,
@@ -168,6 +169,17 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
   const th = profile.thresholds;
   const profileText = dict.rules.profiles[profile.id];
 
+  // Marqueurs de la frise : mêmes événements que le verdict oscillation-event,
+  // via le sélecteur partagé. Un marqueur sans verdict (ou l'inverse) laisserait
+  // le pilote chercher un problème qu'on n'a pas confirmé.
+  const oscEvents = qualifyingEvents(analysis.oscillation, th);
+  const timelineEvents = oscEvents.map((e) => ({
+    tStart: e.tStart,
+    tEnd: e.tEnd,
+    severity: eventSeverity(e, th),
+    label: `${e.freqHz.toFixed(0)} Hz`,
+  }));
+
   const worst = worstSeverity(findings);
   const sev = SEVERITY_META[worst];
   const SevIcon = sev.icon;
@@ -304,8 +316,31 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
           <TimelineStrip
             segments={analysis.timeline.segments}
             durationS={meta.durationS}
+            events={timelineEvents}
             labels={dict.ui.charts.timeline}
           />
+          {oscEvents.length > 0 ? (
+            /* Un marqueur dit OÙ, pas QUOI : la phrase donne les grandeurs
+               mesurées telles quelles, pour que le lecteur voie que le verdict
+               vient d'un calcul et non d'une appréciation. */
+            <div className="mt-3 border-t border-line pt-3">
+              <p className="text-xs font-medium text-ink-2">{t.timelineEventIntro}</p>
+              <ul className="mt-1 space-y-1">
+                {oscEvents.map((e) => (
+                  <li key={e.tStart} className="text-xs leading-relaxed text-ink-3">
+                    {t.timelineEventLine(
+                      e.tStart.toFixed(1),
+                      (e.tEnd - e.tStart).toFixed(2),
+                      e.freqHz.toFixed(0),
+                      e.ratio.toFixed(0),
+                      e.saturationPct.toFixed(0),
+                      e.motorsAtStop.map((m) => `M${m}`).join(', ') || null,
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </figure>
       ) : null}
       {analysis.spectrum ? (

@@ -562,6 +562,17 @@ export const es: Dict = {
       tileFlightTime: 'Tiempo de vuelo',
       flightTimeHint: 'throttle realmente en el aire',
       timelineCaption: 'Timeline del vuelo',
+      timelineEventLine: (
+        tStart: string,
+        duration: string,
+        freq: string,
+        ratio: string,
+        satPct: string,
+        motors: string | null,
+      ): string =>
+        `Oscilación medida a ${tStart} s, durante ${duration} s: ${freq} Hz en el diferencial de motores, amplitud ${ratio} veces el nivel normal del vuelo, ${satPct} % de las muestras con al menos un motor en tope` +
+        (motors !== null ? ` (${motors}).` : '.'),
+      timelineEventIntro: 'Lo que dice la medición, sin interpretación:',
       noFindings: 'Ninguna regla disparada en esta sesión.',
     },
 
@@ -620,6 +631,9 @@ export const es: Dict = {
         stateFlight: 'en vuelo',
         vbat: 'vbat',
         noSegments: 'Ningún segmento detectado.',
+        eventsAria: (count: string, times: string): string =>
+          `${count} evento(s) señalado(s) en ${times}`,
+        eventsLegend: 'oscilación detectada',
       },
     },
   },

@@ -576,6 +576,17 @@ export const zh: Dict = {
       tileFlightTime: '飞行时间',
       flightTimeHint: '真正离地的油门时间',
       timelineCaption: '飞行时间线',
+      timelineEventLine: (
+        tStart: string,
+        duration: string,
+        freq: string,
+        ratio: string,
+        satPct: string,
+        motors: string | null,
+      ): string =>
+        `在 ${tStart} s 测到振荡，持续 ${duration} s：电机差分上 ${freq} Hz，幅度为本次飞行正常水平的 ${ratio} 倍，${satPct} % 的采样至少有一个电机打到限位` +
+        (motors !== null ? `（${motors}）。` : '。'),
+      timelineEventIntro: '测量结果本身，不含解读：',
       noFindings: '这个会话没有触发任何规则。',
     },
 
@@ -635,6 +646,9 @@ export const zh: Dict = {
         stateFlight: '飞行中',
         vbat: 'vbat',
         noSegments: '未检测到任何片段。',
+        eventsAria: (count: string, times: string): string =>
+          `在 ${times} 标记了 ${count} 个事件`,
+        eventsLegend: '检测到振荡',
       },
     },
   },
