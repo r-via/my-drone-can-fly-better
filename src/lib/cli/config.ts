@@ -1,7 +1,9 @@
-// Parsing + lint de configuration CLI Betaflight.
-// Deux sources : un `diff all`/`dump` collé par l'utilisateur, ou le snapshot
-// config embarqué dans les headers du .bbl. Le lint applique des règles
-// déterministes et retourne des Finding (catégorie 'config') chiffrés.
+// Lint de configuration Betaflight.
+// La source unique est le snapshot config embarqué dans les headers du .bbl :
+// il couvre tous les paramètres que les règles ci-dessous lisent, il reflète le
+// profil réellement actif au moment du vol, et il est contemporain du vol - ce
+// qu'un `diff` collé après coup ne garantit sur aucun des trois points. Le lint
+// applique des règles déterministes et retourne des Finding ('config') chiffrés.
 import { fr } from '../i18n/fr';
 
 import type { Dict } from '../i18n/fr';
@@ -20,40 +22,6 @@ const MOTOR_PROTOCOLS = [
   'PROSHOT1000',
   'DISABLED',
 ] as const;
-
-// ---------------------------------------------------------------------------
-// parseCliText - diff all / dump collé
-// ---------------------------------------------------------------------------
-
-const SET_RE = /^set\s+([A-Za-z0-9_]+)\s*=\s*(.+)$/i;
-const FEATURE_RE = /^feature\s+(-?)([A-Za-z0-9_]+)$/i;
-
-/** Parse un texte CLI Betaflight (diff all, dump…). Le dernier `set` gagne. */
-export function parseCliText(text: string): CliConfig {
-  const values: Record<string, string> = {};
-  const features = new Set<string>();
-
-  for (const rawLine of text.split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (line.length === 0 || line.startsWith('#')) continue;
-
-    const setMatch = SET_RE.exec(line);
-    if (setMatch) {
-      values[setMatch[1].toLowerCase()] = setMatch[2].trim();
-      continue;
-    }
-
-    const featMatch = FEATURE_RE.exec(line);
-    if (featMatch) {
-      const name = featMatch[2].toUpperCase();
-      if (featMatch[1] === '-') features.delete(name);
-      else features.add(name);
-    }
-    // Tout le reste (batch, board_name, profile, save…) est ignoré.
-  }
-
-  return { values, features: [...features], source: 'paste', raw: text };
-}
 
 // ---------------------------------------------------------------------------
 // configFromHeaders - snapshot config embarqué dans le .bbl
@@ -126,7 +94,7 @@ export function configFromHeaders(headers: Record<string, string>): CliConfig {
     values['motor_pwm_protocol'] = MOTOR_PROTOCOLS[Number(proto)] ?? proto;
   }
 
-  return { values, features: [], source: 'headers' };
+  return { values };
 }
 
 // ---------------------------------------------------------------------------

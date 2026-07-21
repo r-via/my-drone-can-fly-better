@@ -45,7 +45,6 @@ The exact same pipeline, in a terminal, without a browser:
 ```bash
 npm run analyze -- flight.bbl                       # single log
 npm run analyze -- log1.bbl log2.bbl                # several at once
-npm run analyze -- flight.bbl --cli diff-all.txt    # with a pasted `diff all`
 npm run analyze -- flight.bbl --lang fr             # en | fr | es | de | zh
 ```
 
@@ -69,7 +68,7 @@ npx tsx scripts/smoke.mjs flight.bbl   # sessions, fields, sample rate, headers
                               step response, yoyo, prop wash, filters, timeline, GPS
   -> src/lib/rules/profiles   pick the drone profile from the craft name
   -> src/lib/rules/engine.ts  thresholds -> Finding[] (id, severity, evidence, fix)
-  -> src/lib/cli/config.ts    `diff all` or log headers -> config lint -> Finding[]
+  -> src/lib/cli/config.ts    log headers -> config lint -> Finding[]
   -> src/lib/report.ts        one Report, sorted worst first
 ```
 
@@ -133,11 +132,12 @@ block.](docs/screenshots/findings.png)
 Every rule is documented one by one, with its condition and its threshold
 source, in [`docs/rules.md`](docs/rules.md).
 
-The config lint runs on a pasted `diff all` or, when nothing is pasted, on the
-configuration snapshot the blackbox writes into its own headers, so it works
-from a log alone: `rpm-filter-off-bidir`, `no-bidir`, `no-notch-no-rpm`,
-`dterm-lpf-low`, `gyro-lpf-low`, `ff-zero`, `antigravity-off`, `motor-limit`,
-`vbat-warning`. A pasted diff always wins over the headers.
+The config lint runs on the configuration snapshot the blackbox writes into its
+own headers, so the log alone is enough: `rpm-filter-off-bidir`, `no-bidir`,
+`no-notch-no-rpm`, `dterm-lpf-low`, `gyro-lpf-low`, `ff-zero`, `antigravity-off`,
+`motor-limit`, `vbat-warning`. There is nothing to paste: those headers carry
+every setting the rules read, they reflect the profile that was actually active
+during the flight, and they cannot be out of date with respect to it.
 
 ### Flight score
 
@@ -190,10 +190,10 @@ src/lib/bbl/      WASM parser adapter
 src/lib/dsp/      FFT, Welch, bands, peaks
 src/lib/analysis/ metric modules
 src/lib/rules/    drone profiles + rule engine
-src/lib/cli/      `diff all` parsing and config lint
+src/lib/cli/      config read from the log headers + config lint
 src/lib/i18n/     locale registry and dictionaries
 src/worker/       analysis worker
-scripts/          Node CLI runner and decode probe
+scripts/          Node CLI runner, decode probe, service worker generator
 tests/            vitest suites + golden/ reference outputs
 netlify/          opt-in log sharing function
 docs/             reference documentation, see docs/README.md
@@ -239,6 +239,26 @@ reaches the client bundle. The client calls the native function path
 `netlify dev` without a redirect rule. Without the environment variable the
 endpoint answers `not_configured` and the rest of the site is unaffected.
 Nothing leaves the browser unless the user explicitly asks for it.
+
+### Offline
+
+The site installs as a PWA and works with no connection. `npm run build` runs
+`next build` then `scripts/gen-sw.mjs`, which walks `out/`, freezes the list of
+emitted files into `scripts/sw-template.js` and writes `out/sw.js`. The service
+worker precaches the whole app on first visit (HTML, JS chunks, CSS, fonts,
+icons and the 190 kB WASM decoder), then serves everything cache-first, so a
+reload with the network down still decodes logs. The cache is named after a hash
+of the build output: a new deploy installs a new cache and drops the old one.
+
+`sw.js` is served with `must-revalidate` (see `netlify.toml`), otherwise a new
+build would stay invisible behind the HTTP cache. Registration is skipped in
+`next dev`, which does not emit a service worker.
+
+A new build installs in the background and waits. `ServiceWorkerRegister.tsx`
+shows a small localised pill when it does: "Reload" makes the waiting worker
+take over (`SKIP_WAITING`, then reload on `controllerchange`), "Later" hides it.
+Nothing reloads on its own, so an analysis in progress is never interrupted. A
+tab left open re-checks for updates when it regains focus, at most once an hour.
 
 ---
 

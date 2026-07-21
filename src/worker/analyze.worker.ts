@@ -8,7 +8,6 @@ import type { ParsedFile, Report } from '../lib/types';
 
 export type WorkerRequest = {
   files: Array<{ name: string; bytes: ArrayBuffer }>;
-  cliText: string;
   locale: Locale;
 };
 
@@ -47,7 +46,7 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
     }
 
     post({ type: 'progress', step: dict.system.progressAnalyzing });
-    const report = buildReport(parsed, ev.data.cliText, dict);
+    const report = buildReport(parsed, dict);
     post({ type: 'done', report });
   } catch (e) {
     post({ type: 'error', error: e instanceof Error ? e.message : String(e) });

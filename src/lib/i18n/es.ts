@@ -444,7 +444,10 @@ export const es: Dict = {
       supportKofi: 'Apoyar en Ko-fi',
       footerKofi: '¿Este sitio te ahorra packs? Invita a un café:',
       joinDiscord: 'Discord',
-    viewSource: 'El código en GitHub',
+      viewSource: 'El código en GitHub',
+      updateAvailable: 'Nueva versión disponible',
+      updateReload: 'Recargar',
+      updateDismiss: 'Más tarde',
     },
 
     units: {
@@ -493,13 +496,6 @@ export const es: Dict = {
       rejected: (names: string): string => `Ignorado (ni .bbl ni .bfl): ${names}`,
       selectedFilesAria: 'Archivos seleccionados',
       removeFile: (name: string): string => `Quitar ${name}`,
-      pasteSummaryBefore: 'Pega tu ',
-      pasteSummaryCode: 'diff all',
-      pasteSummaryAfter: ' (opcional - si no, leo la config desde el log)',
-      pasteLabel: 'Salida del comando diff all de Betaflight',
-      pastePlaceholder:
-        '# diff all\n# version\n# Betaflight / …\nset gyro_lpf1_static_hz = 250\n…',
-      pasteNote: 'El diff pegado tiene prioridad sobre los headers del log para el análisis de config.',
     },
 
     severity: {
@@ -545,10 +541,6 @@ export const es: Dict = {
     report: {
       title: 'Informe de vuelo',
       newAnalysis: 'Nuevo análisis',
-      configAria: 'Análisis de la config',
-      configTitle: 'Config',
-      configSourcePaste: '(diff all pegado)',
-      configSourceHeaders: '(headers del log)',
       fileAria: (fileName: string): string => `Informe ${fileName}`,
       validSessions: (count: number): string =>
         `${count} ${count > 1 ? 'sesiones válidas' : 'sesión válida'}`,

@@ -1,42 +1,41 @@
 # Configuration lint
 
 [`src/lib/cli/config.ts`](../src/lib/cli/config.ts) reviews the Betaflight
-configuration itself, independently of how the drone flew. It has two input
-paths and nine rules.
+configuration itself, independently of how the drone flew. One input path, nine
+rules.
 
-## Two sources, one shape
-
-```ts
-parseCliText(text: string): CliConfig            // source: 'paste'
-configFromHeaders(headers: Record<string,string>): CliConfig  // source: 'headers'
-```
-
-A pasted `diff all` always wins. When nothing is pasted, the configuration is
-reconstructed from the snapshot Betaflight writes into the headers of every
-blackbox session, which is why the config lint works from a log alone.
-
-`buildSessionReport` picks the source:
+## One source: the log headers
 
 ```ts
-const config = pasteConfig ?? configFromHeaders(fd.meta.headers);
+configFromHeaders(headers: Record<string,string>): CliConfig
 ```
 
-### Parsing a pasted diff
+Betaflight writes a snapshot of its configuration into the headers of every
+blackbox session, so the `.bbl` alone is enough:
 
-Two line shapes are recognised, everything else (`batch`, `board_name`,
-`profile`, `save`, comments, blank lines) is ignored:
-
-```
-set <name> = <value>      -> values[name.toLowerCase()] = value   (last one wins)
-feature <NAME>            -> features.add(NAME)
-feature -<NAME>           -> features.delete(NAME)
+```ts
+const config = configFromHeaders(fd.meta.headers);
 ```
 
-Feature lines are applied in order, so a `diff all` that enables then disables a
-feature ends up correct.
+### Why not a pasted `diff all`
 
-The raw text is kept in `CliConfig.raw`, which is what the share opt in attaches
-alongside the `.bbl`.
+The site used to accept a pasted `diff all` that overrode the headers. It was
+removed, because the headers beat it on all three counts that matter:
+
+- **Coverage.** Every key the nine rules read is present in the headers. A
+  regression test in [`tests/cli.test.ts`](../tests/cli.test.ts) extracts the
+  key list straight from the lint source and asserts the headers of a real log
+  carry all of them, so a new rule reading a header-less key fails the build
+  rather than going quiet.
+- **The right profile.** The headers hold the PID and rate profile that was
+  actually active during the flight. A `diff all` holds all of them at once,
+  with no way to tell which one flew.
+- **The right moment.** The headers were written by the flight itself. A diff is
+  pasted afterwards, possibly after the very change being investigated.
+
+A plain `diff` (rather than `diff all`) made it worse still: it only lists
+non-default values, so any rule keyed on an absent value silently stopped
+firing.
 
 ### Reconstructing from headers
 
@@ -65,8 +64,8 @@ Three passes:
    `DSHOT300`, `DSHOT600`, `PROSHOT1000`, `DISABLED`) so the evidence string
    reads like the CLI does.
 
-`features` stays empty on this path: decoding the raw bitmask would be work for
-no rule that currently needs it.
+The `features` bitmask is skipped: decoding it would be work for no rule that
+currently needs it.
 
 ### Value reading
 
@@ -114,16 +113,12 @@ produced two findings for one anomaly in every report.
 
 ## Where the findings land
 
-- With at least one usable session: config findings are merged into that
-  session's findings by `buildSessionReport` and appear inline with the flight
-  verdicts.
-- With a pasted diff and no usable session anywhere: they go to
-  `Report.configFindings` and render in their own block at the top of the
-  report, with the source labelled. This is the "review my config, I have no log
-  to give you" path.
+Config findings are merged into the session's findings by `buildSessionReport`
+and appear inline with the flight verdicts. There is no separate config block:
+no session means no headers, hence no configuration to review.
 
 ## Testing
 
-`tests/cli.test.ts` covers both parsers and every rule: the last `set` winning,
-feature add and remove ordering, the composite header splits, the enum mapping,
-the centivolt handling, and each rule firing and staying quiet.
+`tests/cli.test.ts` covers the header reconstruction and every rule: the
+composite header splits, the enum mapping, the centivolt handling, each rule
+firing and staying quiet, and the coverage guard described above.

@@ -1,4 +1,4 @@
-// Orchestrateur : ParsedFile[] + diff CLI éventuel → Report complet.
+// Orchestrateur : ParsedFile[] → Report complet.
 import { analyzeYoyo, analyzePropwash } from './analysis/flight';
 import { analyzeOscillation } from './analysis/oscillation';
 import {
@@ -12,7 +12,7 @@ import {
 } from './analysis/basic';
 import { analyzeSpectrum, analyzeFilters } from './analysis/spectrum';
 import { analyzeStepResponse } from './analysis/step';
-import { configFromHeaders, lintConfig, parseCliText } from './cli/config';
+import { configFromHeaders, lintConfig } from './cli/config';
 import { fr } from './i18n/fr';
 import { evaluateSession } from './rules/engine';
 import { pickProfile } from './rules/profiles';
@@ -81,28 +81,19 @@ export function composeFindings(
   return findings;
 }
 
-export function buildSessionReport(fd: FlightData, pasteConfig: CliConfig | null, dict: Dict = fr): SessionReport {
+export function buildSessionReport(fd: FlightData, dict: Dict = fr): SessionReport {
   const profile = pickProfile(fd.meta.craftName);
   const analysis = analyzeFlightData(fd, profile.motorPoles);
-  const config = pasteConfig ?? configFromHeaders(fd.meta.headers);
+  const config = configFromHeaders(fd.meta.headers);
   return { analysis, profile, findings: composeFindings(analysis, profile, config, dict) };
 }
 
-export function buildReport(files: ParsedFile[], cliText: string, dict: Dict = fr): Report {
-  const pasteConfig = cliText.trim().length > 0 ? parseCliText(cliText) : null;
-
+export function buildReport(files: ParsedFile[], dict: Dict = fr): Report {
   const fileReports: FileReport[] = files.map((pf) => ({
     fileName: pf.fileName,
-    sessionReports: pf.sessions.map((fd) => buildSessionReport(fd, pasteConfig, dict)),
+    sessionReports: pf.sessions.map((fd) => buildSessionReport(fd, dict)),
     skipped: pf.skipped,
   }));
 
-  // Lint global du diff collé sans contexte de session (utile si collé sans .bbl,
-  // ou pour les règles indépendantes du vol).
-  const configFindings =
-    pasteConfig && files.every((f) => f.sessions.length === 0)
-      ? sortFindings(lintConfig(pasteConfig, pickProfile(undefined), null, dict))
-      : [];
-
-  return { files: fileReports, config: pasteConfig, configFindings };
+  return { files: fileReports };
 }

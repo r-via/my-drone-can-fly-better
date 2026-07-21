@@ -21,7 +21,7 @@ src/worker/analyze.worker.ts
   |     +-> rules/profiles.ts    pickProfile(craftName) -> DroneProfile
   |     +-> analysis/*           12 metric modules      -> SessionAnalysis
   |     +-> rules/engine.ts      thresholds             -> Finding[]
-  |     +-> cli/config.ts        diff all or headers    -> Finding[] (config)
+  |     +-> cli/config.ts        log headers            -> Finding[] (config)
   |
   v  postMessage({ type: 'done', report })
 src/components/ReportView.tsx    render: score, tiles, 3 SVG charts, findings, CLI block
@@ -52,7 +52,6 @@ log never freezes the tab.
 ```ts
 type WorkerRequest = {
   files: Array<{ name: string; bytes: ArrayBuffer }>;
-  cliText: string;
   locale: Locale;
 };
 
@@ -88,13 +87,13 @@ src/
   components/     UI. charts/ holds three dependency free SVG components
   lib/
     types.ts      every shared contract, the single source of truth for units
-    report.ts     orchestrator: ParsedFile[] + CLI text -> Report
+    report.ts     orchestrator: ParsedFile[] -> Report
     analyze-client.ts   React hook wrapping the worker
     bbl/parse.ts  WASM adapter
     dsp/dsp.ts    FFT, Welch, band RMS, peaks, stats (260 lines, zero deps)
     analysis/     basic.ts, spectrum.ts, step.ts, flight.ts
     rules/        profiles.ts (thresholds), engine.ts (verdicts)
-    cli/config.ts diff all parsing + config lint
+    cli/config.ts config read from the log headers + config lint
     i18n/         fr/ is the reference shape, en/es/de/zh are typed against it
   worker/         analyze.worker.ts
 scripts/          analyze-node.mjs (CLI), smoke.mjs (decode probe)

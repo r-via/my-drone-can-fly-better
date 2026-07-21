@@ -19,7 +19,7 @@ export type AnalyzerState = {
 };
 
 export function useAnalyzer(): AnalyzerState & {
-  analyze(files: Array<{ name: string; bytes: Uint8Array }>, cliText: string, locale: Locale): void;
+  analyze(files: Array<{ name: string; bytes: Uint8Array }>, locale: Locale): void;
   reset(): void;
 } {
   const [state, setState] = useState<AnalyzerState>({ status: 'idle', report: null });
@@ -33,7 +33,7 @@ export function useAnalyzer(): AnalyzerState & {
     [],
   );
 
-  const analyze = useCallback((files: Array<{ name: string; bytes: Uint8Array }>, cliText: string, locale: Locale) => {
+  const analyze = useCallback((files: Array<{ name: string; bytes: Uint8Array }>, locale: Locale) => {
     // Worker frais par analyse : état WASM propre, et un run précédent
     // éventuellement bloqué est tué au lieu de faire la queue.
     workerRef.current?.terminate();
@@ -70,7 +70,6 @@ export function useAnalyzer(): AnalyzerState & {
         new Uint8Array(ab).set(f.bytes);
         return { name: f.name, bytes: ab };
       }),
-      cliText,
       locale,
     };
     worker.postMessage(

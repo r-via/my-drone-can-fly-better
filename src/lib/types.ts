@@ -279,15 +279,12 @@ export interface SessionAnalysis {
 }
 
 // ---------------------------------------------------------------------------
-// Config CLI (diff all / dump collé, ou headers du log)
+// Config Betaflight, reconstruite depuis les headers du log
 // ---------------------------------------------------------------------------
 
 export interface CliConfig {
-  /** set name = value (le dernier gagne) */
+  /** Nom CLI → valeur, tels que les headers "H clé:valeur" les portent. */
   values: Record<string, string>;
-  features: string[]; // feature XXX / feature -XXX appliqués
-  source: 'paste' | 'headers';
-  raw?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -392,8 +389,6 @@ export interface FileReport {
 
 export interface Report {
   files: FileReport[];
-  config: CliConfig | null;
-  configFindings: Finding[];
   /**
    * Présent uniquement pour un rapport reconstruit depuis un lien partagé.
    * `trimmed` : les courbes n'ont pas tenu dans l'URL, l'affichage doit le dire

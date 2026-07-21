@@ -54,8 +54,8 @@ interface SessionMeta {
 ```
 
 `headers` is the full Betaflight configuration snapshot that the firmware
-writes at the top of every session. It is what makes the config lint work from
-a log alone, with no `diff all` pasted.
+writes at the top of every session. It is the sole input of the config lint,
+which is why the `.bbl` alone is enough.
 
 ### `FlightData`
 
@@ -185,13 +185,12 @@ renamed.
 ```ts
 interface SessionReport { analysis: SessionAnalysis; profile: DroneProfile; findings: Finding[] }
 interface FileReport    { fileName: string; sessionReports: SessionReport[]; skipped: SkippedSession[] }
-interface Report        { files: FileReport[]; config: CliConfig | null; configFindings: Finding[] }
+interface Report        { files: FileReport[]; shared?: { trimmed: boolean } }
 ```
 
-`Report.configFindings` is only populated when a `diff all` was pasted and no
-`.bbl` produced a usable session, that is, when the user wants a config review
-with no flight attached. When sessions exist, config findings are merged into
-each session's `findings` instead, so a report reads as one list per session.
+Config findings are merged into each session's `findings` by
+`buildSessionReport`, so a report reads as one list per session. `shared` is set
+only on a report rebuilt from a share link.
 
 ## Profiles
 
@@ -210,17 +209,14 @@ tabulated in [profiles.md](profiles.md). The display label and the notes shown
 under the gauge are not in the profile, they live in
 `dict.rules.profiles[id].{ label, notes }`, so a profile stays pure data.
 
-## CLI config
+## Betaflight config
 
 ```ts
 interface CliConfig {
-  values: Record<string, string>;   // set name = value, last one wins, keys lowercased
-  features: string[];               // feature XXX / feature -XXX applied in order
-  source: 'paste' | 'headers';
-  raw?: string;                     // the pasted text, kept for the share opt-in
+  values: Record<string, string>;   // CLI name -> value, rebuilt from the log headers
 }
 ```
 
-`features` is only populated from a pasted diff. Reconstructing it from headers
-would mean decoding the raw feature bitmask, which is not worth it, so
-`configFromHeaders` returns an empty list. See [config-lint.md](config-lint.md).
+Built by `configFromHeaders`, the only source. The raw feature bitmask is
+skipped: decoding it would be work for no rule that needs it. See
+[config-lint.md](config-lint.md).

@@ -447,7 +447,10 @@ export const en: Dict = {
       supportKofi: 'Support on Ko-fi',
       footerKofi: 'This site saving you packs? Buy me a coffee:',
       joinDiscord: 'Discord',
-    viewSource: 'Source on GitHub',
+      viewSource: 'Source on GitHub',
+      updateAvailable: 'New version available',
+      updateReload: 'Reload',
+      updateDismiss: 'Later',
     },
 
     // Language-dependent units (Mo/Ko in French, MB/KB in English).
@@ -498,13 +501,6 @@ export const en: Dict = {
       rejected: (names: string): string => `Skipped (neither .bbl nor .bfl): ${names}`,
       selectedFilesAria: 'Selected files',
       removeFile: (name: string): string => `Remove ${name}`,
-      pasteSummaryBefore: 'Paste your ',
-      pasteSummaryCode: 'diff all',
-      pasteSummaryAfter: ' (optional - otherwise I read the config from the log)',
-      pasteLabel: 'Output of the Betaflight diff all command',
-      pastePlaceholder:
-        '# diff all\n# version\n# Betaflight / …\nset gyro_lpf1_static_hz = 250\n…',
-      pasteNote: 'A pasted diff takes priority over the log headers for the config analysis.',
     },
 
     // Severities (FindingCard badges) and global session verdict.
@@ -556,10 +552,6 @@ export const en: Dict = {
     report: {
       title: 'Flight report',
       newAnalysis: 'New analysis',
-      configAria: 'Config analysis',
-      configTitle: 'Config',
-      configSourcePaste: '(pasted diff all)',
-      configSourceHeaders: '(log headers)',
       fileAria: (fileName: string): string => `Report ${fileName}`,
       validSessions: (count: number): string =>
         `${count} ${count > 1 ? 'valid sessions' : 'valid session'}`,

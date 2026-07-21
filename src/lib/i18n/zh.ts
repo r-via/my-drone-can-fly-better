@@ -451,7 +451,10 @@ export const zh: Dict = {
       supportKofi: '在 Ko-fi 上支持',
       footerKofi: '这个网站帮你省下了电池？请杯咖啡吧：',
       joinDiscord: 'Discord',
-    viewSource: 'GitHub 源码',
+      viewSource: 'GitHub 源码',
+      updateAvailable: '有新版本',
+      updateReload: '重新加载',
+      updateDismiss: '稍后',
     },
 
     // 随语言变化的单位（Mo/Ko ↔ MB/KB）。
@@ -503,13 +506,6 @@ export const zh: Dict = {
       rejected: (names: string): string => `已忽略（既不是 .bbl 也不是 .bfl）：${names}`,
       selectedFilesAria: '已选文件',
       removeFile: (name: string): string => `移除 ${name}`,
-      pasteSummaryBefore: '粘贴你的 ',
-      pasteSummaryCode: 'diff all',
-      pasteSummaryAfter: '（可选 - 不贴的话我就从日志里读配置）',
-      pasteLabel: 'Betaflight 的 diff all 命令输出',
-      pastePlaceholder:
-        '# diff all\n# version\n# Betaflight / …\nset gyro_lpf1_static_hz = 250\n…',
-      pasteNote: '配置分析以粘贴的 diff 为准，优先于日志头。',
     },
 
     // 严重度（FindingCard 徽章）与会话整体判定。
@@ -561,10 +557,6 @@ export const zh: Dict = {
     report: {
       title: '飞行报告',
       newAnalysis: '新的分析',
-      configAria: '配置分析',
-      configTitle: '配置',
-      configSourcePaste: '（粘贴的 diff all）',
-      configSourceHeaders: '（日志头）',
       fileAria: (fileName: string): string => `报告 ${fileName}`,
       validSessions: (count: number): string => `${count} 个有效会话`,
       skippedSessions: (count: number): string => `${count} 个已忽略`,

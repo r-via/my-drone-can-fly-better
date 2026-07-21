@@ -8,7 +8,6 @@ loop when working on the analysis itself.
 ```bash
 npm run analyze -- flight.bbl                       # one log
 npm run analyze -- log1.bbl log2.bbl log3.bbl       # several
-npm run analyze -- flight.bbl --cli diff-all.txt    # with a pasted diff all
 npm run analyze -- flight.bbl --lang fr             # en | fr | es | de | zh
 ```
 
@@ -47,9 +46,8 @@ Per file, then per session:
 Severity icons are `❌ crit`, `⚠️ warn`, `ℹ️ info`, `✅ ok`. Each finding prints
 its evidence, then its fix text, then the CLI lines it suggests, indented.
 
-Skipped sessions are listed first with their size and reason. A standalone
-config lint block prints at the end when a `diff all` was passed with no usable
-session.
+Skipped sessions are listed first with their size and reason. Config verdicts
+are read from the log headers and print inline with the flight verdicts.
 
 The CLI does not print the score out of 100. That number is a rendering choice
 of the report screen, not part of the analysis.

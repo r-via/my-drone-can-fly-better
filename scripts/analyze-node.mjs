@@ -1,5 +1,5 @@
 // Runner Node du pipeline complet (mêmes modules que le site).
-// Usage : npm run analyze -- <log.bbl> [log2.bbl ...] [--cli <diff.txt>] [--lang fr|en|es|de|zh]
+// Usage : npm run analyze -- <log.bbl> [log2.bbl ...] [--lang fr|en|es|de|zh]
 import { readFile } from 'node:fs/promises';
 
 import { initWasm, parseFile } from '../src/lib/bbl/parse.ts';
@@ -9,12 +9,6 @@ import { buildReport } from '../src/lib/report.ts';
 const ICONS = { crit: '❌', warn: '⚠️ ', info: 'ℹ️ ', ok: '✅' };
 
 const args = process.argv.slice(2);
-const cliIdx = args.indexOf('--cli');
-let cliText = '';
-if (cliIdx !== -1) {
-  cliText = await readFile(args[cliIdx + 1], 'utf8');
-  args.splice(cliIdx, 2);
-}
 
 let locale = detectLocaleFromEnv(process.env);
 const langIdx = args.indexOf('--lang');
@@ -35,7 +29,7 @@ for (const path of args) {
   parsed.push(await parseFile(path.split('/').pop(), buf, dict));
 }
 
-const report = buildReport(parsed, cliText, dict);
+const report = buildReport(parsed, dict);
 
 for (const file of report.files) {
   console.log(`\n━━━ ${file.fileName} ━━━`);
@@ -65,9 +59,4 @@ for (const file of report.files) {
       }
     }
   }
-}
-
-if (report.configFindings.length > 0) {
-  console.log('\n━━━ Lint config (diff collé) ━━━');
-  for (const f of report.configFindings) console.log(`  ${ICONS[f.severity]} ${f.title} - ${f.evidence}`);
 }

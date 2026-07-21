@@ -11,7 +11,6 @@ interface ShareMeta {
   craftNames?: string[];
   locale?: string;
   fileCount?: number;
-  hasConfig?: boolean;
 }
 
 function parseMeta(raw: FormDataEntryValue | null): ShareMeta {
@@ -75,7 +74,6 @@ export default async (req: Request): Promise<Response> => {
     meta.craftNames?.length ? `Craft: \`${meta.craftNames.join(', ')}\`` : null,
     meta.locale ? `Locale: ${meta.locale}` : null,
     meta.fileCount ? `Files: ${meta.fileCount}` : null,
-    meta.hasConfig ? 'Config: pasted diff all attached' : null,
   ].filter((line): line is string => Boolean(line));
 
   outgoing.append('payload_json', JSON.stringify({ content: lines.join('\n').slice(0, 1900) }));

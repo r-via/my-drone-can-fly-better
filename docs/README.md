@@ -29,7 +29,7 @@ If you are new to the code, read in this order:
 | [dsp.md](dsp.md) | FFT, Welch, band RMS, peak picking, numpy conventions |
 | [analysis.md](analysis.md) | Power, motors, noise, spectrum, tracking, step, yoyo, prop wash, filters, timeline, GPS, failsafe |
 | [rules.md](rules.md) | The 23 flight rules: condition, threshold, evidence, fix |
-| [config-lint.md](config-lint.md) | `diff all` parsing, header reconstruction, the 9 config rules |
+| [config-lint.md](config-lint.md) | config reconstruction from the log headers, the 9 config rules |
 | [profiles.md](profiles.md) | Drone profiles, threshold table, adding a machine |
 | [i18n.md](i18n.md) | Dictionary shape, five locales, detection, adding a language |
 | [ui.md](ui.md) | Components, flight score, charts, design tokens, accessibility |

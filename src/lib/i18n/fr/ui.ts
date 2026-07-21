@@ -14,6 +14,11 @@ export const ui = {
     footerKofi: 'Ce site te fait gagner des packs ? Offre un café :',
     joinDiscord: 'Discord',
     viewSource: 'Le code sur GitHub',
+
+    // src/components/ServiceWorkerRegister.tsx - mise à jour hors ligne.
+    updateAvailable: 'Nouvelle version disponible',
+    updateReload: 'Recharger',
+    updateDismiss: 'Plus tard',
   },
 
   // Unités dépendantes de la langue (Mo/Ko ↔ MB/KB).
@@ -65,13 +70,6 @@ export const ui = {
     rejected: (names: string): string => `Ignoré (ni .bbl ni .bfl) : ${names}`,
     selectedFilesAria: 'Fichiers sélectionnés',
     removeFile: (name: string): string => `Retirer ${name}`,
-    pasteSummaryBefore: 'Colle ton ',
-    pasteSummaryCode: 'diff all',
-    pasteSummaryAfter: ' (optionnel - sinon je lis la config depuis le log)',
-    pasteLabel: 'Sortie de la commande diff all de Betaflight',
-    pastePlaceholder:
-      '# diff all\n# version\n# Betaflight / …\nset gyro_lpf1_static_hz = 250\n…',
-    pasteNote: "Le diff collé prime sur les headers du log pour l'analyse de config.",
   },
 
   // Sévérités (badges FindingCard) et verdict global de session.
@@ -123,10 +121,6 @@ export const ui = {
   report: {
     title: 'Rapport de vol',
     newAnalysis: 'Nouvelle analyse',
-    configAria: 'Analyse de la config',
-    configTitle: 'Config',
-    configSourcePaste: '(diff all collé)',
-    configSourceHeaders: '(headers du log)',
     fileAria: (fileName: string): string => `Rapport ${fileName}`,
     validSessions: (count: number): string =>
       `${count} ${count > 1 ? 'sessions valides' : 'session valide'}`,

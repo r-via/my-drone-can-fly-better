@@ -22,7 +22,7 @@ self hosted: Rajdhani for display, Manrope for text, both SIL OFL, loaded with
 
 ```
 Shell               header, footer, external links, LanguageSwitcher
-UploadZone          drag and drop, file list, the collapsible `diff all` textarea
+UploadZone          drag and drop, file list
 ReportView          the report screen
   ScoreGauge        the /100 ring, count up animation, confetti on a clean flight
   MetricTile        one figure with a tone bar (neutral, ok, warn, crit)
@@ -161,9 +161,8 @@ versions the GUI button can wipe the configuration.
 ## The share opt-in
 
 `ShareLogToggle` sits at the bottom of a report. It is idle until clicked. On
-click it posts the raw `.bbl` files, plus the pasted `diff all` when there is
-one, plus a small metadata blob (craft names, locale, file count) to
-`/.netlify/functions/submit-log`. It refuses locally above 7 MB total to avoid a
+click it posts the raw `.bbl` files plus a small metadata blob (craft names,
+locale, file count) to `/.netlify/functions/submit-log`. It refuses locally above 7 MB total to avoid a
 pointless round trip against the Discord attachment limit.
 
 Nothing is sent before the click, and the component renders nothing at all when

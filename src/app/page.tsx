@@ -3,18 +3,76 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAnalyzer } from '@/lib/analyze-client';
 import { useLocale } from '@/lib/i18n/locale';
+import { ShareDecodeError, decodeSession } from '@/lib/share/codec';
 import ReportView from '@/components/ReportView';
 import UploadZone from '@/components/UploadZone';
 import { AlertIcon } from '@/components/icons';
+
+import type { Report } from '@/lib/types';
 
 export default function Page() {
   const analyzer = useAnalyzer();
   const { locale, dict } = useLocale();
   const t = dict.ui.page;
   const [files, setFiles] = useState<File[]>([]);
-  const [cliText, setCliText] = useState('');
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState<string | null>(null);
+
+  // Rapport reçu par lien. On conserve la charge encodée en plus du rapport
+  // décodé : c'est elle qui permet de re-rendre le rapport dans une autre
+  // langue sans rien redemander à personne.
+  const [sharedEncoded, setSharedEncoded] = useState<string | null>(null);
+  const [sharedReport, setSharedReport] = useState<Report | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
+
+  // Le fragment n'est jamais transmis au serveur : le rapport partagé n'apparaît
+  // donc dans aucun log d'accès, ce qui vaut aussi pour un site statique.
+  //
+  // `hashchange` en plus du montage : une navigation qui ne change que le
+  // fragment ne recharge pas le document. Sans cet écouteur, coller un lien de
+  // partage dans un onglet déjà ouvert sur le site ne produisait rien.
+  useEffect(() => {
+    const read = () => {
+      const match = /^#r=(.+)$/.exec(window.location.hash);
+      if (match) setSharedEncoded(match[1]);
+    };
+    read();
+    window.addEventListener('hashchange', read);
+    return () => window.removeEventListener('hashchange', read);
+  }, []);
+
+  useEffect(() => {
+    if (!sharedEncoded) return;
+    let cancelled = false;
+    void decodeSession(sharedEncoded, dict)
+      .then((report) => {
+        if (cancelled) return;
+        setSharedReport(report);
+        setShareError(null);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setSharedReport(null);
+        setShareError(
+          e instanceof ShareDecodeError && e.reason === 'version'
+            ? dict.ui.shareLink.decodeErrorVersion
+            : dict.ui.shareLink.decodeErrorMalformed,
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+    // `dict` en dépendance : changer de langue re-rend le rapport partagé dans
+    // la nouvelle langue, sans le perdre et sans relire le moindre fichier.
+  }, [sharedEncoded, dict]);
+
+  const dismissShared = () => {
+    // Retirer le fragment, sinon un rechargement ramènerait le rapport partagé.
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    setSharedEncoded(null);
+    setSharedReport(null);
+    setShareError(null);
+  };
 
   const startAnalysis = async () => {
     if (files.length === 0 || reading) return;
@@ -27,7 +85,7 @@ export default function Page() {
           bytes: new Uint8Array(await f.arrayBuffer()),
         })),
       );
-      analyzer.analyze(payload, cliText, locale);
+      analyzer.analyze(payload, locale);
     } catch (e) {
       // File.arrayBuffer() peut rejeter (carte SD éjectée, fichier modifié
       // après sélection) : sans ce catch le clic échouait en silence.
@@ -68,14 +126,18 @@ export default function Page() {
         onReset={() => {
           analyzer.reset();
           setFiles([]);
-          setCliText('');
           setReadError(null);
         }}
       />
     );
   }
 
-  if (analyzer.status === 'working' || reading) {
+  // Après l'analyseur : analyser son propre log doit remplacer la vue partagée.
+  if (sharedReport) {
+    return <ReportView report={sharedReport} files={[]} onReset={dismissShared} />;
+  }
+
+  if (analyzer.status === 'working' || reading || (sharedEncoded && !shareError)) {
     return (
       <div
         role="status"
@@ -122,7 +184,7 @@ export default function Page() {
         </ol>
       </section>
 
-      {analyzer.status === 'error' || readError ? (
+      {analyzer.status === 'error' || readError || shareError ? (
         <div
           role="alert"
           className="flex items-start gap-2.5 rounded-2xl border border-crit/40 bg-crit/10 p-4 text-sm text-ink"
@@ -130,19 +192,15 @@ export default function Page() {
           <AlertIcon className="mt-0.5 size-4 shrink-0 text-crit" />
           <div>
             <p className="font-bold text-crit">{t.errorTitle}</p>
-            <p className="mt-1 text-ink-2">{readError ?? analyzer.error ?? t.errorUnknown}</p>
+            <p className="mt-1 text-ink-2">
+              {shareError ?? readError ?? analyzer.error ?? t.errorUnknown}
+            </p>
           </div>
         </div>
       ) : null}
 
       <section aria-label={t.uploadAria} className="space-y-4">
-        <UploadZone
-          files={files}
-          onFilesChange={setFiles}
-          cliText={cliText}
-          onCliTextChange={setCliText}
-          disabled={reading}
-        />
+        <UploadZone files={files} onFilesChange={setFiles} disabled={reading} />
         <button
           type="button"
           onClick={() => void startAnalysis()}

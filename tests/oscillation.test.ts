@@ -133,7 +133,7 @@ describe('analyzeOscillation - golden racer DAKE F722', () => {
   });
 
   it('produit un verdict critique, pas un simple avertissement', () => {
-    const findings = buildSessionReport(racer, null).findings;
+    const findings = buildSessionReport(racer).findings;
     const f = findings.find((x) => x.id === 'oscillation-event');
     expect(f).toBeDefined();
     expect(f!.severity).toBe('crit');
@@ -150,7 +150,7 @@ describe('analyzeOscillation - golden racer DAKE F722', () => {
     // saturationPct est mesuré DANS la fenêtre, pas sur le log : il reste élevé
     // alors que la saturation globale du log n'est que de 0.4 %.
     expect(long.worst!.saturationPct).toBeGreaterThan(60);
-    expect(buildSessionReport(racer, null).analysis.motors.saturationPct).toBeLessThan(1);
+    expect(buildSessionReport(racer).analysis.motors.saturationPct).toBeLessThan(1);
   });
 
   it('mesure la crête gyro, qui sépare une oscillation d’un crash', () => {
@@ -177,7 +177,7 @@ describe('analyzeOscillation - golden racer DAKE F722', () => {
 describe('analyzeOscillation - pas de faux positif sur le parc', () => {
   it('aucun verdict oscillation-event sur chimera / lr4 / pico', () => {
     for (const fd of [chimera, lr4, pico]) {
-      const findings = buildSessionReport(fd, null).findings;
+      const findings = buildSessionReport(fd).findings;
       expect(findings.find((f) => f.id === 'oscillation-event')).toBeUndefined();
     }
   });

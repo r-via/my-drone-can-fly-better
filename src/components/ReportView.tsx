@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { eventSeverity, qualifyingEvents } from '@/lib/analysis/oscillation';
 import { useLocale } from '@/lib/i18n/locale';
 import type {
-  CliConfig,
   FileReport,
   Finding,
   FindingCategory,
@@ -164,12 +163,10 @@ const CHIP_CATEGORIES: FindingCategory[] = [
 function SessionBlock({
   sessionReport,
   fileName,
-  pasteConfig,
   shareable,
 }: {
   sessionReport: SessionReport;
   fileName: string;
-  pasteConfig: CliConfig | null;
   /** Faux sur un rapport déjà reçu par lien : on ne repartage pas un partage. */
   shareable: boolean;
 }) {
@@ -392,9 +389,7 @@ function SessionBlock({
         ))
       )}
 
-      {shareable ? (
-        <ShareLink sessionReport={sessionReport} fileName={fileName} pasteConfig={pasteConfig} />
-      ) : null}
+      {shareable ? <ShareLink sessionReport={sessionReport} fileName={fileName} /> : null}
     </div>
   );
 }
@@ -403,13 +398,11 @@ function FileSection({
   file,
   selected,
   onSelect,
-  pasteConfig,
   shareable,
 }: {
   file: FileReport;
   selected: number;
   onSelect: (i: number) => void;
-  pasteConfig: CliConfig | null;
   shareable: boolean;
 }) {
   const { locale, dict } = useLocale();
@@ -463,12 +456,7 @@ function FileSection({
       </div>
 
       {current ? (
-        <SessionBlock
-          sessionReport={current}
-          fileName={file.fileName}
-          pasteConfig={pasteConfig}
-          shareable={shareable}
-        />
+        <SessionBlock sessionReport={current} fileName={file.fileName} shareable={shareable} />
       ) : (
         <p className="rounded-2xl border border-line bg-surface p-4 text-sm text-ink-2">
           {t.noUsableSession}
@@ -495,13 +483,12 @@ export default function ReportView({
   const t = dict.ui.report;
   const [selection, setSelection] = useState<Record<number, number>>({});
 
-  const cliFindings: Finding[] = [...report.configFindings];
+  const cliFindings: Finding[] = [];
   report.files.forEach((file, i) => {
     const sr = file.sessionReports[selection[i] ?? 0];
     if (sr) cliFindings.push(...sr.findings);
   });
 
-  const configGroups = groupFindings(report.configFindings);
   const craftNames = report.files
     .map((f) => f.sessionReports[0]?.analysis.meta.craftName)
     .filter((name): name is string => Boolean(name));
@@ -533,38 +520,19 @@ export default function ReportView({
         </div>
       ) : null}
 
-      {report.configFindings.length > 0 ? (
-        <section aria-label={t.configAria} className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">
-            {t.configTitle}{' '}
-            {report.config?.source === 'paste' ? t.configSourcePaste : t.configSourceHeaders}
-          </h3>
-          {configGroups.flatMap((group) =>
-            group.findings.map((finding, i) => (
-              <FindingCard key={`${finding.id}-${i}`} finding={finding} />
-            )),
-          )}
-        </section>
-      ) : null}
-
       {report.files.map((file, i) => (
         <FileSection
           key={file.fileName}
           file={file}
           selected={selection[i] ?? 0}
           onSelect={(v) => setSelection((prev) => ({ ...prev, [i]: v }))}
-          pasteConfig={report.config?.source === 'paste' ? report.config : null}
           shareable={!isShared}
         />
       ))}
 
       <CliExport findings={cliFindings} />
 
-      <ShareLogToggle
-        files={files}
-        craftNames={craftNames}
-        configText={report.config?.source === 'paste' ? report.config.raw : null}
-      />
+      <ShareLogToggle files={files} craftNames={craftNames} />
     </div>
   );
 }

@@ -63,8 +63,8 @@ What it does:
 4. appends files until the cumulative size would exceed 7 500 000 bytes, which
    leaves margin under the 8 MB attachment limit of a non boosted Discord
    webhook;
-5. builds a short message from the metadata (craft names, locale, file count,
-   whether a `diff all` was attached), capped at 1900 characters;
+5. builds a short message from the metadata (craft names, locale, file count),
+   capped at 1900 characters;
 6. relays everything to the webhook.
 
 Responses:

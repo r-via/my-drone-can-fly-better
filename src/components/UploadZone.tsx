@@ -15,18 +15,10 @@ function fmtBytes(n: number, mega: string, kilo: string): string {
 export interface UploadZoneProps {
   files: File[];
   onFilesChange: (files: File[]) => void;
-  cliText: string;
-  onCliTextChange: (value: string) => void;
   disabled?: boolean;
 }
 
-export default function UploadZone({
-  files,
-  onFilesChange,
-  cliText,
-  onCliTextChange,
-  disabled = false,
-}: UploadZoneProps) {
+export default function UploadZone({ files, onFilesChange, disabled = false }: UploadZoneProps) {
   const { dict } = useLocale();
   const t = dict.ui.upload;
   const [dragOver, setDragOver] = useState(false);
@@ -121,30 +113,6 @@ export default function UploadZone({
           ))}
         </ul>
       ) : null}
-
-      <details className="rounded-2xl border border-line bg-surface">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-ink-2 hover:text-ink">
-          {t.pasteSummaryBefore}
-          <code className="font-mono">{t.pasteSummaryCode}</code>
-          {t.pasteSummaryAfter}
-        </summary>
-        <div className="border-t border-line p-4">
-          <label htmlFor="cli-paste" className="sr-only">
-            {t.pasteLabel}
-          </label>
-          <textarea
-            id="cli-paste"
-            value={cliText}
-            disabled={disabled}
-            onChange={(e) => onCliTextChange(e.target.value)}
-            rows={8}
-            spellCheck={false}
-            placeholder={t.pastePlaceholder}
-            className="w-full resize-y rounded-md border border-line bg-bg/60 p-3 font-mono text-xs text-ink placeholder:text-ink-3"
-          />
-          <p className="mt-2 text-xs text-ink-3">{t.pasteNote}</p>
-        </div>
-      </details>
     </div>
   );
 }

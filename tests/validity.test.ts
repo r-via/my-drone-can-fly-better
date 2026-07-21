@@ -30,7 +30,7 @@ beforeAll(async () => {
   pico = await load(PICO, 'btfl_002.bbl');
 });
 
-const ids = (fd: FlightData): string[] => buildSessionReport(fd, null).findings.map((f) => f.id);
+const ids = (fd: FlightData): string[] => buildSessionReport(fd).findings.map((f) => f.id);
 
 // ---------------------------------------------------------------------------
 // Plausibilité vbat
@@ -86,7 +86,7 @@ describe('lint de config depuis les en-têtes du .bbl', () => {
     // Le verdict n'existe QUE parce que l'oscillation est détectée à côté.
     const got = ids(racer);
     expect(got).toContain('filter-coverage-suspect');
-    const f = buildSessionReport(racer, null).findings.find(
+    const f = buildSessionReport(racer).findings.find(
       (x) => x.id === 'filter-coverage-suspect',
     )!;
     expect(f.evidence).toContain('dyn_notch_count = 1');
@@ -98,7 +98,7 @@ describe('lint de config depuis les en-têtes du .bbl', () => {
     // de fade à min_hz + fade_range. Proposer min_hz = 130 avec fade = 20
     // redonne le plafond 150 Hz d'origine (100 + 50) et ne corrige donc rien,
     // alors qu'un test sur min_hz seul passerait au vert.
-    const r = buildSessionReport(racer, null);
+    const r = buildSessionReport(racer);
     const f = r.findings.find((x) => x.id === 'filter-coverage-suspect')!;
     const cli = f.fix?.cli?.join(' ') ?? '';
     const minHz = Number(/rpm_filter_min_hz = (\d+)/.exec(cli)?.[1]);
@@ -128,7 +128,7 @@ describe('lint de config depuis les en-têtes du .bbl', () => {
     // deux : Betaflight garderait la dernière, silencieusement.
     for (const fd of [racer, chimera, lr4, pico]) {
       const seen = new Map<string, string>();
-      for (const f of buildSessionReport(fd, null).findings) {
+      for (const f of buildSessionReport(fd).findings) {
         for (const line of f.fix?.cli ?? []) {
           const m = /^set\s+([a-z0-9_]+)\s*=\s*(.+)$/i.exec(line.trim());
           if (!m) continue;
@@ -178,7 +178,7 @@ describe('lint de config depuis les en-têtes du .bbl', () => {
 
 describe('rapport complet du racer partagé', () => {
   it('le verdict le plus grave est l’oscillation, pas la batterie', () => {
-    const findings = buildSessionReport(racer, null).findings;
+    const findings = buildSessionReport(racer).findings;
     expect(findings[0].id).toBe('oscillation-event');
     expect(findings[0].severity).toBe('crit');
     // Plus aucun critique batterie : c'étaient les deux faux positifs.

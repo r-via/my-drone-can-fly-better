@@ -444,7 +444,10 @@ export const de: Dict = {
       supportKofi: 'Auf Ko-fi unterstützen',
       footerKofi: 'Diese Seite rettet dir Packs? Spendier einen Kaffee:',
       joinDiscord: 'Discord',
-    viewSource: 'Quellcode auf GitHub',
+      viewSource: 'Quellcode auf GitHub',
+      updateAvailable: 'Neue Version verfügbar',
+      updateReload: 'Neu laden',
+      updateDismiss: 'Später',
     },
 
     units: {
@@ -493,13 +496,6 @@ export const de: Dict = {
       rejected: (names: string): string => `Ignoriert (weder .bbl noch .bfl): ${names}`,
       selectedFilesAria: 'Ausgewählte Dateien',
       removeFile: (name: string): string => `${name} entfernen`,
-      pasteSummaryBefore: 'Füg dein ',
-      pasteSummaryCode: 'diff all',
-      pasteSummaryAfter: ' ein (optional - sonst lese ich die Config aus dem Log)',
-      pasteLabel: 'Ausgabe des Betaflight-Kommandos diff all',
-      pastePlaceholder:
-        '# diff all\n# version\n# Betaflight / …\nset gyro_lpf1_static_hz = 250\n…',
-      pasteNote: 'Der eingefügte Diff hat für die Config-Analyse Vorrang vor den Log-Headern.',
     },
 
     severity: {
@@ -545,10 +541,6 @@ export const de: Dict = {
     report: {
       title: 'Flugbericht',
       newAnalysis: 'Neue Analyse',
-      configAria: 'Config-Analyse',
-      configTitle: 'Config',
-      configSourcePaste: '(diff all eingefügt)',
-      configSourceHeaders: '(Log-Header)',
       fileAria: (fileName: string): string => `Bericht ${fileName}`,
       validSessions: (count: number): string =>
         `${count} ${count > 1 ? 'gültige Sessions' : 'gültige Session'}`,

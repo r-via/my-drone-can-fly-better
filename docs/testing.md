@@ -21,7 +21,7 @@ golden suites decode real multi megabyte logs. Configuration is
 | `spectrum.test.ts` | 12 | yes | bands, peaks, motor attribution, filter attenuation |
 | `flight.test.ts` | 11 | yes | yoyo and prop wash |
 | `step.test.ts` | 5 | yes | step response, quality gating |
-| `cli.test.ts` | 12 | yes | diff parsing, header reconstruction, the nine lint rules |
+| `cli.test.ts` | 11 | yes | header reconstruction, lint-key coverage guard, the nine lint rules |
 | `parse.test.ts` | 1 | yes | the decoder agreeing with orangebox on a real chimera log |
 
 The four synthetic suites run anywhere and are where new logic gets covered.
