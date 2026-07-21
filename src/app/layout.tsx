@@ -1,3 +1,4 @@
+import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 import Shell from '@/components/Shell';
 import { LocaleProvider } from '@/lib/i18n/locale';
 import { manrope, rajdhani } from './fonts';
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       >
         <LocaleProvider>
           <Shell>{children}</Shell>
+          <ServiceWorkerRegister />
         </LocaleProvider>
       </body>
     </html>

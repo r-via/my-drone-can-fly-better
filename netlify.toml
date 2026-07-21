@@ -5,3 +5,16 @@
 
 [build.environment]
   NODE_VERSION = "20"
+
+# Le service worker doit être revalidé à chaque visite, sinon un nouveau build
+# reste invisible tant que l'ancien sw.js est en cache HTTP.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Chunks hashés par Next : immuables, jamais revalidés.
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
