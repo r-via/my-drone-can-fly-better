@@ -8,6 +8,8 @@ export interface ShareLogToggleProps {
   files: File[];
   /** Noms de craft détectés, pour contexte dans le message envoyé - purement informatif. */
   craftNames: string[];
+  /** `diff all` collé par l'utilisateur, s'il prime sur les headers du log - voir CliConfig.raw. */
+  configText?: string | null;
 }
 
 type Status = 'idle' | 'sending' | 'sent' | 'error' | 'too-large';
@@ -15,7 +17,7 @@ type Status = 'idle' | 'sending' | 'sent' | 'error' | 'too-large';
 // Marge sous la limite de pièce jointe Discord (8 Mo pour un webhook non boosté).
 const MAX_TOTAL_BYTES = 7_000_000;
 
-export default function ShareLogToggle({ files, craftNames }: ShareLogToggleProps) {
+export default function ShareLogToggle({ files, craftNames, configText }: ShareLogToggleProps) {
   const { locale, dict } = useLocale();
   const t = dict.ui.shareLog;
   const [status, setStatus] = useState<Status>('idle');
@@ -27,7 +29,8 @@ export default function ShareLogToggle({ files, craftNames }: ShareLogToggleProp
 
   const send = async () => {
     if (busy || sent) return;
-    const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+    const configBytes = configText ? new Blob([configText]).size : 0;
+    const totalBytes = files.reduce((sum, f) => sum + f.size, 0) + configBytes;
     if (totalBytes > MAX_TOTAL_BYTES) {
       setStatus('too-large');
       return;
@@ -36,7 +39,13 @@ export default function ShareLogToggle({ files, craftNames }: ShareLogToggleProp
     try {
       const body = new FormData();
       files.forEach((f, i) => body.append(`file${i}`, f, f.name));
-      body.append('meta', JSON.stringify({ craftNames, locale, fileCount: files.length }));
+      if (configText) {
+        body.append('config', new File([configText], 'diff-all.txt', { type: 'text/plain' }));
+      }
+      body.append(
+        'meta',
+        JSON.stringify({ craftNames, locale, fileCount: files.length, hasConfig: Boolean(configText) }),
+      );
       // Chemin natif des Netlify Functions - fonctionne sans redirect dédié,
       // que ce soit en prod ou via `netlify dev` en local (voir README).
       const res = await fetch('/.netlify/functions/submit-log', { method: 'POST', body });

@@ -482,7 +482,11 @@ export default function ReportView({
 
       <CliExport findings={cliFindings} />
 
-      <ShareLogToggle files={files} craftNames={craftNames} />
+      <ShareLogToggle
+        files={files}
+        craftNames={craftNames}
+        configText={report.config?.source === 'paste' ? report.config.raw : null}
+      />
     </div>
   );
 }
