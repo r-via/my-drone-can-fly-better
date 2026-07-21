@@ -149,7 +149,10 @@ Failures are localised, never global:
 - A session that fails to decode (power cut mid log, corrupt headers) is pushed
   to `skipped` with its size and reason. Sibling sessions in the same file are
   still analysed.
-- A session shorter than 100 frames is skipped as an arming blip.
+- A session shorter than 100 frames is skipped as an arming blip, and a session
+  shorter than 10 s of flight is skipped as too short to analyse: the metrics
+  would exist but mean nothing (not enough FFT windows, stick transitions or
+  battery load).
 - Anything thrown above that level becomes `{ type: 'error' }` and the UI shows
   a single error panel with a retry path.
 - `File.arrayBuffer()` rejecting (SD card ejected mid selection) is caught in

@@ -1,9 +1,15 @@
 import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { initWasm, parseFile } from '../src/lib/bbl/parse';
+import { MIN_SESSION_S, initWasm, parseFile, rejectShortSession } from '../src/lib/bbl/parse';
+import { getDict } from '../src/lib/i18n';
+import type { SessionMeta } from '../src/lib/types';
 
 const CHIMERA = '/home/rviau/projects/drones/chimera/blackbox/btfl_016.bbl';
+/** 1,28 s pour 1277 frames : assez de frames pour passer, trop court pour valoir quoi que ce soit. */
+const HOP = '/home/rviau/projects/drones/pavo pico/btfl_001.bbl';
+/** 5 frames : le blip d'armement pur. */
+const BLIP = '/home/rviau/projects/drones/shared-logs/public/parser-stress/error-recovery.bbl';
 
 beforeAll(async () => {
   await initWasm(await readFile(new URL('../public/blackbox-log.wasm', import.meta.url)));
@@ -31,5 +37,48 @@ describe('adaptateur bbl', () => {
     expect(s.gyroUnfilt).not.toBeNull();
     expect(s.erpm).not.toBeNull();
     expect(s.meta.headers['rollPID']).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Vols trop courts
+// ---------------------------------------------------------------------------
+
+const meta = (durationS: number, frameCount: number): SessionMeta => ({
+  index: 0,
+  fileName: 'x.bbl',
+  firmware: 'Betaflight 2025.12.2',
+  fieldNames: [],
+  sampleRateHz: 2000,
+  durationS,
+  frameCount,
+  motorOutputLow: 48,
+  motorOutputHigh: 2047,
+  headers: {},
+});
+
+describe('refus des sessions trop courtes', () => {
+  const fr = getDict('fr');
+
+  it('accepte une session à partir du seuil et refuse juste en dessous', () => {
+    expect(rejectShortSession(meta(MIN_SESSION_S, 20_000), fr)).toBeNull();
+    expect(rejectShortSession(meta(MIN_SESSION_S - 0.1, 20_000), fr)).toContain('9.9');
+  });
+
+  it('distingue le blip d armement du vol trop court', () => {
+    expect(rejectShortSession(meta(0.05, 5), fr)).toBe(fr.system.sessionTooShort('5'));
+    expect(rejectShortSession(meta(3, 6000), fr)).toBe(fr.system.flightTooShort('3.0', '10'));
+  });
+
+  it('écarte un saut de 1,3 s au lieu d en tirer un rapport', async () => {
+    const pf = await parseFile('btfl_001.bbl', new Uint8Array(await readFile(HOP)), fr);
+    expect(pf.sessions).toHaveLength(0);
+    expect(pf.skipped.map((s) => s.error)).toEqual([fr.system.flightTooShort('1.3', '10')]);
+  });
+
+  it('garde le message frames pour un blip d armement réel', async () => {
+    const pf = await parseFile('error-recovery.bbl', new Uint8Array(await readFile(BLIP)), fr);
+    expect(pf.sessions).toHaveLength(0);
+    expect(pf.skipped[0].error).toContain('frames');
   });
 });

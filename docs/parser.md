@@ -132,6 +132,7 @@ A session is pushed to `ParsedFile.skipped` rather than analysed when:
 | zero main frames decoded | `system.noFramesDecoded` |
 | `gyroADC`, `setpoint`, `motor` or `rcCommand[3]` missing | `system.essentialFieldsMissing` |
 | fewer than 100 frames | `system.sessionTooShort` (arming blip) |
+| shorter than `MIN_SESSION_S` (10 s) | `system.flightTooShort` |
 
 Any other thrown error is caught and stored with its message. Sibling sessions
 in the same file are unaffected.

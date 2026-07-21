@@ -8,6 +8,8 @@ export const system = {
   noBlackboxHeader: 'Pas de header blackbox trouvé (fichier non .bbl ?)',
   sessionTooShort: (frames: string) =>
     `Session trop courte (${frames} frames) - probable blip d'armement`,
+  flightTooShort: (seconds: string, minimum: string) =>
+    `Vol trop court (${seconds} s) - il faut au moins ${minimum} s pour une analyse fiable`,
   // scripts/analyze-node.mjs - libellés du rapport terminal.
   cliSessionSkipped: (n: string, kb: string) => `session ${n} ignorée (${kb} ko)`,
   cliProfile: (label: string) => `profil ${label}`,

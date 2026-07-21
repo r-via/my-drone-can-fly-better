@@ -410,6 +410,8 @@ export const zh: Dict = {
     noBlackboxHeader: '没有找到 blackbox 头（文件不是 .bbl？）',
     sessionTooShort: (frames: string) =>
       `会话太短（${frames} 帧）- 八成只是一次解锁抖动`,
+    flightTooShort: (seconds: string, minimum: string) =>
+      `飞行太短（${seconds} 秒）- 可靠分析至少需要 ${minimum} 秒`,
     cliSessionSkipped: (n: string, kb: string) => `跳过 session ${n}（${kb} kB）`,
     cliProfile: (label: string) => `配置 ${label}`,
     cliVbatUnusable: (cells: string, count: string) =>

@@ -19,6 +19,15 @@ const FIRMWARE_MARKER = 'Firmware revision:Betaflight ';
 const SUPPORTED_MIN: [number, number] = [4, 2];
 /** Dernière version que le wrapper accepte sans réécriture. */
 const NATIVE_MAX: [number, number] = [4, 4];
+/** Session sans assez de frames pour être autre chose qu'un blip d'armement. */
+const MIN_SESSION_FRAMES = 100;
+/**
+ * Durée minimale d'un vol analysable. En dessous, les mesures existent mais ne
+ * veulent rien dire : la FFT n'a pas assez de fenêtres, la step response pas
+ * assez de transitions de stick, le sag vbat pas assez de charge. On refuse la
+ * session au lieu de publier des verdicts tirés de 2 secondes de log.
+ */
+export const MIN_SESSION_S = 10;
 
 let wasmModule: WebAssembly.Module | null = null;
 
@@ -169,6 +178,21 @@ function toF32(rows: Row[], col: number): Float32Array {
   return out;
 }
 
+/**
+ * Motif de refus d'une session trop courte, ou null si elle est analysable.
+ * Deux cas distincts : le blip d'armement (quasi aucune frame) et le vol trop
+ * bref pour que les métriques soient fiables.
+ */
+export function rejectShortSession(meta: SessionMeta, dict: Dict = fr): string | null {
+  if (meta.frameCount < MIN_SESSION_FRAMES) {
+    return dict.system.sessionTooShort(String(meta.frameCount));
+  }
+  if (meta.durationS < MIN_SESSION_S) {
+    return dict.system.flightTooShort(meta.durationS.toFixed(1), String(MIN_SESSION_S));
+  }
+  return null;
+}
+
 /** Parse toutes les sessions d'un fichier .bbl. */
 export async function parseFile(fileName: string, buf: Uint8Array, dict: Dict = fr): Promise<ParsedFile> {
   if (!wasmModule) throw new Error('initWasm() doit être appelé avant parseFile()');
@@ -194,13 +218,9 @@ export async function parseFile(fileName: string, buf: Uint8Array, dict: Dict = 
     }
     try {
       const fd = await parseSession(fileName, si, chunk.bytes, original, dict);
-      if (fd.meta.frameCount < 100) {
-        skipped.push({
-          index: si,
-          fileName,
-          sizeBytes: chunk.bytes.length,
-          error: dict.system.sessionTooShort(String(fd.meta.frameCount)),
-        });
+      const rejected = rejectShortSession(fd.meta, dict);
+      if (rejected) {
+        skipped.push({ index: si, fileName, sizeBytes: chunk.bytes.length, error: rejected });
       } else {
         sessions.push(fd);
       }

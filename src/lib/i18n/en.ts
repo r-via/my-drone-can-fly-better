@@ -409,6 +409,8 @@ export const en: Dict = {
     noBlackboxHeader: 'No blackbox header found (not a .bbl file?)',
     sessionTooShort: (frames: string) =>
       `Session too short (${frames} frames) - probably an arming blip`,
+    flightTooShort: (seconds: string, minimum: string) =>
+      `Flight too short (${seconds} s) - at least ${minimum} s are needed for a reliable analysis`,
     cliSessionSkipped: (n: string, kb: string) => `session ${n} skipped (${kb} kB)`,
     cliProfile: (label: string) => `profile ${label}`,
     cliVbatUnusable: (cells: string, count: string) =>
