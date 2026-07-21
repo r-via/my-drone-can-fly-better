@@ -349,6 +349,12 @@ export const es: Dict = {
     headersUnreadable: 'Headers ilegibles (¿sesión corrupta?)',
     noFramesDecoded: 'Ningún frame decodificado (¿datos corruptos?)',
     essentialFieldsMissing: 'Faltan campos esenciales (gyroADC/setpoint/motor/rcCommand)',
+    dataVersionUnsupported: 'Versión de datos desconocida para el decodificador (¿fragmento de log corrupto?)',
+    decoderRejected: (raw: string) => `Imposible decodificar: ${raw}`,
+    firmwareTooOld: (version: string, minimum: string) =>
+      `Firmware demasiado antiguo (Betaflight ${version}) - el decodificador necesita ${minimum} como mínimo`,
+    firmwareNotSupported: (flavour: string) =>
+      `Firmware no compatible: ${flavour} - solo Betaflight se decodifica de forma fiable`,
 
     wasmLoadFailed: (httpStatus: string) =>
       `No se pudo cargar el decodificador WASM (HTTP ${httpStatus})`,

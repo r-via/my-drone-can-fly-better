@@ -353,6 +353,12 @@ export const zh: Dict = {
     headersUnreadable: '头部无法读取（会话损坏？）',
     noFramesDecoded: '没有解码出任何帧（数据损坏？）',
     essentialFieldsMissing: '缺少关键字段（gyroADC/setpoint/motor/rcCommand）',
+    dataVersionUnsupported: '解码器无法识别的数据版本（日志片段损坏？）',
+    decoderRejected: (raw: string) => `无法解码：${raw}`,
+    firmwareTooOld: (version: string, minimum: string) =>
+      `固件太旧（Betaflight ${version}）- 解码器最低需要 ${minimum}`,
+    firmwareNotSupported: (flavour: string) =>
+      `不支持的固件：${flavour} - 只有 Betaflight 能可靠解码`,
 
     // src/worker/analyze.worker.ts - 进度 + WASM 加载错误。
     wasmLoadFailed: (httpStatus: string) =>

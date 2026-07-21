@@ -11,6 +11,12 @@ export const system = {
   headersUnreadable: 'Headers illisibles (session corrompue ?)',
   noFramesDecoded: 'Aucune frame décodée (données corrompues ?)',
   essentialFieldsMissing: 'Champs essentiels absents (gyroADC/setpoint/motor/rcCommand)',
+  dataVersionUnsupported: 'Version de données inconnue du décodeur (fragment de log corrompu ?)',
+  decoderRejected: (raw: string) => `Décodage impossible : ${raw}`,
+  firmwareTooOld: (version: string, minimum: string) =>
+    `Firmware trop ancien (Betaflight ${version}) - le décodeur demande ${minimum} au minimum`,
+  firmwareNotSupported: (flavour: string) =>
+    `Firmware non supporté : ${flavour} - seul Betaflight est décodé de façon fiable`,
 
   // src/worker/analyze.worker.ts - progression + erreur de chargement WASM.
   wasmLoadFailed: (httpStatus: string) =>

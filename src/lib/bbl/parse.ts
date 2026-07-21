@@ -15,6 +15,10 @@ import type { F32x3, F32x4, FlightData, ParsedFile, SessionMeta, SkippedSession 
 
 const MAGIC = 'H Product:Blackbox flight data recorder';
 const FIRMWARE_MARKER = 'Firmware revision:Betaflight ';
+/** Plancher du décodeur WASM : il rejette explicitement 4.0 et 4.1. Mesuré, pas supposé. */
+const SUPPORTED_MIN: [number, number] = [4, 2];
+/** Dernière version que le wrapper accepte sans réécriture. */
+const NATIVE_MAX: [number, number] = [4, 4];
 
 let wasmModule: WebAssembly.Module | null = null;
 
@@ -37,7 +41,21 @@ function indexOfBytes(hay: Uint8Array, needle: Uint8Array, from: number): number
   return -1;
 }
 
-/** Réécrit toute version Betaflight non supportée (≥4.5, 2025.12…) en 4.4.2, à longueur constante. */
+/** Découpe "4.4.2" / "2025.12.4" en [majeur, mineur]. null si la forme est inattendue. */
+function versionParts(ver: string): [number, number] | null {
+  const m = /^(\d+)\.(\d+)/.exec(ver);
+  return m ? [Number(m[1]), Number(m[2])] : null;
+}
+
+/** Au-delà de 4.4 le wrapper refuse la version, alors que le format de frame reste lisible. */
+function needsSpoof(ver: string): boolean {
+  const p = versionParts(ver);
+  if (!p) return true; // forme exotique : tenter le spoof plutôt que d'abandonner
+  const [major, minor] = p;
+  return major > NATIVE_MAX[0] || (major === NATIVE_MAX[0] && minor > NATIVE_MAX[1]);
+}
+
+/** Réécrit toute version Betaflight trop récente (≥4.5, 2025.12…) en 4.4.2, à longueur constante. */
 export function spoofFirmware(buf: Uint8Array): { data: Uint8Array; original: string | null } {
   const data = buf.slice();
   const marker = encode(FIRMWARE_MARKER);
@@ -49,13 +67,57 @@ export function spoofFirmware(buf: Uint8Array): { data: Uint8Array; original: st
     while (ve < data.length && data[ve] !== 0x20 && data[ve] !== 0x0a && data[ve] !== 0x0d) ve++;
     const ver = new TextDecoder().decode(data.subarray(vs, ve));
     original ??= ver;
-    if (!/^4\.[0-4]\./.test(ver)) {
+    if (needsSpoof(ver)) {
       const repl = encode('4.4.2'.padEnd(ve - vs, ' '));
       data.set(repl.subarray(0, ve - vs), vs);
     }
     i = ve;
   }
   return { data, original };
+}
+
+/**
+ * Refuse en amont ce que le décodeur ne sait pas lire, pour remplacer ses erreurs
+ * brutes ("logs from Betaflight v4.1.0 are not supported", "headers required for
+ * parsing are missing") par un message traduit.
+ *
+ * Sous 4.2 aucun spoof ne rattrape le log : les headers d'un 3.x sont réellement
+ * différents, monter la version déclarée déplace juste l'erreur. Les forks
+ * (EmuFlight, Rotorflight) décodent en silence de travers - vbat et compte de
+ * cellules faux - donc ils sont refusés aussi.
+ *
+ * Retourne le message d'erreur, ou null si la session peut être tentée.
+ */
+export function unsupportedFirmware(chunk: Uint8Array, dict: Dict): string | null {
+  const rev = extractHeaderText(chunk)['Firmware revision']?.trim() ?? '';
+  const m = /^(\S+)\s+(\d+\.\d+(?:\.\d+)?)/.exec(rev);
+  if (!m) return null; // forme inconnue : laisser le décodeur trancher
+  const [, flavour, ver] = m;
+  if (flavour !== 'Betaflight') return dict.system.firmwareNotSupported(flavour);
+  const p = versionParts(ver);
+  if (!p) return null;
+  const [major, minor] = p;
+  if (major < SUPPORTED_MIN[0] || (major === SUPPORTED_MIN[0] && minor < SUPPORTED_MIN[1])) {
+    return dict.system.firmwareTooOld(ver, SUPPORTED_MIN.join('.'));
+  }
+  return null;
+}
+
+/**
+ * Traduit les messages bruts du décodeur WASM. Ils remontaient tels quels dans
+ * le rapport : un utilisateur en français, espagnol ou chinois lisait
+ * "one or more headers required for parsing are missing" au milieu de son
+ * rapport traduit. Le message brut est conservé en dernier recours, pour ne pas
+ * masquer une erreur inconnue derrière un texte générique.
+ */
+export function translateDecoderError(e: unknown, dict: Dict): string {
+  const raw = e instanceof Error ? e.message : String(e);
+  const s = raw.toLowerCase();
+  if (s.includes('headers') && (s.includes('missing') || s.includes('required'))) {
+    return dict.system.headersUnreadable;
+  }
+  if (s.includes('data version')) return dict.system.dataVersionUnsupported;
+  return dict.system.decoderRejected(raw);
 }
 
 /** Découpe un .bbl multi-sessions sur le magic header. */
@@ -125,6 +187,11 @@ export async function parseFile(fileName: string, buf: Uint8Array, dict: Dict = 
 
   for (let si = 0; si < chunks.length; si++) {
     const chunk = chunks[si];
+    const unsupported = unsupportedFirmware(chunk.bytes, dict);
+    if (unsupported) {
+      skipped.push({ index: si, fileName, sizeBytes: chunk.bytes.length, error: unsupported });
+      continue;
+    }
     try {
       const fd = await parseSession(fileName, si, chunk.bytes, original, dict);
       if (fd.meta.frameCount < 100) {
@@ -142,7 +209,7 @@ export async function parseFile(fileName: string, buf: Uint8Array, dict: Dict = 
         index: si,
         fileName,
         sizeBytes: chunk.bytes.length,
-        error: e instanceof Error ? e.message : String(e),
+        error: translateDecoderError(e, dict),
       });
     }
   }
