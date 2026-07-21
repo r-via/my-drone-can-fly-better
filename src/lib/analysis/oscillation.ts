@@ -241,6 +241,15 @@ function segment(
     }
     const saturationPct = count > 0 ? (100 * satSamples) / count : 0;
 
+    // Crête d'attitude : mesurée, pas utilisée comme filtre. Sans log de crash
+    // dans le corpus, aucun seuil « impact » ne serait défendable ; en revanche
+    // le chiffre permet au lecteur de trancher lui-même oscillation ou crash.
+    let peakGyroDps = 0;
+    for (let i = s; i <= e; i++) {
+      const g = Math.hypot(fd.gyro[0][i], fd.gyro[1][i], fd.gyro[2][i]);
+      if (g > peakGyroDps) peakGyroDps = g;
+    }
+
     // Le drone doit voler AU DÉCLENCHEMENT : un différentiel énorme au sol
     // (posé, hélices qui touchent) n'est pas une oscillation de la boucle.
     // On regarde en amont de tStart, jamais pendant : couper les gaz est la
@@ -268,6 +277,7 @@ function segment(
       ratio: peakAmp / baselineAmp,
       saturationPct,
       motorsAtStop: atStop.map((v, m) => (v ? m + 1 : 0)).filter((m) => m > 0),
+      peakGyroDps,
       severity: 'warn', // arbitré par le moteur de règles (seuils du profil)
     });
   }

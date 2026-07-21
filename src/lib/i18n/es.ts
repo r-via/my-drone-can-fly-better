@@ -206,7 +206,7 @@ export const es: Dict = {
       title: (freq: string | null) =>
         freq !== null ? `Oscilación de ${freq} Hz en vuelo` : 'Oscilación en vuelo',
       detail:
-        'El bucle PID entró en oscilación: los motores se pelean entre ellos a una frecuencia demasiado rápida para venir del mando. Crece sola y acaba en los topes, un motor a fondo y el opuesto cortado. Causas habituales: demasiada D (o P), ruido de motor que se cuela en el D-term por falta de filtrado, o un notch dinámico que no cubre las fundamentales.',
+        'El bucle PID entró en oscilación: los motores se pelean entre ellos a una frecuencia demasiado rápida para venir del mando. Crece sola y acaba en los topes, un motor a fondo y el opuesto cortado. Causas habituales: demasiada D (o P), ruido de motor que se cuela en el D-term por falta de filtrado, o un notch dinámico que no cubre las fundamentales. El pico de giro dice si la actitud aguantó: unas decenas de °/s, el bucle osciló sin que el dron se fuera; varios cientos, hubo un impacto o una pérdida de control, y eso es otra historia.',
       evidence: (
         tStart: string,
         duration: string,
@@ -215,13 +215,15 @@ export const es: Dict = {
         satPct: string,
         motors: string | null,
         others: number,
+        gyroDps: string,
       ) =>
         `En t=${tStart} s durante ${duration} s` +
         (freq !== null ? `, ${freq} Hz` : '') +
         `, amplitud ${ratio}x el nivel normal, ${satPct} % de las muestras en tope` +
         (motors !== null ? ` (${motors})` : '') +
+        `, pico de giro ${gyroDps} °/s` +
         (others > 1 ? ` - ${others} episodios en total` : ''),
-      fix: 'Repite el vuelo con el master PID a 0.7 para confirmar que viene del tune. Comprueba que dyn_notch_count esté en 3 y que dyn_notch_min_hz baje por debajo de tu fundamental de motor más baja, si no el ruido llega al D-term.',
+      fix: 'Ataca las causas en orden: primero la cobertura de filtrado alrededor de las fundamentales de motor, y solo después las ganancias. Para decidir, repite exactamente el mismo vuelo con el master PID a 0.7: si la oscilación desaparece son las ganancias, si sigue es el filtrado.',
     },
 
     batteryReadingsImplausible: {
@@ -345,7 +347,15 @@ export const es: Dict = {
         ]
           .filter((x) => x !== null)
           .join('; '),
-      fix: 'Amplía la cobertura antes de tocar los PID: baja rpm_filter_min_hz por debajo de tu fundamental más baja, ajusta fade_range y vuelve a 3 notches dinámicos. Repite el mismo vuelo para comparar.',
+      fix: 'Amplía la cobertura antes de tocar los PID. Ojo al cálculo: el techo está en rpm_filter_min_hz + fade_range, así que es su suma la que debe quedar por debajo de tu fundamental más baja, no min_hz por sí solo. Vuelve también a 3 notches dinámicos y repite el mismo vuelo para comparar.',
+    },
+    pidMasterConfirm: {
+      title: 'Vuelo de prueba para decidir entre ganancias y filtrado',
+      detail:
+        'Una oscilación mantenida viene o de ganancias demasiado altas o de ruido que atraviesa el D-term. Las dos dejan exactamente la misma huella en el log y ninguna medición las separa a posteriori: hace falta un segundo vuelo. Bajar el master PID no corrige nada por sí mismo, es una prueba - si la oscilación desaparece son las ganancias, si sigue igual es el filtrado, y volver a subir el master no cuesta nada.',
+      evidence: (current: string, target: string) =>
+        `simplified_master_multiplier = ${current}; vuelo de prueba propuesto a ${target}`,
+      fix: 'Aplica este valor, repite exactamente el mismo vuelo y compara los dos logs. Después vuelve a tu valor original: este ajuste es una prueba, no una corrección.',
     },
     dtermLpfLow: {
       title: 'LPF1 D-term muy bajo',
@@ -569,9 +579,11 @@ export const es: Dict = {
         ratio: string,
         satPct: string,
         motors: string | null,
+        gyroDps: string,
       ): string =>
         `Oscilación medida a ${tStart} s, durante ${duration} s: ${freq} Hz en el diferencial de motores, amplitud ${ratio} veces el nivel normal del vuelo, ${satPct} % de las muestras con al menos un motor en tope` +
-        (motors !== null ? ` (${motors}).` : '.'),
+        (motors !== null ? ` (${motors})` : '') +
+        `. Pico de giro durante el episodio: ${gyroDps} °/s.`,
       timelineEventIntro: 'Lo que dice la medición, sin interpretación:',
       noFindings: 'Ninguna regla disparada en esta sesión.',
     },
@@ -602,6 +614,28 @@ export const es: Dict = {
       sent: '¡Log enviado, gracias!',
       error: 'Fallo al enviar - inténtalo más tarde.',
       tooLarge: 'Log demasiado grande para compartir automáticamente.',
+    },
+
+    shareLink: {
+      title: 'Compartir este informe',
+      description:
+        'El informe entero cabe en el propio enlace: no se guarda nada en ningún servidor y tu .bbl no sale de tu máquina. Quien lo abra verá este informe en su propio idioma.',
+      button: 'Copiar enlace',
+      copied: 'Enlace copiado',
+      copiedSr: 'Enlace de compartir copiado al portapapeles',
+      building: 'Preparando…',
+      error: 'No se pudo preparar el enlace.',
+      charCount: (n: number): string => `${n} caracteres`,
+      trimmed:
+        'Las gráficas no cabían en el enlace: lleva la puntuación, los veredictos y las cifras, pero no las curvas.',
+      overBudget:
+        'Este enlace supera los 2000 caracteres de un mensaje de Discord. Funciona, pero tendrás que enviarlo por otra vía (MD, foro, acortador).',
+      bannerTitle: 'Informe recibido por enlace',
+      bannerText:
+        'Este informe se calculó en la máquina de otra persona y luego se codificó en la dirección. Para analizar tu propio vuelo, parte de un log.',
+      bannerCta: 'Analizar mi log',
+      decodeErrorMalformed: 'Este enlace para compartir está incompleto o dañado.',
+      decodeErrorVersion: 'Este enlace viene de una versión más reciente del sitio. Recarga la página y vuelve a pedirlo.',
     },
 
     charts: {

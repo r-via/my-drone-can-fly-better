@@ -44,7 +44,15 @@ export const lint = {
       ]
         .filter((x) => x !== null)
         .join(' ; '),
-    fix: "Élargis la couverture avant de toucher aux PID : descends rpm_filter_min_hz sous ta fondamentale la plus basse, resserre fade_range, et remets 3 notches dynamiques. Refais le même vol pour comparer.",
+    fix: "Élargis la couverture avant de toucher aux PID. Attention au calcul : le plafond est à rpm_filter_min_hz + fade_range, c'est donc leur somme qui doit passer sous ta fondamentale la plus basse, pas min_hz tout seul. Remets aussi 3 notches dynamiques, puis refais le même vol pour comparer.",
+  },
+  pidMasterConfirm: {
+    title: "Vol d'essai pour trancher gains ou filtrage",
+    detail:
+      "Une oscillation entretenue vient soit de gains trop élevés, soit de bruit mal filtré qui traverse le D-term. Les deux produisent exactement la même trace dans le log, aucune mesure ne les sépare a posteriori : il faut un second vol pour lever le doute. Baisser le master PID ne corrige rien en soi, c'est un test - si l'oscillation disparaît, les gains sont en cause ; si elle reste identique, c'est le filtrage, et remonter le master ensuite ne coûte rien.",
+    evidence: (current: string, target: string) =>
+      `simplified_master_multiplier = ${current} ; vol d'essai proposé à ${target}`,
+    fix: "Applique cette valeur, refais exactement le même vol, puis compare les deux logs. Reviens ensuite à ta valeur d'origine : ce réglage est un test, pas une correction.",
   },
   dtermLpfLow: {
     title: 'LPF1 D-term très bas',

@@ -209,7 +209,7 @@ export const en: Dict = {
       title: (freq: string | null) =>
         freq !== null ? `${freq} Hz oscillation in flight` : 'Oscillation in flight',
       detail:
-        'The PID loop went into oscillation: the motors are fighting each other at a rate far too fast to come from stick input. It builds up on its own and ends against the stops, one motor flat out while the opposite one is cut. Usual suspects: too much D (or P), motor noise leaking into the D-term through weak filtering, or a dynamic notch that does not cover the motor fundamentals.',
+        'The PID loop went into oscillation: the motors are fighting each other at a rate far too fast to come from stick input. It builds up on its own and ends against the stops, one motor flat out while the opposite one is cut. Usual suspects: too much D (or P), motor noise leaking into the D-term through weak filtering, or a dynamic notch that does not cover the motor fundamentals. The peak gyro tells you whether attitude held: a few tens of deg/s means the loop oscillated without the quad getting away; several hundred means an impact or a tumble, which is a different story.',
       evidence: (
         tStart: string,
         duration: string,
@@ -218,13 +218,15 @@ export const en: Dict = {
         satPct: string,
         motors: string | null,
         others: number,
+        gyroDps: string,
       ) =>
         `At t=${tStart} s for ${duration} s` +
         (freq !== null ? `, ${freq} Hz` : '') +
         `, amplitude ${ratio}x the normal level, ${satPct} % of samples against the stops` +
         (motors !== null ? ` (${motors})` : '') +
+        `, peak gyro ${gyroDps} deg/s` +
         (others > 1 ? ` - ${others} episodes in total` : ''),
-      fix: 'Fly the same pattern again with the PID master multiplier at 0.7 to confirm it comes from the tune. Check that dyn_notch_count is 3 and that dyn_notch_min_hz sits below your lowest motor fundamental, otherwise the noise reaches the D-term.',
+      fix: 'Take the causes in order: filtering coverage around the motor fundamentals first, gains only after that. To settle it, fly exactly the same pattern with the PID master multiplier at 0.7: if the oscillation disappears it is the gains, if it stays it is the filtering.',
     },
 
     batteryReadingsImplausible: {
@@ -348,7 +350,15 @@ export const en: Dict = {
         ]
           .filter((x) => x !== null)
           .join('; '),
-      fix: 'Widen the coverage before touching the PIDs: lower rpm_filter_min_hz below your lowest fundamental, tighten fade_range, and go back to 3 dynamic notches. Fly the same pattern again to compare.',
+      fix: 'Widen the coverage before touching the PIDs. Watch the arithmetic: the ceiling sits at rpm_filter_min_hz + fade_range, so it is their sum that must fall below your lowest fundamental, not min_hz on its own. Go back to 3 dynamic notches too, then fly the same pattern again to compare.',
+    },
+    pidMasterConfirm: {
+      title: 'Test flight to settle gains vs filtering',
+      detail:
+        'A sustained oscillation comes either from gains that are too high or from noise that gets through the D-term. Both leave exactly the same trace in the log, and no measurement can separate them after the fact: it takes a second flight. Lowering the PID master fixes nothing by itself, it is a test - if the oscillation goes away the gains are to blame, if it stays the same it is the filtering, and putting the master back costs nothing.',
+      evidence: (current: string, target: string) =>
+        `simplified_master_multiplier = ${current}; test flight suggested at ${target}`,
+      fix: 'Apply this value, fly exactly the same pattern, then compare the two logs. Put your original value back afterwards: this setting is a test, not a fix.',
     },
     dtermLpfLow: {
       title: 'Very low D-term LPF1',
@@ -579,9 +589,11 @@ export const en: Dict = {
         ratio: string,
         satPct: string,
         motors: string | null,
+        gyroDps: string,
       ): string =>
         `Oscillation measured at ${tStart} s, lasting ${duration} s: ${freq} Hz on the motor differential, amplitude ${ratio} times the normal level for this flight, ${satPct} % of samples with at least one motor against a stop` +
-        (motors !== null ? ` (${motors}).` : '.'),
+        (motors !== null ? ` (${motors})` : '') +
+        `. Peak gyro during the episode: ${gyroDps} deg/s.`,
       timelineEventIntro: 'What the measurement says, with no interpretation:',
       noFindings: 'No rules triggered on this session.',
     },
@@ -613,6 +625,28 @@ export const en: Dict = {
       sent: 'Log sent - thanks!',
       error: 'Send failed - try again later.',
       tooLarge: 'Log too large to share automatically.',
+    },
+
+    shareLink: {
+      title: 'Share this report',
+      description:
+        'The whole report fits inside the link itself: nothing is stored on a server, and your .bbl never leaves your machine. Whoever opens it sees this report in their own language.',
+      button: 'Copy link',
+      copied: 'Link copied',
+      copiedSr: 'Share link copied to clipboard',
+      building: 'Preparing…',
+      error: 'Could not build the link.',
+      charCount: (n: number): string => `${n} characters`,
+      trimmed:
+        'The charts did not fit in the link: it carries the score, the verdicts and the numbers, but not the curves.',
+      overBudget:
+        'This link is over the 2000-character limit of a Discord message. It works, but you will need another route (DM, forum, URL shortener).',
+      bannerTitle: 'Report received via link',
+      bannerText:
+        "This report was computed on someone else's machine, then encoded into the address. To analyse your own flight, start from a log.",
+      bannerCta: 'Analyse my log',
+      decodeErrorMalformed: 'This share link is incomplete or damaged.',
+      decodeErrorVersion: 'This link comes from a newer version of the site. Reload the page, then ask for it again.',
     },
 
     // SVG charts - flat objects passed as the `labels` prop (pure components, no hooks).

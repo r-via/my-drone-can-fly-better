@@ -152,6 +152,22 @@ describe('analyzeOscillation - golden racer DAKE F722', () => {
     expect(long.worst!.saturationPct).toBeGreaterThan(60);
     expect(buildSessionReport(racer, null).analysis.motors.saturationPct).toBeLessThan(1);
   });
+
+  it('mesure la crête gyro, qui sépare une oscillation d’un crash', () => {
+    // La question que pose tout lecteur devant ce verdict : « c'est pas plutôt
+    // un crash ? ». Sur ce log non, et c'est mesurable : l'attitude n'a jamais
+    // été perdue. Un tumble monte à plusieurs centaines de °/s et sature
+    // souvent le gyro à 2000, ici la crête reste au niveau du reste du vol.
+    const w = analyzeOscillation(racer).worst!;
+    expect(w.peakGyroDps).toBeGreaterThan(50); // mesuré, pas laissé à zéro
+    expect(w.peakGyroDps).toBeLessThan(300);
+
+    // Corollaire décisif : les 4 moteurs participent à parts égales. Une hélice
+    // cassée ou un moteur qui lâche ferait décrocher un seul bras.
+    expect(w.motorsAtStop).toEqual([1, 2, 3, 4]);
+    // Et le différentiel est périodique, pas large bande comme un impact.
+    expect(w.concentration).toBeGreaterThan(0.5);
+  });
 });
 
 // ---------------------------------------------------------------------------

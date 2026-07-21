@@ -208,7 +208,7 @@ export const rules = {
     title: (freq: string | null) =>
       freq !== null ? `Oscillation ${freq} Hz en vol` : 'Oscillation en vol',
     detail:
-      "La boucle PID est partie en oscillation : les moteurs se battent entre eux à une fréquence trop rapide pour venir du pilotage. Ça monte en amplitude tout seul et ça finit en butée, moteur à fond d'un côté et coupé de l'autre. Causes classiques : trop de D (ou de P), du bruit moteur qui fuit dans le D-term par manque de filtrage, ou une notch dynamique qui ne couvre pas les fondamentales.",
+      "La boucle PID est partie en oscillation : les moteurs se battent entre eux à une fréquence trop rapide pour venir du pilotage. Ça monte en amplitude tout seul et ça finit en butée, moteur à fond d'un côté et coupé de l'autre. Causes classiques : trop de D (ou de P), du bruit moteur qui fuit dans le D-term par manque de filtrage, ou une notch dynamique qui ne couvre pas les fondamentales. La crête gyro dit si l'attitude a tenu : quelques dizaines de °/s, la boucle a oscillé sans que le drone parte ; plusieurs centaines, il y a eu un choc ou un départ en vrille et c'est une autre histoire.",
     evidence: (
       tStart: string,
       duration: string,
@@ -217,13 +217,15 @@ export const rules = {
       satPct: string,
       motors: string | null,
       others: number,
+      gyroDps: string,
     ) =>
       `À t=${tStart} s pendant ${duration} s` +
       (freq !== null ? `, ${freq} Hz` : '') +
       `, amplitude ${ratio}x le régime normal, ${satPct} % des échantillons en butée` +
       (motors !== null ? ` (${motors})` : '') +
+      `, crête gyro ${gyroDps} °/s` +
       (others > 1 ? ` - ${others} épisodes au total` : ''),
-    fix: "Refais le vol avec le master PID à 0.7 pour confirmer que ça vient du tune. Vérifie que dyn_notch_count est à 3 et que dyn_notch_min_hz descend sous ta fondamentale moteur la plus basse, sinon le bruit passe dans le D-term.",
+    fix: "Prends les causes dans l'ordre : d'abord la couverture de filtrage autour des fondamentales moteur, ensuite seulement les gains. Pour trancher, refais exactement le même vol avec le master PID à 0.7 : si l'oscillation disparaît, ce sont les gains ; si elle reste, c'est le filtrage.",
   },
 
   batteryReadingsImplausible: {

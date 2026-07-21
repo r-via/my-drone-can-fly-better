@@ -157,6 +157,37 @@ function rpmFadeTopHz(minHz: number | null, fadeRangeHz: number | null): number 
   return minHz + (fadeRangeHz ?? 0);
 }
 
+/** fade_range proposé : assez court pour dégager les fondamentales mesurées,
+ *  assez large pour que l'extinction des notches reste progressive. */
+const SUGGESTED_FADE_HZ = 20;
+/** Marge entre le plafond de fade proposé et la fondamentale la plus basse :
+ *  le régime moteur descend encore un peu sous sa médiane en vol. */
+const FADE_CLEARANCE_HZ = 10;
+/** Plancher : sous ce seuil les notches mordent dans la bande de pilotage. */
+const RPM_MIN_HZ_FLOOR = 60;
+
+/** Master PID du vol d'essai (%). -30 % suffit à faire taire un cycle limite
+ *  dû aux gains, sans rendre la machine molle au point d'être indépilotable. */
+const MASTER_CONFIRM_PCT = 70;
+
+/**
+ * Couple (min_hz, fade_range) qui sort une fondamentale de la zone atténuée.
+ *
+ * Le piège : Betaflight calcule le plafond de fade à `min_hz + fade_range`.
+ * Baisser min_hz jusqu'à la fondamentale sans tenir compte du fade laisse le
+ * plafond au même endroit et ne change donc strictement rien. Il faut retirer
+ * les deux termes. Retourne null quand dégager la bande exigerait de descendre
+ * sous le plancher : mieux vaut ne rien proposer qu'une valeur nuisible.
+ */
+export function suggestRpmFade(
+  lowestFundamentalHz: number,
+): { minHz: number; fadeHz: number } | null {
+  if (!Number.isFinite(lowestFundamentalHz) || lowestFundamentalHz <= 0) return null;
+  const minHz = Math.floor((lowestFundamentalHz - FADE_CLEARANCE_HZ - SUGGESTED_FADE_HZ) / 10) * 10;
+  if (minHz < RPM_MIN_HZ_FLOOR) return null;
+  return { minHz, fadeHz: SUGGESTED_FADE_HZ };
+}
+
 /** true/false si motor_pwm_protocol est présent, null sinon. */
 function isDshotProtocol(raw: string | undefined): boolean | null {
   if (raw === undefined) return null;
@@ -268,9 +299,11 @@ export function lintConfig(
       const cli: string[] = [];
       if (notchLow !== null) cli.push(`set dyn_notch_count = ${DEFAULT_NOTCH_COUNT}`);
       if (faded.length > 0) {
-        const lowest = Math.min(...faded.map((m) => m.hz));
-        cli.push(`set rpm_filter_min_hz = ${Math.max(0, Math.floor((lowest - 10) / 10) * 10)}`);
-        cli.push('set rpm_filter_fade_range_hz = 20');
+        const s = suggestRpmFade(Math.min(...faded.map((m) => m.hz)));
+        if (s !== null) {
+          cli.push(`set rpm_filter_min_hz = ${s.minHz}`);
+          cli.push(`set rpm_filter_fade_range_hz = ${s.fadeHz}`);
+        }
       }
       findings.push({
         id: 'filter-coverage-suspect',
@@ -287,6 +320,33 @@ export function lintConfig(
           DEFAULT_NOTCH_COUNT,
         ),
         fix: { text: L.filterCoverageSuspect.fix, cli },
+      });
+    }
+
+    // pid-master-confirm - le vol d'essai qui tranche entre gains et filtrage.
+    // Le verdict oscillation conseille de refaire le vol avec le master à 0.7,
+    // mais lui ne connaît pas la config et ne peut pas donner la commande. Ici
+    // on sait que les sliders simplifiés pilotent réellement les PID : la même
+    // consigne devient copiable. Sans eux la valeur n'aurait aucun effet, et
+    // avec un master déjà bas il n'y a plus de marge à retirer.
+    const master = num('simplified_master_multiplier');
+    if (
+      oscConfirmed &&
+      num('simplified_pids_mode') !== 0 &&
+      master !== null &&
+      master > MASTER_CONFIRM_PCT
+    ) {
+      findings.push({
+        id: 'pid-master-confirm',
+        severity: 'info',
+        category: 'config',
+        title: L.pidMasterConfirm.title,
+        detail: L.pidMasterConfirm.detail,
+        evidence: L.pidMasterConfirm.evidence(String(master), String(MASTER_CONFIRM_PCT)),
+        fix: {
+          text: L.pidMasterConfirm.fix,
+          cli: [`set simplified_master_multiplier = ${MASTER_CONFIRM_PCT}`],
+        },
       });
     }
   }

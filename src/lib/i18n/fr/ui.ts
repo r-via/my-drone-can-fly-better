@@ -157,9 +157,11 @@ export const ui = {
       ratio: string,
       satPct: string,
       motors: string | null,
+      gyroDps: string,
     ): string =>
       `Oscillation mesurée à ${tStart} s, pendant ${duration} s : ${freq} Hz sur le différentiel moteur, amplitude ${ratio} fois le régime normal du vol, ${satPct} % des échantillons avec au moins un moteur en butée` +
-      (motors !== null ? ` (${motors}).` : '.'),
+      (motors !== null ? ` (${motors})` : '') +
+      `. Crête gyro pendant l'épisode : ${gyroDps} °/s.`,
     timelineEventIntro: 'Ce que la mesure dit, sans interprétation :',
     noFindings: 'Aucune règle déclenchée sur cette session.',
   },
@@ -191,6 +193,28 @@ export const ui = {
     sent: 'Log envoyé - merci !',
     error: "Échec de l'envoi - réessaie plus tard.",
     tooLarge: 'Log trop volumineux pour être partagé automatiquement.',
+  },
+
+  shareLink: {
+    title: 'Partager ce rapport',
+    description:
+      "Le rapport entier tient dans le lien lui-même : rien n'est déposé sur un serveur, et ton .bbl ne quitte pas ta machine. Qui l'ouvre voit ce rapport dans sa propre langue.",
+    button: 'Copier le lien',
+    copied: 'Lien copié',
+    copiedSr: 'Lien de partage copié dans le presse-papiers',
+    building: 'Préparation…',
+    error: "Impossible de préparer le lien.",
+    charCount: (n: number): string => `${n} caractères`,
+    trimmed: "Les graphes ne tenaient pas dans le lien : il porte le score, les verdicts et les chiffres, pas les courbes.",
+    overBudget:
+      "Ce lien dépasse les 2000 caractères d'un message Discord. Il fonctionne, mais il faudra le passer autrement (MP, forum, raccourcisseur).",
+    // Bandeau affiché en haut d'un rapport ouvert depuis un lien.
+    bannerTitle: 'Rapport reçu par lien',
+    bannerText:
+      "Ce rapport a été calculé sur la machine de quelqu'un d'autre, puis encodé dans l'adresse. Pour analyser ton propre vol, repars d'un log.",
+    bannerCta: 'Analyser mon log',
+    decodeErrorMalformed: 'Ce lien de partage est incomplet ou abîmé.',
+    decodeErrorVersion: "Ce lien vient d'une version plus récente du site. Recharge la page, puis redemande-le.",
   },
 
   // Graphes SVG - objets plats passés en prop `labels` (composants purs, sans hook).

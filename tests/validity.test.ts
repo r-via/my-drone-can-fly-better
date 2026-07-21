@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { analyzePower, analyzeTimeline } from '../src/lib/analysis/basic';
 import { initWasm, parseFile } from '../src/lib/bbl/parse';
+import { suggestRpmFade } from '../src/lib/cli/config';
 import { buildSessionReport } from '../src/lib/report';
 import type { FlightData } from '../src/lib/types';
 
@@ -92,15 +93,52 @@ describe('lint de config depuis les en-têtes du .bbl', () => {
     expect(f.evidence).toMatch(/145|147/);
   });
 
-  it('propose un rpm_filter_min_hz sous la fondamentale la plus basse', () => {
-    const f = buildSessionReport(racer, null).findings.find(
-      (x) => x.id === 'filter-coverage-suspect',
-    )!;
+  it('propose un couple min_hz/fade_range dont le PLAFOND dégage les fondamentales', () => {
+    // Le piège que ce test existe pour attraper : Betaflight place le plafond
+    // de fade à min_hz + fade_range. Proposer min_hz = 130 avec fade = 20
+    // redonne le plafond 150 Hz d'origine (100 + 50) et ne corrige donc rien,
+    // alors qu'un test sur min_hz seul passerait au vert.
+    const r = buildSessionReport(racer, null);
+    const f = r.findings.find((x) => x.id === 'filter-coverage-suspect')!;
     const cli = f.fix?.cli?.join(' ') ?? '';
-    const m = /rpm_filter_min_hz = (\d+)/.exec(cli);
-    expect(m).not.toBeNull();
-    expect(Number(m![1])).toBeLessThan(145); // sous la plus basse mesurée
-    expect(cli).toContain('rpm_filter_fade_range_hz = 20');
+    const minHz = Number(/rpm_filter_min_hz = (\d+)/.exec(cli)?.[1]);
+    const fadeHz = Number(/rpm_filter_fade_range_hz = (\d+)/.exec(cli)?.[1]);
+    expect(Number.isFinite(minHz) && Number.isFinite(fadeHz)).toBe(true);
+
+    const fundamentals = (r.analysis.spectrum?.perMotorHz ?? [])
+      .map((m) => m.median)
+      .filter((h) => h > 0);
+    expect(fundamentals.length).toBe(4);
+    // La propriété qui compte, exprimée telle quelle.
+    expect(minHz + fadeHz).toBeLessThan(Math.min(...fundamentals));
+  });
+
+  it('ne propose rien plutôt qu’un min_hz qui morde dans la bande de pilotage', () => {
+    expect(suggestRpmFade(145)).toEqual({ minHz: 110, fadeHz: 20 });
+    expect(suggestRpmFade(200)!.minHz + suggestRpmFade(200)!.fadeHz).toBeLessThan(200);
+    // 85 - 10 - 20 = 55, sous le plancher de 60 Hz : se taire est la bonne réponse.
+    expect(suggestRpmFade(85)).toBeNull();
+    expect(suggestRpmFade(0)).toBeNull();
+    expect(suggestRpmFade(Number.NaN)).toBeNull();
+  });
+
+  it('aucune commande proposée n’en contredit une autre', () => {
+    // collectCliLines dédoublonne les lignes IDENTIQUES, mais deux règles qui
+    // fixeraient la même clé à deux valeurs différentes passeraient toutes les
+    // deux : Betaflight garderait la dernière, silencieusement.
+    for (const fd of [racer, chimera, lr4, pico]) {
+      const seen = new Map<string, string>();
+      for (const f of buildSessionReport(fd, null).findings) {
+        for (const line of f.fix?.cli ?? []) {
+          const m = /^set\s+([a-z0-9_]+)\s*=\s*(.+)$/i.exec(line.trim());
+          if (!m) continue;
+          const [, key, val] = m;
+          const prev = seen.get(key);
+          expect(prev === undefined || prev === val, `${key}: "${prev}" vs "${val}"`).toBe(true);
+          seen.set(key, val);
+        }
+      }
+    }
   });
 
   it('signale que TPA n’a jamais agi sur ce vol', () => {

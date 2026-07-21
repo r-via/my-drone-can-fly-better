@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { eventSeverity, qualifyingEvents } from '@/lib/analysis/oscillation';
 import { useLocale } from '@/lib/i18n/locale';
 import type {
+  CliConfig,
   FileReport,
   Finding,
   FindingCategory,
@@ -26,6 +27,7 @@ import {
 import MetricTile, { type MetricTone } from '@/components/MetricTile';
 import ScoreGauge from '@/components/ScoreGauge';
 import SessionPicker, { type SessionPickerItem } from '@/components/SessionPicker';
+import ShareLink from '@/components/ShareLink';
 import ShareLogToggle from '@/components/ShareLogToggle';
 import { SpectrumChart } from '@/components/charts/SpectrumChart';
 import { StepResponseChart } from '@/components/charts/StepResponseChart';
@@ -159,7 +161,18 @@ const CHIP_CATEGORIES: FindingCategory[] = [
 // Blocs
 // ---------------------------------------------------------------------------
 
-function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
+function SessionBlock({
+  sessionReport,
+  fileName,
+  pasteConfig,
+  shareable,
+}: {
+  sessionReport: SessionReport;
+  fileName: string;
+  pasteConfig: CliConfig | null;
+  /** Faux sur un rapport déjà reçu par lien : on ne repartage pas un partage. */
+  shareable: boolean;
+}) {
   const { locale, dict } = useLocale();
   const t = dict.ui.report;
   const fmt = makeFormatters(locale, dict);
@@ -335,6 +348,7 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
                       e.ratio.toFixed(0),
                       e.saturationPct.toFixed(0),
                       e.motorsAtStop.map((m) => `M${m}`).join(', ') || null,
+                      e.peakGyroDps.toFixed(0),
                     )}
                   </li>
                 ))}
@@ -377,6 +391,10 @@ function SessionBlock({ sessionReport }: { sessionReport: SessionReport }) {
           </section>
         ))
       )}
+
+      {shareable ? (
+        <ShareLink sessionReport={sessionReport} fileName={fileName} pasteConfig={pasteConfig} />
+      ) : null}
     </div>
   );
 }
@@ -385,10 +403,14 @@ function FileSection({
   file,
   selected,
   onSelect,
+  pasteConfig,
+  shareable,
 }: {
   file: FileReport;
   selected: number;
   onSelect: (i: number) => void;
+  pasteConfig: CliConfig | null;
+  shareable: boolean;
 }) {
   const { locale, dict } = useLocale();
   const t = dict.ui.report;
@@ -441,7 +463,12 @@ function FileSection({
       </div>
 
       {current ? (
-        <SessionBlock sessionReport={current} />
+        <SessionBlock
+          sessionReport={current}
+          fileName={file.fileName}
+          pasteConfig={pasteConfig}
+          shareable={shareable}
+        />
       ) : (
         <p className="rounded-2xl border border-line bg-surface p-4 text-sm text-ink-2">
           {t.noUsableSession}
@@ -479,6 +506,10 @@ export default function ReportView({
     .map((f) => f.sessionReports[0]?.analysis.meta.craftName)
     .filter((name): name is string => Boolean(name));
 
+  const shared = report.shared;
+  const isShared = shared !== undefined;
+  const ts = dict.ui.shareLink;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -488,9 +519,19 @@ export default function ReportView({
           onClick={onReset}
           className="rounded-full border border-line bg-surface px-4 py-1.5 text-sm font-semibold text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
         >
-          {t.newAnalysis}
+          {isShared ? ts.bannerCta : t.newAnalysis}
         </button>
       </div>
+
+      {isShared ? (
+        <div className="rounded-2xl border border-line-strong bg-surface-2 p-4">
+          <p className="text-sm font-bold text-ink">{ts.bannerTitle}</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-2">{ts.bannerText}</p>
+          {/* Dire que les courbes manquent, plutôt que laisser croire que ce
+              vol n'avait pas de spectre. */}
+          {shared.trimmed ? <p className="mt-2 text-xs text-ink-2">{ts.trimmed}</p> : null}
+        </div>
+      ) : null}
 
       {report.configFindings.length > 0 ? (
         <section aria-label={t.configAria} className="space-y-2">
@@ -512,6 +553,8 @@ export default function ReportView({
           file={file}
           selected={selection[i] ?? 0}
           onSelect={(v) => setSelection((prev) => ({ ...prev, [i]: v }))}
+          pasteConfig={report.config?.source === 'paste' ? report.config : null}
+          shareable={!isShared}
         />
       ))}
 

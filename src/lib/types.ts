@@ -208,6 +208,13 @@ export interface OscillationEvent {
   saturationPct: number;
   /** Moteurs (1-based) ayant touché une butée pendant l'événement. */
   motorsAtStop: number[];
+  /**
+   * Crête de |gyro| (norme 3 axes, deg/s) pendant l'événement. Sépare une
+   * oscillation d'un impact : un cycle limite secoue les moteurs en laissant
+   * l'attitude tenue (quelques dizaines de deg/s), un crash part en tumble à
+   * plusieurs centaines, souvent jusqu'à la saturation du gyro.
+   */
+  peakGyroDps: number;
   severity: 'warn' | 'crit';
 }
 

@@ -206,7 +206,7 @@ export const de: Dict = {
       title: (freq: string | null) =>
         freq !== null ? `${freq} Hz Oszillation im Flug` : 'Oszillation im Flug',
       detail:
-        'Der PID-Loop ist in Schwingung geraten: die Motoren arbeiten gegeneinander, viel zu schnell um vom Knüppel zu kommen. Das schaukelt sich von selbst auf und endet an den Anschlägen, ein Motor voll auf, der gegenüberliegende aus. Übliche Ursachen: zu viel D (oder P), Motorrauschen das mangels Filterung in den D-Term durchschlägt, oder ein Dynamic Notch der die Motorgrundfrequenzen nicht abdeckt.',
+        'Der PID-Loop ist in Schwingung geraten: die Motoren arbeiten gegeneinander, viel zu schnell um vom Knüppel zu kommen. Das schaukelt sich von selbst auf und endet an den Anschlägen, ein Motor voll auf, der gegenüberliegende aus. Übliche Ursachen: zu viel D (oder P), Motorrauschen das mangels Filterung in den D-Term durchschlägt, oder ein Dynamic Notch der die Motorgrundfrequenzen nicht abdeckt. Die Gyro-Spitze sagt, ob die Lage gehalten hat: ein paar Dutzend °/s heißt, der Loop hat geschwungen ohne dass der Copter weggegangen ist; mehrere Hundert heißt Einschlag oder Abkippen, und das ist eine andere Geschichte.',
       evidence: (
         tStart: string,
         duration: string,
@@ -215,13 +215,15 @@ export const de: Dict = {
         satPct: string,
         motors: string | null,
         others: number,
+        gyroDps: string,
       ) =>
         `Bei t=${tStart} s für ${duration} s` +
         (freq !== null ? `, ${freq} Hz` : '') +
         `, Amplitude ${ratio}x des Normalniveaus, ${satPct} % der Samples am Anschlag` +
         (motors !== null ? ` (${motors})` : '') +
+        `, Gyro-Spitze ${gyroDps} °/s` +
         (others > 1 ? ` - ${others} Episoden insgesamt` : ''),
-      fix: 'Flieg denselben Flug nochmal mit dem PID-Master-Multiplikator auf 0.7, um zu bestätigen dass es am Tune liegt. Prüf ob dyn_notch_count auf 3 steht und dyn_notch_min_hz unter deine niedrigste Motorgrundfrequenz reicht, sonst kommt das Rauschen in den D-Term.',
+      fix: 'Geh die Ursachen der Reihe nach an: zuerst die Filterabdeckung rund um die Motorgrundfrequenzen, erst danach die Gains. Zum Entscheiden denselben Flug nochmal mit dem PID-Master-Multiplikator auf 0.7: verschwindet die Oszillation, sind es die Gains; bleibt sie, ist es die Filterung.',
     },
 
     batteryReadingsImplausible: {
@@ -345,7 +347,15 @@ export const de: Dict = {
         ]
           .filter((x) => x !== null)
           .join('; '),
-      fix: 'Erweitere die Abdeckung, bevor du an die PIDs gehst: senk rpm_filter_min_hz unter deine niedrigste Grundfrequenz, zieh fade_range enger und geh zurück auf 3 dynamische Notches. Flieg denselben Flug nochmal zum Vergleich.',
+      fix: 'Erweitere die Abdeckung, bevor du an die PIDs gehst. Achtung beim Rechnen: die Obergrenze liegt bei rpm_filter_min_hz + fade_range, also muss ihre Summe unter deine niedrigste Grundfrequenz fallen, nicht min_hz allein. Geh außerdem zurück auf 3 dynamische Notches und flieg denselben Flug nochmal zum Vergleich.',
+    },
+    pidMasterConfirm: {
+      title: 'Testflug zur Entscheidung Gains oder Filterung',
+      detail:
+        'Eine anhaltende Oszillation kommt entweder von zu hohen Gains oder von Rauschen das durch den D-Term kommt. Beides hinterlässt exakt dieselbe Spur im Log, und keine Messung trennt sie im Nachhinein: es braucht einen zweiten Flug. Den PID-Master zu senken behebt für sich nichts, es ist ein Test - verschwindet die Oszillation, liegt es an den Gains; bleibt sie gleich, ist es die Filterung, und den Master danach wieder hochzusetzen kostet nichts.',
+      evidence: (current: string, target: string) =>
+        `simplified_master_multiplier = ${current}; Testflug vorgeschlagen bei ${target}`,
+      fix: 'Setz diesen Wert, flieg exakt denselben Flug und vergleich die beiden Logs. Stell danach deinen ursprünglichen Wert wieder her: diese Einstellung ist ein Test, keine Korrektur.',
     },
     dtermLpfLow: {
       title: 'D-Term-LPF1 sehr niedrig',
@@ -568,9 +578,11 @@ export const de: Dict = {
         ratio: string,
         satPct: string,
         motors: string | null,
+        gyroDps: string,
       ): string =>
         `Oszillation gemessen bei ${tStart} s, über ${duration} s: ${freq} Hz auf dem Motordifferential, Amplitude ${ratio} mal das normale Niveau dieses Flugs, ${satPct} % der Samples mit mindestens einem Motor am Anschlag` +
-        (motors !== null ? ` (${motors}).` : '.'),
+        (motors !== null ? ` (${motors})` : '') +
+        `. Gyro-Spitze während der Episode: ${gyroDps} °/s.`,
       timelineEventIntro: 'Was die Messung sagt, ohne Interpretation:',
       noFindings: 'Keine Regel hat in dieser Session ausgelöst.',
     },
@@ -601,6 +613,29 @@ export const de: Dict = {
       sent: 'Log gesendet - danke!',
       error: 'Senden fehlgeschlagen - versuch es später noch mal.',
       tooLarge: 'Log zu groß, um automatisch geteilt zu werden.',
+    },
+
+    shareLink: {
+      title: 'Diesen Bericht teilen',
+      description:
+        'Der ganze Bericht steckt im Link selbst: nichts wird auf einem Server abgelegt, und dein .bbl verlässt deinen Rechner nicht. Wer ihn öffnet, sieht diesen Bericht in seiner eigenen Sprache.',
+      button: 'Link kopieren',
+      copied: 'Link kopiert',
+      copiedSr: 'Teilen-Link in die Zwischenablage kopiert',
+      building: 'Wird vorbereitet…',
+      error: 'Link konnte nicht erstellt werden.',
+      charCount: (n: number): string => `${n} Zeichen`,
+      trimmed:
+        'Die Diagramme haben nicht in den Link gepasst: er trägt Score, Verdikte und Zahlen, aber keine Kurven.',
+      overBudget:
+        'Dieser Link überschreitet die 2000 Zeichen einer Discord-Nachricht. Er funktioniert, muss aber anders verschickt werden (DM, Forum, URL-Kürzer).',
+      bannerTitle: 'Bericht per Link erhalten',
+      bannerText:
+        'Dieser Bericht wurde auf dem Rechner einer anderen Person berechnet und dann in die Adresse kodiert. Für deinen eigenen Flug fang mit einem Log an.',
+      bannerCta: 'Mein Log analysieren',
+      decodeErrorMalformed: 'Dieser Teilen-Link ist unvollständig oder beschädigt.',
+      decodeErrorVersion:
+        'Dieser Link stammt aus einer neueren Version der Seite. Lade die Seite neu und frag ihn noch einmal an.',
     },
 
     charts: {

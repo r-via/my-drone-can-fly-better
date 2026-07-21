@@ -117,16 +117,16 @@ describe('phrase déterministe sous la frise', () => {
     for (const { code } of LOCALES) {
       const r = getDict(code).ui.report;
       expect(r.timelineEventIntro.length).toBeGreaterThan(0);
-      const line = r.timelineEventLine('13.7', '0.80', '36', '43', '71', 'M1, M2');
+      const line = r.timelineEventLine('13.7', '0.80', '36', '43', '71', 'M1, M2', '138');
       // Aucun chiffre mesuré ne doit être perdu par une traduction.
-      for (const v of ['13.7', '0.80', '36', '43', '71', 'M1, M2']) {
+      for (const v of ['13.7', '0.80', '36', '43', '71', 'M1, M2', '138']) {
         expect(line, `${code} / ${v}`).toContain(v);
       }
     }
   });
 
   it('reste correct quand aucun moteur n’a touché de butée', () => {
-    const line = getDict('fr').ui.report.timelineEventLine('5.0', '0.30', '52', '9', '0', null);
+    const line = getDict('fr').ui.report.timelineEventLine('5.0', '0.30', '52', '9', '0', null, '41');
     expect(line).not.toContain('null');
     expect(line.trim().endsWith('.')).toBe(true);
   });
@@ -135,8 +135,8 @@ describe('phrase déterministe sous la frise', () => {
     const fr = getDict('fr').ui.report;
     const en = getDict('en').ui.report;
     expect(en.timelineEventIntro).not.toBe(fr.timelineEventIntro);
-    expect(en.timelineEventLine('1', '1', '1', '1', '1', null)).not.toBe(
-      fr.timelineEventLine('1', '1', '1', '1', '1', null),
+    expect(en.timelineEventLine('1', '1', '1', '1', '1', null, '1')).not.toBe(
+      fr.timelineEventLine('1', '1', '1', '1', '1', null, '1'),
     );
   });
 });

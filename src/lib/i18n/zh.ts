@@ -208,7 +208,7 @@ export const zh: Dict = {
       title: (freq: string | null) =>
         freq !== null ? `飞行中出现 ${freq} Hz 振荡` : '飞行中出现振荡',
       detail:
-        'PID 环路进入了振荡：电机之间互相较劲，频率远高于打杆能产生的范围。它会自己越振越大，最后打到上下限，一个电机满油而对角的那个被切掉。常见原因：D（或 P）过大、滤波不足让电机噪声窜进 D-term、或者动态陷波没有覆盖到电机基频。',
+        'PID 环路进入了振荡：电机之间互相较劲，频率远高于打杆能产生的范围。它会自己越振越大，最后打到上下限，一个电机满油而对角的那个被切掉。常见原因：D（或 P）过大、滤波不足让电机噪声窜进 D-term、或者动态陷波没有覆盖到电机基频。陀螺峰值能说明姿态有没有守住：几十 °/s 说明只是环路在振，机身没有失控；几百 °/s 则是撞击或翻滚，那是另一回事。',
       evidence: (
         tStart: string,
         duration: string,
@@ -217,13 +217,15 @@ export const zh: Dict = {
         satPct: string,
         motors: string | null,
         others: number,
+        gyroDps: string,
       ) =>
         `在 t=${tStart} s 持续 ${duration} s` +
         (freq !== null ? `，${freq} Hz` : '') +
         `，幅度为正常水平的 ${ratio} 倍，${satPct} % 的采样打到限位` +
         (motors !== null ? `（${motors}）` : '') +
+        `，陀螺峰值 ${gyroDps} °/s` +
         (others > 1 ? ` - 共 ${others} 段` : ''),
-      fix: '把 PID master 调到 0.7 再飞一次同样的动作，确认是不是 tune 的问题。检查 dyn_notch_count 是否为 3，以及 dyn_notch_min_hz 是否低于你最低的电机基频，否则噪声会进入 D-term。',
+      fix: '按顺序排查：先看电机基频附近的滤波覆盖，之后才轮到增益。要下结论，就用 PID master 0.7 再飞一次完全相同的动作：振荡消失说明是增益，仍然存在说明是滤波。',
     },
 
     batteryReadingsImplausible: {
@@ -348,7 +350,15 @@ export const zh: Dict = {
         ]
           .filter((x) => x !== null)
           .join('；'),
-      fix: '先扩大覆盖再动 PID：把 rpm_filter_min_hz 降到最低基频以下，收紧 fade_range，并改回 3 个动态陷波。再飞一次同样的动作对比。',
+      fix: '先扩大覆盖再动 PID。注意算法：上限在 rpm_filter_min_hz + fade_range，所以要低于最低基频的是这两者之和，而不是 min_hz 本身。同时改回 3 个动态陷波，然后再飞一次同样的动作对比。',
+    },
+    pidMasterConfirm: {
+      title: '用一次试飞区分增益还是滤波',
+      detail:
+        '持续振荡要么来自增益过高，要么来自穿过 D-term 的噪声。两者在日志里留下的痕迹完全相同，事后没有任何测量能把它们分开：必须再飞一次。降低 PID master 本身并不能修好什么，它是一个测试 - 振荡消失说明是增益，完全没变说明是滤波，之后把 master 调回去没有任何代价。',
+      evidence: (current: string, target: string) =>
+        `simplified_master_multiplier = ${current}；建议试飞值 ${target}`,
+      fix: '设成这个值，飞一次完全相同的动作，然后对比两份日志。之后改回原值：这是测试，不是修复。',
     },
     dtermLpfLow: {
       title: 'D-term LPF1 设得非常低',
@@ -583,9 +593,11 @@ export const zh: Dict = {
         ratio: string,
         satPct: string,
         motors: string | null,
+        gyroDps: string,
       ): string =>
         `在 ${tStart} s 测到振荡，持续 ${duration} s：电机差分上 ${freq} Hz，幅度为本次飞行正常水平的 ${ratio} 倍，${satPct} % 的采样至少有一个电机打到限位` +
-        (motors !== null ? `（${motors}）。` : '。'),
+        (motors !== null ? `（${motors}）` : '') +
+        `。该段期间陀螺峰值：${gyroDps} °/s。`,
       timelineEventIntro: '测量结果本身，不含解读：',
       noFindings: '这个会话没有触发任何规则。',
     },
@@ -616,6 +628,26 @@ export const zh: Dict = {
       sent: '日志已发送，谢谢！',
       error: '发送失败 - 请稍后重试。',
       tooLarge: '日志太大，无法自动分享。',
+    },
+
+    shareLink: {
+      title: '分享这份报告',
+      description:
+        '整份报告都装在链接本身里：不会存到任何服务器，你的 .bbl 也不会离开你的电脑。打开链接的人会看到这份报告的本地语言版本。',
+      button: '复制链接',
+      copied: '链接已复制',
+      copiedSr: '分享链接已复制到剪贴板',
+      building: '准备中…',
+      error: '无法生成链接。',
+      charCount: (n: number): string => `${n} 个字符`,
+      trimmed: '图表没能塞进链接：它带的是评分、判定和数据，但没有曲线。',
+      overBudget:
+        '这个链接超过了 Discord 单条消息的 2000 字符上限。链接本身可用，但得换个方式发送（私信、论坛、短链接）。',
+      bannerTitle: '通过链接收到的报告',
+      bannerText: '这份报告是在别人的电脑上算出来的，然后编码进了网址。要分析你自己的飞行，请从日志开始。',
+      bannerCta: '分析我的日志',
+      decodeErrorMalformed: '这个分享链接不完整或已损坏。',
+      decodeErrorVersion: '这个链接来自更新版本的网站。请刷新页面后重新索取。',
     },
 
     // SVG 图表 - 以 `labels` prop 传入的扁平对象（纯组件，无 hook）。

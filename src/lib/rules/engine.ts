@@ -558,6 +558,7 @@ export function evaluateSession(
           f0(w.saturationPct),
           w.motorsAtStop.map((m) => `M${m}`).join(', ') || null,
           qualifying.length,
+          f0(w.peakGyroDps),
         ),
         fix: { text: r.oscillationEvent.fix },
       });
