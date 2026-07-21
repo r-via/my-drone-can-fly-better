@@ -374,6 +374,7 @@ export const en: Dict = {
       supportKofi: 'Support on Ko-fi',
       footerKofi: 'This site saving you packs? Buy me a coffee:',
       joinDiscord: 'Discord',
+    viewSource: 'Source on GitHub',
     },
 
     // Language-dependent units (Mo/Ko in French, MB/KB in English).
@@ -531,8 +532,8 @@ export const en: Dict = {
     shareLog: {
       title: 'Help improve the tool',
       description:
-        "Sends the raw .bbl log(s) from this analysis to Rémi (the site's dev), on a private channel. Helps catch real-world cases the rules miss. Nothing is sent unless you flip this switch.",
-      toggleLabel: (count: number): string =>
+        "Sends the raw .bbl log(s) from this analysis to Rémi (the site's dev), on a private channel. Helps catch real-world cases the rules miss. Nothing is sent unless you click the button.",
+      buttonLabel: (count: number): string =>
         count > 1 ? `Share the ${count} logs` : 'Share this log',
       sending: 'Sending…',
       sent: 'Log sent - thanks!',

@@ -371,6 +371,7 @@ export const es: Dict = {
       supportKofi: 'Apoyar en Ko-fi',
       footerKofi: '¿Este sitio te ahorra packs? Invita a un café:',
       joinDiscord: 'Discord',
+    viewSource: 'El código en GitHub',
     },
 
     units: {
@@ -520,8 +521,8 @@ export const es: Dict = {
     shareLog: {
       title: 'Ayudar a mejorar la herramienta',
       description:
-        'Envía el/los log(s) .bbl bruto(s) de este análisis a Rémi (el dev del sitio), a un canal privado. Sirve para detectar casos reales que las reglas no pillan. No se envía nada hasta que actives este switch.',
-      toggleLabel: (count: number): string =>
+        'Envía el/los log(s) .bbl bruto(s) de este análisis a Rémi (el dev del sitio), a un canal privado. Sirve para detectar casos reales que las reglas no pillan. No se envía nada hasta que pulses el botón.',
+      buttonLabel: (count: number): string =>
         count > 1 ? `Compartir los ${count} logs` : 'Compartir este log',
       sending: 'Enviando…',
       sent: '¡Log enviado, gracias!',
