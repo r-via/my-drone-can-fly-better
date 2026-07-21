@@ -266,6 +266,7 @@ Nothing leaves the browser unless the user explicitly asks for it.
   WASM decoder.
 - [Plasmatree PID-Analyzer](https://github.com/Plasmatree/PID-Analyzer) for the
   step response method.
-- Betaflight, for logging all of this in the first place.
+- [Betaflight](https://betaflight.com), for logging all of this in the first
+  place.
 
 If the tool saves you a pack or two: <https://ko-fi.com/rvia>.
