@@ -373,6 +373,7 @@ export const en: Dict = {
       languageLabel: 'Language',
       supportKofi: 'Support on Ko-fi',
       footerKofi: 'This site saving you packs? Buy me a coffee:',
+      joinDiscord: 'Discord',
     },
 
     // Language-dependent units (Mo/Ko in French, MB/KB in English).

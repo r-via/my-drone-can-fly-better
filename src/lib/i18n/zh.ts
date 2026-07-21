@@ -377,6 +377,7 @@ export const zh: Dict = {
       languageLabel: '语言',
       supportKofi: '在 Ko-fi 上支持',
       footerKofi: '这个网站帮你省下了电池？请杯咖啡吧：',
+      joinDiscord: 'Discord',
     },
 
     // 随语言变化的单位（Mo/Ko ↔ MB/KB）。
