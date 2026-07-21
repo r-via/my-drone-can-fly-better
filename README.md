@@ -123,12 +123,15 @@ block.](docs/screenshots/findings.png)
 
 | Category | Rules |
 | --- | --- |
-| Vibrations | `noise-mech-high`, `chassis-resonance`, `motor-noise-peak`, `propwash-severe`, `propwash-untested` |
+| Vibrations | `noise-mech-high`, `chassis-resonance`, `motor-noise-peak` |
 | Filters | `noise-filtered-leak`, `filters-weak`, `filters-residual-hf` |
-| PID | `tracking-poor`, `step-overshoot`, `step-slow`, `step-settle-off`, `yoyo-detected` |
+| PID | `tracking-poor`, `step-overshoot`, `step-slow`, `step-settle-off`, `yoyo-detected`, `propwash-severe` |
 | Motors | `motors-saturation`, `motors-imbalance`, `motors-desync` |
 | Battery | `battery-sag`, `battery-empty`, `battery-cells-unexpected` |
-| GPS / safety / log | `gps-low-sats`, `failsafe-triggered`, `log-quality`, `all-good` |
+| GPS / safety / log | `gps-low-sats`, `failsafe-triggered`, `log-quality`, `propwash-untested`, `all-good` |
+
+Every rule is documented one by one, with its condition and its threshold
+source, in [`docs/rules.md`](docs/rules.md).
 
 The config lint runs on a pasted `diff all` or, when nothing is pasted, on the
 configuration snapshot the blackbox writes into its own headers, so it works
@@ -193,8 +196,12 @@ src/worker/       analysis worker
 scripts/          Node CLI runner and decode probe
 tests/            vitest suites + golden/ reference outputs
 netlify/          opt-in log sharing function
-docs/screenshots/ images used by this README
+docs/             reference documentation, see docs/README.md
 ```
+
+Full documentation lives in [`docs/`](docs/README.md): architecture, data model,
+parser, DSP, every metric, every rule, profiles, i18n, UI, CLI, tests,
+deployment and known limitations.
 
 Brand assets and their usage rules are documented in
 [`public/brand/README.md`](public/brand/README.md).
