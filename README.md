@@ -260,6 +260,22 @@ Nothing leaves the browser unless the user explicitly asks for it.
 
 ---
 
+## Contributing
+
+Rules, drone profiles and translations are the three places where an outside
+contribution lands most easily. [CONTRIBUTING.md](CONTRIBUTING.md) covers the
+shape of a rule, where thresholds live, how the dictionaries stay complete, and
+what the golden tests expect.
+
+---
+
+## License
+
+MIT, see [LICENSE](LICENSE). The vendored decoder
+([blackbox-log](https://github.com/blackbox-log/blackbox-log)) is MIT too.
+
+---
+
 ## Credits
 
 - [blackbox-log](https://github.com/blackbox-log/blackbox-log) for the Rust to
