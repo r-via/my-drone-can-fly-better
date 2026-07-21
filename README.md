@@ -9,7 +9,7 @@ by DSP (FFT, Welch, Wiener deconvolution) and a deterministic rule engine. No
 model, no inference, no server round trip: every verdict comes from a threshold
 comparison you can read in `src/lib/rules/` and cites the numbers it fired on.
 
-Live: <https://mydronecanflybetter.netlify.app>
+Live: <https://mydronecanflybetter.wooplib.com>
 
 ![Flight report header: a 76/100 gauge, the detected craft and drone profile, the
 score breakdown per category, then metric tiles for session duration, sample

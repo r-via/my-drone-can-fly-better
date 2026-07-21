@@ -11,7 +11,7 @@ const DESCRIPTION =
   'Fully local Betaflight blackbox analysis: DSP and deterministic rules, quantified verdicts, ready-to-paste CLI commands. Your logs never leave your browser.';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://mydronecanflybetter.netlify.app'),
+  metadataBase: new URL('https://mydronecanflybetter.wooplib.com'),
   title: TITLE,
   description: DESCRIPTION,
   openGraph: {

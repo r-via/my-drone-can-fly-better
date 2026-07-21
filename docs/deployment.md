@@ -3,7 +3,7 @@
 Static export. The analysis needs no server at all: the site is HTML, JS, CSS
 and one WASM blob.
 
-Live at <https://mydronecanflybetter.netlify.app>.
+Live at <https://mydronecanflybetter.wooplib.com>.
 
 ## Build
 
