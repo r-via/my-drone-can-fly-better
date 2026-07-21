@@ -6,7 +6,13 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { analyzePower, analyzeTimeline } from '../src/lib/analysis/basic';
 import { initWasm, parseFile } from '../src/lib/bbl/parse';
-import { suggestRpmFade } from '../src/lib/cli/config';
+import {
+  configFromHeaders,
+  parseNum,
+  suggestAntiGravity,
+  suggestRpmFade,
+  suggestSliderBump,
+} from '../src/lib/cli/config';
 import { buildSessionReport } from '../src/lib/report';
 import type { FlightData } from '../src/lib/types';
 
@@ -139,6 +145,66 @@ describe('lint de config depuis les en-têtes du .bbl', () => {
         }
       }
     }
+  });
+
+  it('passe par les sliders et jamais par p_roll/d_roll quand ils sont actifs', () => {
+    // Les 4 drones du parc ont simplified_pids_mode = 2 : écrire un gain en
+    // direct donnerait l'illusion d'un réglage appliqué, jusqu'à ce que les
+    // sliders le recalculent. Le piège vaut d'être verrouillé.
+    const direct = /^set\s+[pidf]_(roll|pitch|yaw)\b/i;
+    for (const fd of [racer, chimera, lr4, pico]) {
+      const cfg = configFromHeaders(fd.meta.headers);
+      expect(parseNum(cfg.values['simplified_pids_mode'])).not.toBe(0);
+      for (const f of buildSessionReport(fd).findings) {
+        for (const line of f.fix?.cli ?? []) {
+          expect(direct.test(line), `${f.id}: ${line}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('ne propose un ajustement de slider que s’il est réellement mesurable', () => {
+    const cfg = (values: Record<string, string>) => ({ values, features: [], source: 'paste' as const, raw: '' });
+    // Sliders désactivés : ce sont les gains directs qui font foi, pas eux.
+    expect(suggestSliderBump(cfg({ simplified_pids_mode: '0', simplified_d_gain: '100' }), 'simplified_d_gain', 10)).toBeNull();
+    // Firmware sans sliders du tout (log 7 pouces du corpus public).
+    expect(suggestSliderBump(cfg({ simplified_d_gain: '100' }), 'simplified_d_gain', 10)).toBeNull();
+    // Valeur absente du log : rien à quoi ajouter un delta.
+    expect(suggestSliderBump(cfg({ simplified_pids_mode: '2' }), 'simplified_d_gain', 10)).toBeNull();
+    expect(suggestSliderBump(cfg({ simplified_pids_mode: '2', simplified_d_gain: '100' }), 'simplified_d_gain', 10)).toBe('set simplified_d_gain = 110');
+    // Déjà au plafond : le clamp annule l'ajustement, on se tait.
+    expect(suggestSliderBump(cfg({ simplified_pids_mode: '2', simplified_d_gain: '200' }), 'simplified_d_gain', 10)).toBeNull();
+
+    // anti_gravity_gain : l'échelle a changé en 4.2 (1000-30000 avant). Le log
+    // 7 pouces du corpus est resté dessus avec 10000 - un pas de -20 n'y aurait
+    // aucun sens, mieux vaut ne rien proposer.
+    expect(suggestAntiGravity(cfg({ anti_gravity_gain: '10000' }), -20)).toBeNull();
+    expect(suggestAntiGravity(cfg({ anti_gravity_gain: '80' }), -20)).toBe('set anti_gravity_gain = 60');
+  });
+
+  it('ne conseille pas de monter les gains quand le gyro est bruité', () => {
+    // Le Pico déclenche tracking-poor ET noise-mech-high : la prose y dit
+    // explicitement de régler le bruit AVANT de toucher aux PID. Fournir la
+    // commande quand même contredirait le texte du même verdict.
+    const findings = buildSessionReport(pico).findings;
+    const tracking = findings.find((f) => f.id === 'tracking-poor');
+    expect(tracking).toBeDefined();
+    expect(findings.some((f) => f.id === 'noise-mech-high')).toBe(true);
+    expect(tracking!.fix?.cli).toBeUndefined();
+  });
+
+  it('n’attache jamais une commande à un axe qu’elle ne règle pas', () => {
+    // Le Pico titre « dépassement sur Yaw » (118 %) alors que le roll dépasse
+    // aussi (110 %). Le slider D ne touche que roll et pitch : proposer
+    // simplified_d_gain sous un verdict Yaw serait incohérent, et d_yaw vaut 0
+    // sur tout le parc. L'evidence montre déjà les trois axes.
+    const f = buildSessionReport(pico).findings.find((x) => x.id === 'step-overshoot')!;
+    expect(f.title).toContain('Yaw');
+    expect(f.fix?.cli).toBeUndefined();
+    // Le Chimera dépasse sur roll/pitch : là, la commande a un sens.
+    const c = buildSessionReport(chimera).findings.find((x) => x.id === 'step-overshoot')!;
+    expect(c.title).not.toContain('Yaw');
+    expect(c.fix?.cli?.join(' ')).toMatch(/simplified_(pitch_)?d_gain/);
   });
 
   it('signale que TPA n’a jamais agi sur ce vol', () => {

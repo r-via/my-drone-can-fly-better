@@ -70,7 +70,7 @@ export function composeFindings(
   dict: Dict = fr,
 ): Finding[] {
   const findings = sortFindings([
-    ...evaluateSession(analysis, profile, dict),
+    ...evaluateSession(analysis, profile, dict, config),
     ...lintConfig(config, profile, analysis, dict),
   ]);
   // « Tout est propre » (émis par le moteur, qui ne voit pas le lint config)

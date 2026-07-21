@@ -5,11 +5,13 @@
 // sans dict explicite, la référence française est utilisée (comportement legacy).
 
 import { eventSeverity, qualifyingEvents } from '../analysis/oscillation';
+import { parseNum, suggestAntiGravity, suggestSliderBump } from '../cli/config';
 import { fr } from '../i18n/fr';
 import { AXIS_NAMES } from '../types';
 import type { Dict } from '../i18n/fr';
 import type {
   Axis,
+  CliConfig,
   DroneProfile,
   Finding,
   SessionAnalysis,
@@ -71,15 +73,31 @@ function perAxisList(values: ReadonlyArray<number | null>, digits = 1): string {
     .join(' / ');
 }
 
+/**
+ * `config` est optionnel et sert uniquement à rendre les conseils copiables :
+ * aucune règle ne se déclenche ni ne change de sévérité selon la config, un
+ * verdict reste tiré des seules mesures de vol. Sans elle, les mêmes findings
+ * sortent avec leur conseil en prose et sans ligne de commande.
+ */
 export function evaluateSession(
   analysis: SessionAnalysis,
   profile: DroneProfile,
   dict: Dict = fr,
+  config: CliConfig | null = null,
 ): Finding[] {
   const t = profile.thresholds;
   const r = dict.rules;
   const profileLabel = r.profiles[profile.id].label;
   const findings: Finding[] = [];
+  /** Lignes de commande d'un conseil, ou undefined pour n'en afficher aucune. */
+  const cliOf = (...lines: (string | null)[]): string[] | undefined => {
+    const kept = lines.filter((l): l is string => l !== null);
+    return kept.length > 0 ? kept : undefined;
+  };
+  const bump = (key: string, delta: number): string | null =>
+    config === null ? null : suggestSliderBump(config, key, delta);
+  // parseNum et pas parseFloat : les headers écrivent les booléens « ON »/« OFF ».
+  const cfgNum = (key: string): number | null => parseNum(config?.values[key]);
 
   const worstUnfilt = worstAxis(analysis.noise.axes.map((a) => a.unfiltRms));
   const worstFilt = worstAxis(analysis.noise.axes.map((a) => a.filtRms));
@@ -217,7 +235,17 @@ export function evaluateSession(
         title: r.filtersWeak.title,
         detail: r.filtersWeak.detail(f1(weakest.value), AXIS_NAMES[weakest.axis]),
         evidence: r.filtersWeak.evidence(perAxisList(atts)),
-        fix: { text: r.filtersWeak.fix },
+        // Baisser le multiplicateur descend les fréquences de coupure, donc
+        // filtre PLUS. On ne le propose que si le filtre RPM tourne déjà : tant
+        // qu'il est absent, c'est lui qu'il faut activer (verdict no-bidir), pas
+        // compenser à l'aveugle avec des LPF plus agressifs et leur latence.
+        fix: {
+          text: r.filtersWeak.fix,
+          cli:
+            cfgNum('dshot_bidir') === 1 && cfgNum('rpm_filter_harmonics') !== 0
+              ? cliOf(bump('simplified_gyro_filter_multiplier', -15))
+              : undefined,
+        },
       });
     }
 
@@ -257,10 +285,16 @@ export function evaluateSession(
           t.trackingWarn,
           t.trackingCrit,
         ),
+        // Aucune commande dans la branche gyro bruité : le conseil y est
+        // justement de NE PAS monter les gains tant que le bruit est là.
+        // Fournir la ligne quand même reviendrait à contredire le texte.
         fix: {
           text: noiseLow
             ? r.trackingPoor.fixCleanGyro(AXIS_NAMES[worstTrack.axis])
             : r.trackingPoor.fixNoisyGyro,
+          cli: noiseLow
+            ? cliOf(bump('simplified_pi_gain', 10), bump('simplified_feedforward_gain', 10))
+            : undefined,
         },
       });
     }
@@ -291,7 +325,24 @@ export function evaluateSession(
           t.overshootWarn,
           qualityNote(worstOver.axis),
         ),
-        fix: { text: r.stepOvershoot.fix(AXIS_NAMES[worstOver.axis]) },
+        // La commande doit régler l'axe que le titre nomme, sinon le rapport
+        // affiche « dépassement sur Yaw » au-dessus d'un slider qui ne touche
+        // que roll et pitch. Sur yaw il n'y a rien à monter (d_yaw = 0 sur tout
+        // le parc) : pas de commande, et l'evidence montre déjà les 3 axes.
+        // simplified_pitch_d_gain ne règle QUE l'équilibre pitch/roll : il n'a
+        // de sens que si le pitch dépasse seul, sinon décaler l'équilibre
+        // soulagerait un axe en chargeant l'autre.
+        fix: {
+          text: r.stepOvershoot.fix(AXIS_NAMES[worstOver.axis]),
+          cli:
+            worstOver.axis === 2
+              ? undefined
+              : cliOf(
+                  worstOver.axis === 1 && (overshoots[0] ?? 0) < t.overshootWarn
+                    ? bump('simplified_pitch_d_gain', 10)
+                    : bump('simplified_d_gain', 10),
+                ),
+        },
       });
     }
 
@@ -501,7 +552,10 @@ export function evaluateSession(
       title: isPico ? r.yoyoDetected.titleWarn : r.yoyoDetected.titleInfo,
       detail: r.yoyoDetected.detail(isPico ? '' : r.yoyoDetected.confirmNote),
       evidence: r.yoyoDetected.evidence(f1(analysis.yoyo.ratio), t.yoyoRatioWarn, peaks),
-      fix: { text: r.yoyoDetected.fix },
+      fix: {
+        text: r.yoyoDetected.fix,
+        cli: config === null ? undefined : cliOf(suggestAntiGravity(config, -20)),
+      },
     });
   }
 

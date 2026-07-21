@@ -102,7 +102,7 @@ export function configFromHeaders(headers: Record<string, string>): CliConfig {
 // ---------------------------------------------------------------------------
 
 /** Lit une valeur numérique ; ON/OFF → 1/0 ; listes "a,b,c" → premier élément. */
-function parseNum(raw: string | undefined): number | null {
+export function parseNum(raw: string | undefined): number | null {
   if (raw === undefined) return null;
   const s = raw.trim().toUpperCase();
   if (s === 'ON' || s === 'TRUE') return 1;
@@ -166,6 +166,54 @@ function isDshotProtocol(raw: string | undefined): boolean | null {
     return n >= 5 && n <= 7; // DSHOT150/300/600
   }
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// Suggestions de commandes - sliders simplifiés
+// ---------------------------------------------------------------------------
+
+/** Bornes des sliders du Configurator. On ne s'écarte jamais beaucoup d'une
+ *  valeur déjà présente dans le log, donc valide : ce clamp est un garde-fou. */
+const SLIDER_MIN = 20;
+const SLIDER_MAX = 200;
+
+/**
+ * Ajustement d'un slider PID/filtre simplifié, prêt à coller.
+ *
+ * Pourquoi passer par les sliders plutôt que par p_roll / d_roll : dès que
+ * simplified_pids_mode est actif, ce sont eux qui calculent les PID. Écrire les
+ * gains en direct donne l'illusion d'un réglage appliqué, jusqu'à ce que les
+ * sliders les recalculent. Les quatre drones du parc sont dans ce cas, ce n'est
+ * donc pas un cas limite. Retourne null quand les sliders ne pilotent rien (les
+ * valeurs directes sont alors la bonne cible), quand la valeur courante est
+ * absente du log, ou quand le clamp annule l'ajustement.
+ */
+export function suggestSliderBump(
+  config: CliConfig,
+  key: string,
+  delta: number,
+): string | null {
+  const mode = parseNum(config.values['simplified_pids_mode']);
+  if (mode === null || mode === 0) return null;
+  const cur = parseNum(config.values[key]);
+  if (cur === null) return null;
+  const next = Math.min(SLIDER_MAX, Math.max(SLIDER_MIN, Math.round(cur + delta)));
+  if (next === cur) return null;
+  return `set ${key} = ${next}`;
+}
+
+/**
+ * Ajustement d'anti_gravity_gain. Betaflight a changé d'échelle en 4.2 : avant,
+ * le gain se comptait en milliers (1000-30000). Un log resté sur l'ancienne
+ * échelle ne se corrige pas avec le même pas, et on préfère ne rien proposer
+ * plutôt qu'une valeur qui n'a pas de sens dans son référentiel.
+ */
+export function suggestAntiGravity(config: CliConfig, delta: number): string | null {
+  const cur = parseNum(config.values['anti_gravity_gain']);
+  if (cur === null || cur > 200) return null;
+  const next = Math.min(200, Math.max(20, Math.round(cur + delta)));
+  if (next === cur) return null;
+  return `set anti_gravity_gain = ${next}`;
 }
 
 const SEVERITY_RANK = { crit: 3, warn: 2, info: 1, ok: 0 } as const;
