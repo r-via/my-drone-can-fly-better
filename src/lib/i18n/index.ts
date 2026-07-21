@@ -42,3 +42,14 @@ export function detectLocale(): Locale {
 export function persistLocale(locale: Locale): void {
   if (typeof window !== 'undefined') window.localStorage.setItem('mdcfb.locale', locale);
 }
+
+/**
+ * Détection côté Node (CLI) : LC_ALL, LC_MESSAGES, LANG puis LANGUAGE, au
+ * format POSIX (`fr_FR.UTF-8`, `en_US`, éventuellement une liste `fr:en_US`
+ * façon gettext) - défaut anglais si rien d'exploitable (locale "C"/"POSIX").
+ */
+export function detectLocaleFromEnv(env: Record<string, string | undefined>): Locale {
+  const raw = env.LC_ALL || env.LC_MESSAGES || env.LANG || env.LANGUAGE || '';
+  const code = raw.split(/[:_.]/)[0]?.toLowerCase();
+  return isLocale(code) ? code : 'en';
+}
