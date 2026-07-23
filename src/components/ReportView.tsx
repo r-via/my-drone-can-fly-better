@@ -205,6 +205,7 @@ function SessionBlock({
       share: t.axisShare(a.weight),
       detail: t.axisDetails[a.category as keyof typeof t.axisDetails],
       targetId: hasSection ? `findings-${a.category}` : null,
+      score: a.evaluated ? a.score : undefined,
     };
   });
 

@@ -22,6 +22,9 @@ export interface GaugeSegment {
   detail: string;
   /** Ancre de la section de verdicts de l'axe, ou null si aucun verdict. */
   targetId?: string | null;
+  /** Note 0-100 de l'axe : longueur remplie de la tranche (piste + progression).
+   *  Absent pour une tranche « données absentes », dessinée pleine en gris. */
+  score?: number;
 }
 
 const TONE_VAR: Record<SegmentTone, string> = {
@@ -165,15 +168,29 @@ export default function ScoreGauge({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [score, worst]);
 
+  // L'anneau est une barre de progression circulaire : chaque axe apporte un
+  // arc dont la longueur vaut (part de l'axe) × (note de l'axe), les arcs sont
+  // collés bout à bout, et le non-gagné reste en une seule piste grise en fin
+  // de course. À 44/100, l'anneau est visiblement rempli à ~44 %. Une tranche
+  // « données absentes » (score undefined) garde sa part entière, en gris.
   const totalWeight = segments.reduce((s, seg) => s + seg.weight, 0) || 1;
-  const usableDeg = 360 - segments.length * GAP_DEG;
+  // Éléments séparés par un gap : les tranches + le reliquat de piste.
+  const usableDeg = 360 - (segments.length + 1) * GAP_DEG;
+  /** Un axe à 0 garde un tick visible : il doit rester lisible et survolable. */
+  const MIN_FILL_DEG = 3;
   let cursor = 0;
   const arcs = segments.map((seg) => {
-    const span = (seg.weight / totalWeight) * usableDeg;
+    const fullSpan = (seg.weight / totalWeight) * usableDeg;
+    const fillSpan =
+      seg.score === undefined
+        ? fullSpan
+        : Math.max(MIN_FILL_DEG, (fullSpan * Math.max(0, Math.min(100, seg.score))) / 100);
     const a0 = cursor;
-    cursor += span + GAP_DEG;
-    return { seg, d: arcPath(a0, a0 + span) };
+    cursor += fillSpan + GAP_DEG;
+    return { seg, d: arcPath(a0, a0 + fillSpan) };
   });
+  const remainderEnd = 360 - GAP_DEG;
+  const remainder = remainderEnd - cursor >= 1 ? arcPath(cursor, remainderEnd) : null;
 
   const hovered = segments.find((s) => s.key === hoveredKey) ?? null;
 
@@ -185,6 +202,16 @@ export default function ScoreGauge({
         role="img"
         aria-label={segments.map((s) => `${s.label} : ${s.status}`).join(', ')}
       >
+        {/* Reliquat non gagné : une seule piste grise en fin d'anneau. */}
+        {remainder ? (
+          <path
+            d={remainder}
+            fill="none"
+            stroke="var(--line)"
+            strokeWidth="10"
+            strokeLinecap="round"
+          />
+        ) : null}
         {arcs.map(({ seg, d }, i) => {
           const isHovered = seg.key === hoveredKey;
           const baseOpacity = seg.tone === 'absent' ? 0.55 : 1;
