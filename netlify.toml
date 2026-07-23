@@ -6,6 +6,13 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Liens de partage : /s sert l'aperçu OG (Discord, Slack) puis redirige vers
+# l'app en préservant le fragment #r=… (voir netlify/functions/share-preview.ts).
+[[redirects]]
+  from = "/s"
+  to = "/.netlify/functions/share-preview"
+  status = 200
+
 # Le service worker doit être revalidé à chaque visite, sinon un nouveau build
 # reste invisible tant que l'ancien sw.js est en cache HTTP.
 [[headers]]

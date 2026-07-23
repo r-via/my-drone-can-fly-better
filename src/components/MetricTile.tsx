@@ -53,9 +53,11 @@ export default function MetricTile({
         {toneSr ? <span className="sr-only">{toneSr} - </span> : null}
         {label}
       </p>
-      <p className="mt-0.5 font-mono text-xl font-bold leading-tight text-ink sm:text-2xl">
+      {/* whitespace-nowrap + taille réduite : une valeur comme « 5 min 07 s »
+          ne doit JAMAIS se replier sur deux lignes dans la tuile. */}
+      <p className="mt-0.5 whitespace-nowrap font-mono text-base font-bold leading-tight text-ink sm:text-lg">
         {value}
-        {unit ? <span className="ml-1 text-sm font-normal text-ink-2">{unit}</span> : null}
+        {unit ? <span className="ml-1 text-xs font-normal text-ink-2">{unit}</span> : null}
       </p>
       {hint ? <p className="mt-1 text-[10.5px] text-ink-3">{hint}</p> : null}
     </div>

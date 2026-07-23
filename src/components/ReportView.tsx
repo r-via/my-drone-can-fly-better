@@ -4,14 +4,18 @@ import { useState } from 'react';
 import { eventSeverity, qualifyingEvents } from '@/lib/analysis/oscillation';
 import { useLocale } from '@/lib/i18n/locale';
 import type {
-  FileReport,
   Finding,
   FindingCategory,
   Report,
   SessionReport,
   Severity,
+  SkippedSession,
 } from '@/lib/types';
+import { buildComparisons } from '@/lib/compare';
+import { computeFlightScore } from '@/lib/score';
+import ChartHelp from '@/components/ChartHelp';
 import CliExport from '@/components/CliExport';
+import ComparisonPanel from '@/components/ComparisonPanel';
 import FindingCard, { SEVERITY_META } from '@/components/FindingCard';
 import {
   AlertIcon,
@@ -24,7 +28,7 @@ import {
   WaveIcon,
 } from '@/components/icons';
 import MetricTile, { type MetricTone } from '@/components/MetricTile';
-import ScoreGauge from '@/components/ScoreGauge';
+import ScoreGauge, { type GaugeSegment } from '@/components/ScoreGauge';
 import SessionPicker, { type SessionPickerItem } from '@/components/SessionPicker';
 import ShareLink from '@/components/ShareLink';
 import ShareLogToggle from '@/components/ShareLogToggle';
@@ -121,29 +125,6 @@ function groupFindings(
   });
 }
 
-// ---------------------------------------------------------------------------
-// Score /100 - purement une visualisation du même verdict, pas une nouvelle
-// règle : pénalité fixe par sévérité, plafonnée à 0. Le détail par catégorie
-// reste affiché à côté pour que le chiffre soit traçable, pas une boîte noire.
-// ---------------------------------------------------------------------------
-
-const SEVERITY_PENALTY: Record<Severity, number> = { crit: 25, warn: 12, info: 4, ok: 0 };
-
-function computeFlightScore(groups: Array<{ category: FindingCategory; findings: Finding[] }>): {
-  score: number;
-  penalties: Array<{ category: FindingCategory; penalty: number }>;
-} {
-  const penalties = groups
-    .map((g) => ({
-      category: g.category,
-      penalty: g.findings.reduce((sum, f) => sum + SEVERITY_PENALTY[f.severity], 0),
-    }))
-    .filter((p) => p.penalty > 0)
-    .sort((a, b) => b.penalty - a.penalty);
-  const score = Math.max(0, 100 - penalties.reduce((sum, p) => sum + p.penalty, 0));
-  return { score, penalties };
-}
-
 /** Catégories affichées en aperçu rapide - seulement celles pertinentes pour ce vol. */
 const CHIP_CATEGORIES: FindingCategory[] = [
   'securite',
@@ -162,13 +143,11 @@ const CHIP_CATEGORIES: FindingCategory[] = [
 
 function SessionBlock({
   sessionReport,
-  fileName,
-  shareable,
+  skipped,
 }: {
   sessionReport: SessionReport;
-  fileName: string;
-  /** Faux sur un rapport déjà reçu par lien : on ne repartage pas un partage. */
-  shareable: boolean;
+  /** Sessions écartées du même fichier : affichées repliées, rattachées au vol. */
+  skipped: SkippedSession[];
 }) {
   const { locale, dict } = useLocale();
   const t = dict.ui.report;
@@ -208,33 +187,75 @@ function SessionBlock({
     satPct >= th.saturationCrit ? 'crit' : satPct >= th.saturationWarn ? 'warn' : 'ok';
 
   const groups = groupFindings(findings);
-  const { score, penalties } = computeFlightScore(groups);
-  const breakdown = penalties
-    .slice(0, 3)
-    .map((p) => `${dict.ui.categories[p.category]} -${p.penalty}`)
-    .join(' · ');
+  const flightScore = computeFlightScore(sessionReport);
+  const { score, axes } = flightScore;
 
+  // Tranches de l'anneau : une par axe pondéré, grise quand la donnée manque.
+  // Le tooltip porte la note de l'axe, sa part du score et ce qu'il mesure.
+  // Une tranche dont l'axe a des verdicts pointe vers sa section (ancre).
+  const gaugeSegments: GaugeSegment[] = axes.map((a) => {
+    const label = dict.ui.categories[a.category];
+    const hasSection = groups.some((g) => g.category === a.category);
+    return {
+      key: a.category,
+      weight: a.weight,
+      tone: a.evaluated ? a.worst : ('absent' as const),
+      label,
+      status: a.evaluated ? `${a.score}/100` : t.axisNoData,
+      share: t.axisShare(a.weight),
+      detail: t.axisDetails[a.category as keyof typeof t.axisDetails],
+      targetId: hasSection ? `findings-${a.category}` : null,
+    };
+  });
+
+  // Traçabilité du chiffre : axes entamés ou absents, puis déductions plates.
+  const breakdown = [
+    ...axes
+      .filter((a) => !a.evaluated || a.score < 100)
+      .map((a) =>
+        a.evaluated ? `${dict.ui.categories[a.category]} ${a.score}` : `${dict.ui.categories[a.category]} n/a`,
+      ),
+    ...flightScore.flatPenalties.map((p) => `${dict.ui.categories[p.category]} -${p.penalty}`),
+  ].join(' · ');
+
+  // GPS masqué quand absent (la plupart des quads n'en ont pas) ; la batterie
+  // reste affichée en grisé « données absentes » - c'est un axe du score.
   const chipCategories = CHIP_CATEGORIES.filter((cat) => {
     if (cat === 'gps') return analysis.gps.available;
-    if (cat === 'batterie') return power !== null;
     return true;
   });
   const chips = chipCategories.map((cat) => {
+    if (cat === 'batterie' && power === null) {
+      return { category: cat, worst: 'ok' as Severity, absent: true };
+    }
     const group = groups.find((g) => g.category === cat);
-    return { category: cat, worst: group ? worstSeverity(group.findings) : ('ok' as Severity) };
+    return {
+      category: cat,
+      worst: group ? worstSeverity(group.findings) : ('ok' as Severity),
+      absent: false,
+    };
   });
 
   return (
     <div className="space-y-4">
       {/* Bandeau profil + score de vol */}
       <div className="flex flex-col gap-5 rounded-2xl border border-line-strong bg-surface-2 p-5 sm:flex-row sm:items-center">
-        <ScoreGauge score={score} worst={worst} />
+        <ScoreGauge
+          score={score}
+          worst={worst}
+          segments={gaugeSegments}
+          gotoHint={t.axisGoto}
+        />
         <div className="min-w-0 flex-1">
           <p className="font-display text-xl font-bold text-ink">
             {meta.craftName || profileText.label}
-            <span className="ml-2 font-sans text-sm font-normal text-ink-3">
-              {t.profileTag(profileText.label)}
-            </span>
+            {/* Sans craft name, le titre EST déjà le nom du profil : le tag
+                « profil X » répéterait le même texte côte à côte. */}
+            {meta.craftName ? (
+              <span className="ml-2 font-sans text-sm font-normal text-ink-3">
+                {t.profileTag(profileText.label)}
+              </span>
+            ) : null}
           </p>
           <p className="mt-0.5 font-mono text-xs text-ink-3">
             {meta.firmware}
@@ -246,7 +267,10 @@ function SessionBlock({
             <SevIcon className="size-3.5" />
             {dict.ui.verdict[worst]}
           </p>
-          {breakdown ? <p className="mt-2 font-mono text-[11px] text-ink-3">100 - {breakdown}</p> : null}
+          {breakdown ? <p className="mt-2 font-mono text-[11px] text-ink-3">{breakdown}</p> : null}
+          {flightScore.capped ? (
+            <p className="mt-1 text-[11px] text-ink-3">{t.scoreCappedNote}</p>
+          ) : null}
           {profileText.notes.length > 0 ? (
             <ul className="mt-3 space-y-0.5 text-xs text-ink-2">
               {profileText.notes.map((note) => (
@@ -276,9 +300,16 @@ function SessionBlock({
         />
         <MetricTile
           label={t.tileMaxCurrent}
-          value={power && power.ampMax != null ? fmt.fixed(power.ampMax, 1) : 'n/a'}
-          unit={power && power.ampMax != null ? 'A' : undefined}
-          hint={power && power.ampAvg != null ? t.currentAvg(fmt.fixed(power.ampAvg, 1)) : undefined}
+          value={power && power.ampMax != null && !power.ampImplausible ? fmt.fixed(power.ampMax, 1) : 'n/a'}
+          unit={power && power.ampMax != null && !power.ampImplausible ? 'A' : undefined}
+          hint={
+            power?.ampImplausible
+              ? t.currentUnreliable
+              : power && power.ampAvg != null
+                ? t.currentAvg(fmt.fixed(power.ampAvg, 1))
+                : undefined
+          }
+          tone={power?.ampImplausible ? 'warn' : undefined}
           icon={BoltIcon}
         />
         <MetricTile
@@ -299,6 +330,20 @@ function SessionBlock({
       {/* Aperçu rapide par catégorie */}
       <div className="flex flex-wrap gap-2">
         {chips.map((chip) => {
+          if (chip.absent) {
+            return (
+              <span
+                key={chip.category}
+                title={t.axisNotEvaluated(dict.ui.categories[chip.category])}
+                className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-3 py-1.5 text-xs font-semibold text-ink-3 opacity-70"
+              >
+                <span aria-hidden="true" className="font-mono">
+                  ∅
+                </span>
+                {dict.ui.categories[chip.category]}
+              </span>
+            );
+          }
           const chipSev = SEVERITY_META[chip.worst];
           const ChipIcon = chipSev.icon;
           return (
@@ -317,18 +362,47 @@ function SessionBlock({
         })}
       </div>
 
+      {/* Sessions écartées du fichier - repliées : elles ne concernent pas le vol
+          affiché, mais elles ne doivent pas disparaître avec la vue par onglet. */}
+      {skipped.length > 0 ? (
+        <details className="group rounded-2xl border border-line bg-surface">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-xs font-semibold text-ink-2 [&::-webkit-details-marker]:hidden">
+            <span
+              aria-hidden="true"
+              className="font-mono text-ink-3 transition-transform group-open:rotate-90"
+            >
+              ▶
+            </span>
+            <AlertIcon className="size-3.5 shrink-0 text-warn" />
+            {t.skippedInFileSummary(skipped.length)}
+          </summary>
+          <ul className="space-y-1 px-4 pb-3 pl-9 text-xs text-ink-2">
+            {skipped.map((s) => (
+              <li key={s.index}>
+                {t.skippedSession(String(s.index + 1), s.error, fmt.bytes(s.sizeBytes))}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
       {/* Graphes (chaque SVG porte son propre titre) */}
       {analysis.timeline.segments.length > 0 ? (
         <figure className="rounded-2xl border border-line bg-surface p-4">
-          <figcaption className="mb-2 text-sm font-semibold text-ink">
+          <figcaption className="mb-2 flex items-center justify-between gap-2 text-sm font-semibold text-ink">
             {t.timelineCaption}
+            <ChartHelp topic="timeline" />
           </figcaption>
-          <TimelineStrip
-            segments={analysis.timeline.segments}
-            durationS={meta.durationS}
-            events={timelineEvents}
-            labels={dict.ui.charts.timeline}
-          />
+          <div className="overflow-x-auto">
+            <div className="min-w-[600px]">
+              <TimelineStrip
+                segments={analysis.timeline.segments}
+                durationS={meta.durationS}
+                events={timelineEvents}
+                labels={dict.ui.charts.timeline}
+              />
+            </div>
+          </div>
           {oscEvents.length > 0 ? (
             /* Un marqueur dit OÙ, pas QUOI : la phrase donne les grandeurs
                mesurées telles quelles, pour que le lecteur voie que le verdict
@@ -356,16 +430,31 @@ function SessionBlock({
       ) : null}
       {analysis.spectrum ? (
         <div className="rounded-2xl border border-line bg-surface p-4">
-          <SpectrumChart
-            axes={analysis.spectrum.axes}
-            motorFundamentalHz={analysis.spectrum.motorFundamentalHz}
-            labels={dict.ui.charts.spectrum}
-          />
+          <div className="mb-1 flex justify-end">
+            <ChartHelp topic="spectrum" />
+          </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[600px]">
+              <SpectrumChart
+                axes={analysis.spectrum.axes}
+                motorFundamentalHz={analysis.spectrum.motorFundamentalHz}
+                sampleRateHz={meta.sampleRateHz}
+                labels={dict.ui.charts.spectrum}
+              />
+            </div>
+          </div>
         </div>
       ) : null}
       {analysis.step ? (
         <div className="rounded-2xl border border-line bg-surface p-4">
-          <StepResponseChart axes={analysis.step.axes} labels={dict.ui.charts.step} />
+          <div className="mb-1 flex justify-end">
+            <ChartHelp topic="step" />
+          </div>
+          <div className="overflow-x-auto">
+            <div className="min-w-[600px]">
+              <StepResponseChart axes={analysis.step.axes} labels={dict.ui.charts.step} />
+            </div>
+          </div>
         </div>
       ) : null}
 
@@ -376,7 +465,13 @@ function SessionBlock({
         </p>
       ) : (
         groups.map((group) => (
-          <section key={group.category} aria-label={dict.ui.categories[group.category]}>
+          <section
+            key={group.category}
+            /* Ancre visée par les tranches de la jauge (et par l'URL). */
+            id={`findings-${group.category}`}
+            aria-label={dict.ui.categories[group.category]}
+            className="scroll-mt-6"
+          >
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-3">
               {dict.ui.categories[group.category]}
             </h4>
@@ -389,86 +484,25 @@ function SessionBlock({
         ))
       )}
 
-      {shareable ? <ShareLink sessionReport={sessionReport} fileName={fileName} /> : null}
     </div>
   );
 }
 
-function FileSection({
-  file,
-  selected,
-  onSelect,
-  shareable,
-}: {
-  file: FileReport;
-  selected: number;
-  onSelect: (i: number) => void;
-  shareable: boolean;
-}) {
-  const { locale, dict } = useLocale();
-  const t = dict.ui.report;
-  const fmt = makeFormatters(locale, dict);
-  const valid = file.sessionReports.length;
-  const skipped = file.skipped.length;
+// ---------------------------------------------------------------------------
+// Vue principale - un onglet par vol, comparaison en tête
+// ---------------------------------------------------------------------------
 
-  // Heure relative de début : cumul des durées des sessions valides précédentes.
-  let offset = 0;
-  const items: SessionPickerItem[] = file.sessionReports.map((sr, i) => {
-    const dur = sr.analysis.meta.durationS;
-    const item: SessionPickerItem = {
-      value: i,
-      label: t.sessionLabel(String(sr.analysis.meta.index + 1)),
-      sublabel: t.sessionSublabel(fmt.duration(dur), fmt.clock(offset)),
-    };
-    offset += dur;
-    return item;
-  });
-
-  const current = file.sessionReports[selected] ?? file.sessionReports[0];
-
-  return (
-    <section aria-label={t.fileAria(file.fileName)} className="space-y-4">
-      <div className="rounded-2xl border border-line bg-surface p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="min-w-0 truncate font-mono text-base font-semibold text-ink">
-            {file.fileName}
-          </h2>
-          <p className="text-xs text-ink-2">
-            {t.validSessions(valid)}
-            {skipped > 0 ? <span className="text-warn"> · {t.skippedSessions(skipped)}</span> : null}
-          </p>
-        </div>
-        {skipped > 0 ? (
-          <ul className="mt-2 space-y-1 text-xs text-ink-2">
-            {file.skipped.map((s) => (
-              <li key={s.index} className="flex items-start gap-1.5">
-                <AlertIcon className="mt-0.5 size-3.5 shrink-0 text-warn" />
-                <span>{t.skippedSession(String(s.index + 1), s.error, fmt.bytes(s.sizeBytes))}</span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {items.length > 1 ? (
-          <div className="mt-3">
-            <SessionPicker items={items} selected={selected} onSelect={onSelect} />
-          </div>
-        ) : null}
-      </div>
-
-      {current ? (
-        <SessionBlock sessionReport={current} fileName={file.fileName} shareable={shareable} />
-      ) : (
-        <p className="rounded-2xl border border-line bg-surface p-4 text-sm text-ink-2">
-          {t.noUsableSession}
-        </p>
-      )}
-    </section>
-  );
+interface Flight {
+  key: string;
+  fileName: string;
+  /** Libellé d'onglet : nom de fichier, suffixé du n° de session si le fichier en a plusieurs. */
+  label: string;
+  durationS: number;
+  report: SessionReport;
 }
 
-// ---------------------------------------------------------------------------
-// Vue principale
-// ---------------------------------------------------------------------------
+/** Valeur d'onglet réservée à la comparaison de passes (les vols sont >= 0). */
+const COMPARE_TAB = -1;
 
 export default function ReportView({
   report,
@@ -479,15 +513,41 @@ export default function ReportView({
   onReset: () => void;
   files: File[];
 }) {
-  const { dict } = useLocale();
+  const { locale, dict } = useLocale();
   const t = dict.ui.report;
-  const [selection, setSelection] = useState<Record<number, number>>({});
+  const fmt = makeFormatters(locale, dict);
+  const [active, setActive] = useState(0);
 
-  const cliFindings: Finding[] = [];
-  report.files.forEach((file, i) => {
-    const sr = file.sessionReports[selection[i] ?? 0];
-    if (sr) cliFindings.push(...sr.findings);
+  // Aplatissement : chaque (fichier, session) devient un vol, donc un onglet.
+  // Un fichier multi-sessions se scinde en plusieurs onglets - c'est bien « un
+  // onglet par vol », pas par fichier.
+  const flights: Flight[] = [];
+  report.files.forEach((file) => {
+    const multi = file.sessionReports.length > 1;
+    file.sessionReports.forEach((sr) => {
+      const n = sr.analysis.meta.index + 1;
+      flights.push({
+        key: `${file.fileName}#${sr.analysis.meta.index}`,
+        fileName: file.fileName,
+        label: multi ? `${file.fileName} · ${n}` : file.fileName,
+        durationS: sr.analysis.meta.durationS,
+        report: sr,
+      });
+    });
   });
+
+  // Sessions écartées : rattachées au(x) vol(s) du même fichier, où elles
+  // s'affichent repliées. Un fichier sans aucune session exploitable n'a pas
+  // d'onglet : ses raisons restent listées globalement sous la barre d'onglets.
+  const skippedByFile = new Map<string, SkippedSession[]>();
+  report.files.forEach((f) => {
+    if (f.skipped.length > 0 && f.sessionReports.length > 0) {
+      skippedByFile.set(f.fileName, f.skipped);
+    }
+  });
+  const orphanSkipped = report.files
+    .filter((f) => f.sessionReports.length === 0)
+    .flatMap((f) => f.skipped.map((s) => ({ fileName: f.fileName, s })));
 
   const craftNames = report.files
     .map((f) => f.sessionReports[0]?.analysis.meta.craftName)
@@ -497,17 +557,58 @@ export default function ReportView({
   const isShared = shared !== undefined;
   const ts = dict.ui.shareLink;
 
+  // Comparaison de passes : toutes sessions confondues, groupées par quad et
+  // ordonnées dans le temps. Sans objet sur un lien partagé (une seule session).
+  const comparisons = isShared
+    ? []
+    : buildComparisons(report.files.flatMap((f) => f.sessionReports));
+
+  const showCompareTab = comparisons.length > 0;
+  const compareActive = showCompareTab && active === COMPARE_TAB;
+  const activeIdx = !compareActive && active >= 0 && active < flights.length ? active : 0;
+  const activeFlight = compareActive ? null : flights[activeIdx];
+
+  // Score par onglet : strictement le même calcul que la carte de score du vol,
+  // pour que le chiffre de l'onglet et celui de la jauge ne divergent jamais.
+  const tabItems: SessionPickerItem[] = flights.map((f, i) => {
+    const { score } = computeFlightScore(f.report);
+    return {
+      value: i,
+      label: f.label,
+      sublabel: fmt.duration(f.durationS),
+      score,
+      tone: worstSeverity(f.report.findings),
+    };
+  });
+  if (showCompareTab) {
+    tabItems.push({
+      value: COMPARE_TAB,
+      label: dict.compare.tabLabel,
+      sublabel: dict.compare.tabCount(comparisons.length),
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl font-bold text-ink">{t.title}</h1>
-        <button
-          type="button"
-          onClick={onReset}
-          className="rounded-full border border-line bg-surface px-4 py-1.5 text-sm font-semibold text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
-        >
-          {isShared ? ts.bannerCta : t.newAnalysis}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Partage du vol affiché - jamais sur un rapport déjà reçu par lien
+              (on ne repartage pas un partage). */}
+          {!isShared && activeFlight ? (
+            <ShareLink
+              sessionReport={activeFlight.report}
+              fileName={activeFlight.fileName}
+            />
+          ) : null}
+          <button
+            type="button"
+            onClick={onReset}
+            className="rounded-full border border-line bg-surface px-4 py-1.5 text-sm font-semibold text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
+          >
+            {isShared ? ts.bannerCta : t.newAnalysis}
+          </button>
+        </div>
       </div>
 
       {isShared ? (
@@ -520,17 +621,57 @@ export default function ReportView({
         </div>
       ) : null}
 
-      {report.files.map((file, i) => (
-        <FileSection
-          key={file.fileName}
-          file={file}
-          selected={selection[i] ?? 0}
-          onSelect={(v) => setSelection((prev) => ({ ...prev, [i]: v }))}
-          shareable={!isShared}
+      {/* Onglets : un par vol (score en barre de remplissage) + un onglet
+          Comparaison. Masqués quand il n'y a qu'un seul choix possible. */}
+      {tabItems.length > 1 ? (
+        <SessionPicker
+          items={tabItems}
+          selected={compareActive ? COMPARE_TAB : activeIdx}
+          onSelect={setActive}
+          ariaLabel={t.flightsAria}
         />
-      ))}
+      ) : null}
 
-      <CliExport findings={cliFindings} />
+      {/* Fichiers sans aucune session exploitable : leurs raisons n'ont pas
+          d'onglet où vivre. Repliées ici pour ne pas repousser le rapport. */}
+      {orphanSkipped.length > 0 ? (
+        <details className="group rounded-2xl border border-line bg-surface">
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-xs font-semibold text-ink-2 [&::-webkit-details-marker]:hidden">
+            <span
+              aria-hidden="true"
+              className="font-mono text-ink-3 transition-transform group-open:rotate-90"
+            >
+              ▶
+            </span>
+            <AlertIcon className="size-3.5 shrink-0 text-warn" />
+            {t.skippedOrphanSummary(orphanSkipped.length)}
+          </summary>
+          <ul className="space-y-1 px-4 pb-3 pl-9 text-xs text-ink-2">
+            {orphanSkipped.map(({ fileName, s }) => (
+              <li key={`${fileName}#${s.index}`}>
+                <span className="font-mono">{fileName}</span> ·{' '}
+                {t.skippedSession(String(s.index + 1), s.error, fmt.bytes(s.sizeBytes))}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
+      {compareActive ? (
+        <ComparisonPanel comparisons={comparisons} />
+      ) : activeFlight ? (
+        <SessionBlock
+          key={activeFlight.key}
+          sessionReport={activeFlight.report}
+          skipped={skippedByFile.get(activeFlight.fileName) ?? []}
+        />
+      ) : (
+        <p className="rounded-2xl border border-line bg-surface p-4 text-sm text-ink-2">
+          {t.noUsableSession}
+        </p>
+      )}
+
+      {activeFlight ? <CliExport findings={activeFlight.report.findings} /> : null}
 
       <ShareLogToggle files={files} craftNames={craftNames} />
     </div>

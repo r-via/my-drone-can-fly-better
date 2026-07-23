@@ -40,14 +40,14 @@ export default function Shell({ children }: { children: ReactNode }) {
   return (
     <>
       <header className="border-b border-line">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <p className="flex items-baseline gap-2 font-display text-[15px] font-bold tracking-[0.14em] text-ink">
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
+          <p className="flex items-baseline gap-2 whitespace-nowrap font-display text-[15px] font-bold tracking-[0.14em] text-ink">
             <span aria-hidden="true" className="font-mono text-accent">
               //
             </span>
             {dict.ui.app.logo}
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <p className="hidden text-xs text-ink-3 xl:block">{dict.ui.app.headerTagline}</p>
             <a
               href={GITHUB_URL}
@@ -73,10 +73,12 @@ export default function Shell({ children }: { children: ReactNode }) {
               href={KOFI_URL}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label={dict.ui.app.supportKofi}
+              title={dict.ui.app.supportKofi}
               className="inline-flex items-center gap-1.5 rounded-full bg-amber/15 px-3 py-1.5 text-xs font-bold text-amber transition-all hover:-translate-y-px hover:bg-amber/25 hover:shadow-[0_6px_18px_-8px_var(--amber)]"
             >
               <KofiIcon className="size-4" />
-              <span>{dict.ui.app.supportKofi}</span>
+              <span className="hidden sm:inline">{dict.ui.app.supportKofi}</span>
             </a>
             <LanguageSwitcher />
           </div>

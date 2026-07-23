@@ -68,6 +68,45 @@ describe('validité du canal vbat', () => {
     }
   });
 
+  it('un pack 4S à pics de tension isolés reste détecté 4S (pas un 5S fantôme)', () => {
+    // Cas GEPRC F722 AIO : canal vbat bruité, la tension saute vers le haut
+    // pendant les pointes de courant. Ces pics rares poussent le MAX au-dessus
+    // de 17.4 V (4×4.35) et faisaient détecter 5S sur un vrai pack 4S.
+    const fs = 500;
+    const n = 6000;
+    const time = new Float64Array(n);
+    const vbat = new Float32Array(n);
+    const amperage = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      time[i] = i / fs;
+      const spike = i % 300 === 0; // ~0.3 % des échantillons : pics isolés
+      vbat[i] = spike ? 18.9 : 16.4; // 4S : 4.1 V/cell, pic à 4.7 V/cell (impossible)
+      amperage[i] = spike ? 80 : 5; // le pic de tension coïncide avec le courant
+    }
+    const fd = {
+      meta: { sampleRateHz: fs },
+      time,
+      vbat,
+      amperage,
+    } as unknown as FlightData;
+
+    const p = analyzePower(fd)!;
+    expect(p.cells).toBe(4); // ceil(18.9/4.35)=5 en max, 4 via le p99 robuste
+    expect(p.vbatMax).toBeCloseTo(18.9, 1); // le max brut reste affiché tel quel
+    expect(p.implausibleSamples).toBeGreaterThan(0); // les pics restent signalés
+    // Le canal courant décroche comme vbat : 80 A en pointe contre 5 A tenus.
+    // Sur la carte réelle, ce couple donnait « courant max 326 A » sur un AIO.
+    expect(p.ampP99).toBeCloseTo(5, 0);
+    expect(p.ampImplausible).toBe(true);
+  });
+
+  it('le canal courant du racer reste crédible malgré son vbat HS', () => {
+    // Pointe/soutenu ≈ 1.3 sur ce log : un vrai courant de vol, à afficher.
+    // Seul le couple « vbat incohérent + pointes isolées » condamne le canal.
+    const p = analyzePower(racer)!;
+    expect(p.ampImplausible).toBe(false);
+  });
+
   it('perCellMinSustained reste proche du min brut quand la mesure est saine', () => {
     // Sans glitch, le minimum tenu sur 1 s ne peut pas être très loin du
     // minimum instantané : la différence est la décharge, pas du bruit.

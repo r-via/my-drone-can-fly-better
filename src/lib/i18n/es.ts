@@ -111,6 +111,8 @@ export const es: Dict = {
       title: (axis: string) => `Estabilización desviada en ${axis}`,
       detail:
         'Tras el transitorio, la respuesta no se estabiliza en 1 (la consigna): el rate alcanzado deriva respecto a lo pedido. Típicamente es el I-term (demasiado bajo si <1, demasiado alto o en lucha si >1) o un feedforward mal calibrado.',
+      noFfNote:
+        ' Sin feedforward en este eje, la respuesta converge más despacio: estabilizarse un poco por debajo de la consigna dentro de la ventana de medida es en parte esperable, el I-term cierra la brecha más allá.',
       evidence: (axis: string, settleValue: string, qualityNote: string) =>
         `Valor de estabilización ${axis} = ${settleValue} (esperado entre 0.85 y 1.15)${qualityNote}`,
       fix: (axis: string) =>
@@ -172,6 +174,15 @@ export const es: Dict = {
       fix: 'Verifica el pack usado - celdas de más pueden quemar ESC/motores, celdas de menos hunden el rendimiento.',
     },
 
+    batteryNotLogged: {
+      title: 'Batería ausente del log',
+      detail:
+        'El log no contiene ni tensión ni corriente: el campo BATTERY está desactivado en los ajustes de blackbox. No hay avería, la placa simplemente no graba esas medidas - todos los veredictos de batería (sag, pack agotado, sensor) quedan sin objeto en este log.',
+      evidence: (mask: string) =>
+        `fields_disabled_mask = ${mask} (bit BATTERY activo) - ningún campo vbat/amperage en las tramas`,
+      fix: 'Reactiva el registro de batería para recuperar los veredictos de sag y tensión en tus próximos logs.',
+    },
+
     yoyoDetected: {
       titleWarn: 'Yoyo detectado (oscilación de empuje)',
       titleInfo: 'Indicio de yoyo (por confirmar)',
@@ -227,12 +238,15 @@ export const es: Dict = {
     },
 
     batteryReadingsImplausible: {
-      title: 'Medidas de batería incoherentes',
-      detail:
-        'El log contiene tensiones físicamente imposibles: por encima de la tensión en vacío mientras el quad consume mucha corriente. Bajo carga una batería solo puede bajar. Es el ADC de vbat que se descuelga en los transitorios de corriente, no el pack que sube. Mientras sea así, ni el sag ni la tensión mínima son medibles en este vuelo, así que los veredictos de batería se han retirado en vez de anunciarte un pack muerto por error.',
+      title: 'La medición de alimentación de la placa está fallando',
+      detail: (currentNote: string) =>
+        `El registro contiene tensiones físicamente imposibles: por encima de la tensión en vacío mientras el dron consume mucha corriente. Bajo carga una batería solo puede bajar: es el ADC de la placa que se descuelga en los transitorios, no el pack que se recupera.${currentNote} No es un problema del pack ni del tune: es el circuito de medición de alimentación de la placa. Y mientras mienta, la compensación de sag y las alarmas de tensión de Betaflight trabajan sobre esos mismos valores falsos - no te fíes del beeper de batería para aterrizar. Los veredictos de batería de este informe se retiraron antes que anunciarte en falso un pack muerto.`,
+      currentNote: (ampMax: string, ampP99: string) =>
+        ` La medición de corriente se descuelga igual: ${ampMax} A leídos en pico cuando el pico sostenido del vuelo ronda los ${ampP99} A - un pico así es una lectura del sensor, no una corriente.`,
       evidence: (count: number, vmax: string, vmin: string) =>
-        `${count} muestra(s) por encima de la tensión en reposo bajo fuerte carga; rango leído ${vmin} a ${vmax} V`,
-      fix: 'Revisa el filtrado de la medida de vbat (condensador en la entrada), las soldaduras del cable de potencia y el ajuste vbat_scale. Vuelve a volar para confirmar antes de concluir nada sobre el pack.',
+        `${count} muestra(s) por encima de la tensión de reposo bajo carga fuerte; rango leído ${vmin} a ${vmax} V`,
+      fix: (scales: string) =>
+        `Revisa el filtrado de la medición vbat (condensador en la entrada), las soldaduras de los cables de potencia y el ajuste ${scales}. Vuela de nuevo para confirmar antes de concluir nada sobre el pack.`,
     },
 
     gpsLowSats: {
@@ -415,6 +429,7 @@ export const es: Dict = {
     cliVbatRange: (cells: string, max: string, min: string, sag: string) =>
       `${cells}S ${max}→${min} V (sag ${sag} V)`,
     cliCurrentMax: (amps: string) => `corriente máx ${amps} A`,
+    cliCurrentUnreliable: 'corriente: sensor no fiable, valor descartado',
     headersUnreadable: 'Headers ilegibles (¿sesión corrupta?)',
     dataVersionUnsupported: 'Versión de datos desconocida para el decodificador (¿fragmento de log corrupto?)',
     decoderRejected: (raw: string) => `Imposible decodificar: ${raw}`,
@@ -450,6 +465,12 @@ export const es: Dict = {
       updateAvailable: 'Nueva versión disponible',
       updateReload: 'Recargar',
       updateDismiss: 'Más tarde',
+    },
+
+    credits: {
+      title: 'Agradecimientos',
+      intro:
+        'Gracias a los pilotos que han hecho avanzar el sitio: pruebas, logs compartidos, bugs reportados y buenas ideas.',
     },
 
     units: {
@@ -543,6 +564,7 @@ export const es: Dict = {
     report: {
       title: 'Informe de vuelo',
       newAnalysis: 'Nuevo análisis',
+    flightsAria: 'Vuelos analizados',
       fileAria: (fileName: string): string => `Informe ${fileName}`,
       validSessions: (count: number): string =>
         `${count} ${count > 1 ? 'sesiones válidas' : 'sesión válida'}`,
@@ -550,9 +572,30 @@ export const es: Dict = {
         `${count} ${count > 1 ? 'ignoradas' : 'ignorada'}`,
       skippedSession: (index: string, error: string, size: string): string =>
         `Sesión ${index} ignorada - ${error} (${size})`,
+      skippedOrphanSummary: (count: number): string =>
+        count > 1
+          ? `${count} sesiones ignoradas - archivos sin vuelo aprovechable`
+          : `1 sesión ignorada - archivo sin vuelo aprovechable`,
+      skippedInFileSummary: (count: number): string =>
+        count > 1
+          ? `${count} otras sesiones ignoradas en este archivo`
+          : `1 otra sesión ignorada en este archivo`,
       sessionLabel: (index: string): string => `Sesión ${index}`,
       sessionSublabel: (duration: string, start: string): string => `${duration} · t+${start}`,
       noUsableSession: 'Ninguna sesión aprovechable en este archivo - mira los motivos arriba.',
+      axisNotEvaluated: (label: string): string => `${label}: no evaluada - faltan datos en el log`,
+      scoreCappedNote: 'Puntuación limitada a 95: un eje no se midió (franja gris).',
+      axisNoData: 'no evaluada - faltan datos',
+      axisShare: (pct: number): string => `${pct} % de la nota`,
+      axisGoto: 'Clic: ir a los veredictos de este eje',
+      axisDetails: {
+        securite: 'Failsafe disparado en vuelo.',
+        vibrations: 'Ruido mecánico del gyro en bruto, resonancia del frame, desequilibrio de hélice/motor.',
+        filtres: 'Atenuación del ruido de motor, ruido residual tras el filtrado, fugas de alta frecuencia.',
+        pid: 'Seguimiento de consigna, respuesta al escalón (overshoot, lentitud, estabilización), oscilaciones, prop wash, yoyo.',
+        moteurs: 'Saturación, desequilibrio entre motores, desyncs.',
+        batterie: 'Sag bajo carga, descarga profunda, coherencia del sensor, número de celdas.',
+      },
       profileTag: (label: string): string => `perfil ${label}`,
       tileDuration: 'Duración de sesión',
       tileSampleRate: 'Muestreo',
@@ -562,6 +605,7 @@ export const es: Dict = {
       batteryNoVbat: 'sin medida de vbat',
       tileMaxCurrent: 'Corriente máx',
       currentAvg: (avg: string): string => `media ${avg} A`,
+      currentUnreliable: 'sensor no fiable, valor descartado',
       tileSaturation: 'Saturación de motores',
       tileFlightTime: 'Tiempo de vuelo',
       flightTimeHint: 'throttle realmente en el aire',
@@ -605,9 +649,10 @@ export const es: Dict = {
       buttonLabel: (count: number): string =>
         count > 1 ? `Compartir los ${count} logs` : 'Compartir este log',
       sending: 'Enviando…',
+      sendingPart: (done: number, total: number): string => `Enviando ${done}/${total}…`,
       sent: '¡Log enviado, gracias!',
       error: 'Fallo al enviar - inténtalo más tarde.',
-      tooLarge: 'Log demasiado grande para compartir automáticamente.',
+      tooLarge: 'Más de 100 MB de logs - demasiado para el envío automático.',
     },
 
     shareLink: {
@@ -632,6 +677,64 @@ export const es: Dict = {
       decodeErrorVersion: 'Este enlace viene de una versión más reciente del sitio. Recarga la página y vuelve a pedirlo.',
     },
 
+    chartHelp: {
+      buttonLabel: 'Cómo leerla',
+      buttonAria: (chart: string): string => `Cómo leer: ${chart}`,
+      closeAria: 'Cerrar la ayuda',
+      readTitle: 'Cómo se lee',
+      examplesTitle: 'Ejemplos',
+      goodTag: 'Bien',
+      badTag: 'Mal',
+      timeline: {
+        title: 'La línea de tiempo del vuelo',
+        intro:
+          'Esta franja cuenta la sesión de izquierda a derecha: qué hacía el quad (en el suelo, gas bajo, en vuelo), el voltaje de la batería superpuesto y los incidentes detectados.',
+        points: [
+          'Cada color es un estado: los bloques verdes son los momentos realmente en vuelo.',
+          'La línea amarilla es el voltaje de la batería: debe bajar despacio y de forma regular durante el vuelo.',
+          'Un triángulo de alerta marca un incidente detectado: su posición dice cuándo, su etiqueta la frecuencia medida.',
+          'Una caída brusca de la línea amarilla significa que la batería se hunde bajo carga (gastada o exigida de más).',
+        ],
+        examples: {
+          good: 'Vuelo continuo, voltaje en pendiente suave, sin marcadores: nada que señalar.',
+          bad: 'Marcadores de alerta en pleno vuelo y voltaje que cae a tirones: incidentes que corregir, batería sufriendo.',
+        },
+      },
+      spectrum: {
+        title: 'El espectro del giroscopio',
+        intro:
+          'Un quad siempre vibra un poco. Este gráfico ordena esas vibraciones por frecuencia (en Hz): a la izquierda las lentas, a la derecha las rápidas. Cuanto más alto el pico, más fuerte la vibración.',
+        points: [
+          'Un pico estrecho cerca de la línea discontinua «motores» es normal: es el giro de las hélices.',
+          'La banda de «resonancia» debe mantenerse baja: un bulto ahí es el chasis vibrando (jello en la imagen).',
+          'En el resto, la curva debe quedarse pegada abajo (el «suelo»).',
+          'Los tres colores son los tres ejes (Roll, Pitch, Yaw): deben parecerse.',
+          'Si las curvas se cortan antes del borde derecho (zona rayada «no medible»), el log se grabó demasiado lento: el espectro no puede ver nada por encima de la mitad de la cadencia de grabación. Graba más rápido (blackbox_sample_rate) para cubrir todo el rango.',
+        ],
+        examples: {
+          good: 'Suelo bajo y plano, un solo pico estrecho en la frecuencia de los motores: quad sano.',
+          bad: 'Bulto ancho en la banda de resonancia y suelo cargado: vibraciones mecánicas - revisa hélices, rodamientos y tornillería.',
+        },
+      },
+      step: {
+        title: 'La respuesta al escalón',
+        intro:
+          'Simulamos un golpe de stick franco y miramos cómo el quad sigue la orden. La línea discontinua «objetivo 1.0» es exactamente lo pedido: la curva ideal sube rápido y se queda ahí.',
+        points: [
+          'La curva debe subir rápido hacia el objetivo: cuanto antes suba, más rápido responde el quad.',
+          'Un ligero rebase por encima del objetivo (menos de ~15 %) es aceptable.',
+          'Tras el pico, la curva debe asentarse en la línea objetivo sin hacer olas.',
+          'Rebotes repetidos significan que el quad oscila tras cada orden: tune demasiado nervioso.',
+        ],
+        examples: {
+          good: 'Subida franca, ligero rebase y la curva se asienta en el objetivo: tune equilibrado.',
+          bad: 'Gran rebase seguido de rebotes: el quad sobre-reacciona y oscila (P demasiado alta o D demasiado baja).',
+          badSlow:
+            'Subida lenta que solo alcanza el objetivo muy tarde: el quad va por detrás de los sticks (P baja o filtrado pesado).',
+        },
+      },
+    },
+
     charts: {
       spectrum: {
         title: 'Espectro del gyro (0-1 kHz)',
@@ -641,6 +744,7 @@ export const es: Dict = {
         bandMotors: 'motores',
         xAxis: 'Frecuencia (Hz)',
         motorLine: (hz: string): string => `motores ~${hz} Hz`,
+        beyondNyquist: (hz: string): string => `no medible - log grabado a ${hz} Hz`,
       },
       step: {
         title: 'Respuesta al escalón (0-500 ms)',
@@ -663,6 +767,54 @@ export const es: Dict = {
           `${count} evento(s) señalado(s) en ${times}`,
         eventsLegend: 'oscilación detectada',
       },
+    },
+  },
+
+  compare: {
+    title: 'Comparación de pasadas',
+    tabLabel: 'Comparación',
+    tabCount: (n: number): string => `${n} ${n > 1 ? 'pares' : 'par'}`,
+    heading: (before: string, after: string) => `${before} → ${after}`,
+    sessionLabel: (fileName: string, session: string) => `${fileName} sesión ${session}`,
+    noTuneChange:
+      'No cambió ningún ajuste entre estos dos vuelos: las diferencias de abajo vienen del vuelo, no del tune.',
+    summaryNoChange: 'ningún ajuste cambiado',
+    summaryChanges: (n: number) => `${n} ${n > 1 ? 'ajustes cambiados' : 'ajuste cambiado'}`,
+    caveatsCount: (n: number) => `${n} ${n > 1 ? 'salvedades' : 'salvedad'}`,
+    tuneTitle: 'Lo que cambió',
+    metricsTitle: 'Lo que dice la medición',
+    driverNote:
+      'Los deslizadores simplificados van primero: son ellos los que recalculan las ganancias listadas debajo, no al revés.',
+    deltaUnavailable: 'ejes distintos',
+    metricUnavailable: 'n/d',
+
+    metrics: {
+      filtNoise: 'Ruido filtrado (deg/s)',
+      unfiltNoise: 'Ruido crudo (deg/s)',
+      tracking: 'Error de seguimiento (deg/s)',
+      overshoot: 'Sobreimpulso (%)',
+      riseTime: 'Tiempo de subida (ms)',
+      ms: 'Pico de sensibilidad Ms',
+      residualHf: 'Residual >100 Hz',
+      propwash: 'Prop wash (deg/s)',
+      saturation: 'Saturación de motores (%)',
+    },
+
+    caveats: {
+      inferredCraft: (board: string) =>
+        `Vuelos agrupados por placa (${board}) porque los registros no llevan nombre de dron: pon un craft_name para despejar la duda. Si estos vuelos vienen de dos máquinas distintas sobre la misma placa, la comparación no tiene sentido.`,
+      firmware: (before: string, after: string) =>
+        `Firmware distinto (${before} → ${after}): un tune no se traslada entre versiones mayores, y hay parámetros que cambian de nombre o de sentido. La comparación de ajustes no es fiable.`,
+      sampleRate: (before: string, after: string) =>
+        `Frecuencia de muestreo distinta (${before} → ${after} Hz): el ruido residual y el espectro no se comparan entre estos registros.`,
+      duration: (before: string, after: string) =>
+        `Duraciones muy distintas (${before} s → ${after} s): el vuelo más corto vio menos situaciones, así que sus peores valores salen mecánicamente más bajos.`,
+      stickRange: (before: string, after: string) =>
+        `Exigencia de mando distinta (${before} → ${after} deg/s máximo): un vuelo más tranquilo baja el sobreimpulso y el prop wash sin que ningún ajuste intervenga.`,
+      mechanical: (before: string, after: string) =>
+        `El giro crudo cambió (${before} → ${after} deg/s RMS). No responde al tune: algo se movió mecánicamente entre los dos vuelos (hélice, rodamiento, tornillería). Las diferencias de ruido filtrado ya no miden solo el filtrado.`,
+      battery: (before: string, after: string) =>
+        `Caída por celda muy distinta (${before} → ${after} V) sin compensación activa: la misma consigna no da el mismo empuje. Activa vbat_sag_compensation o vuelve a volar con un nivel de batería comparable.`,
     },
   },
 };

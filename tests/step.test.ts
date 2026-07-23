@@ -193,6 +193,53 @@ describe('analyzeStepResponse — synthétique', () => {
     const fd = makeFd(FS, [x, x, x], [y, y, y]);
     expect(analyzeStepResponse(fd)).toBeNull();
   });
+
+  // Ms = max|1-T| a une valeur ANALYTIQUE sur un 2e ordre, ce qui en fait le
+  // seul indicateur du module vérifiable autrement que par comparaison :
+  //   |S(u)| = u·√(u²+4ζ²) / √((1-u²)² + 4ζ²u²),  u = w/wn
+  it.each([
+    { zeta: 0.5, fn: 15, msTheory: 1.468, fTheory: 17.5, seed: 1337 },
+    { zeta: 0.3, fn: 20, msTheory: 1.995, fTheory: 21.5, seed: 2024 },
+  ])('Ms retrouve la théorie sur un 2e ordre (zeta=$zeta, $fn Hz)', (c) => {
+    const x = stepSequence(N, FS, mulberry32(c.seed));
+    const y = secondOrder(x, FS, 2 * Math.PI * c.fn, c.zeta);
+    const roll = analyzeStepResponse(makeFd(FS, [x, x, x], [y, y, y]))!.axes[0];
+
+    expect(roll!.ms).not.toBeNull();
+    // 10 % de marge : le lissage ±1.5 Hz rabote un peu le pic (toujours vers le
+    // bas), et le système de référence est intégré en Euler.
+    expect(roll!.ms!).toBeGreaterThan(c.msTheory * 0.9);
+    expect(roll!.ms!).toBeLessThan(c.msTheory * 1.1);
+    expect(roll!.msFreqHz!).toBeGreaterThan(c.fTheory * 0.8);
+    expect(roll!.msFreqHz!).toBeLessThan(c.fTheory * 1.2);
+    // Mt = max|T| : > 0 dB dès qu'il y a résonance, et croît quand ζ baisse.
+    expect(roll!.mtDb!).toBeGreaterThan(0);
+  });
+
+  it('1er ordre : aucun Ms publié, parce que max|S| n’y dépasse jamais 1', () => {
+    const x = stepSequence(N, FS, mulberry32(4242));
+    const y = firstOrder(x, FS, 0.02);
+    const roll = analyzeStepResponse(makeFd(FS, [x, x, x], [y, y, y]))!.axes[0];
+
+    // Une boucle du 1er ordre n'amplifie rien : |S| monte vers 1 sans jamais le
+    // franchir. Publier « Ms = 0.8 » laisserait croire à une mesure alors que
+    // c'est une non-mesure - le plancher théorique Ms ≥ 1 l'interdit.
+    expect(roll!.settleValue).not.toBeNull(); // la courbe, elle, reste exploitable
+    expect(roll!.ms).toBeNull();
+    expect(roll!.msFreqHz).toBeNull();
+    expect(roll!.msBandTopHz).toBeNull();
+  });
+
+  it('courbe pathologique : pas de Ms non plus', () => {
+    const x = stepSequence(N, FS, mulberry32(99));
+    const raw = secondOrder(x, FS, 2 * Math.PI * 15, 0.5);
+    const y = new Float32Array(N);
+    for (let i = 0; i < N; i++) y[i] = 0.05 * raw[i];
+    const roll = analyzeStepResponse(makeFd(FS, [x, x, x], [y, y, y]))!.axes[0];
+
+    expect(roll!.settleValue).toBeNull();
+    expect(roll!.ms).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

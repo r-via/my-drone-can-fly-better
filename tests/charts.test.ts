@@ -57,6 +57,11 @@ function makeStep(peak: number, n = 1001): AxisStepResponse {
     y,
     riseTimeMs: 20,
     peakValue: peak,
+    ms: 1.2,
+    msFreqHz: 28,
+    mtDb: 0.9,
+    mtFreqHz: 24,
+    msBandTopHz: 26,
     overshootPct: (peak - 1) * 100,
     settleValue: 1,
     quality: 0.9,
@@ -241,6 +246,23 @@ describe('composants React (rendu sans DOM : appel direct, structure élément)'
     expect((el.props as { viewBox?: string }).viewBox).toMatch(/^0 0 \d+ \d+$/);
     // sans fondamentale moteur : ne crashe pas
     expect(SpectrumChart({ axes, motorFundamentalHz: null }).type).toBe('svg');
+  });
+
+  it('SpectrumChart hachure la zone au-delà de Nyquist quand le log est lent', () => {
+    const axes: [AxisSpectrum, AxisSpectrum, AxisSpectrum] = [
+      makeSpectrum(150, 2000, 250),
+      makeSpectrum(150, 2000, 250),
+      makeSpectrum(150, 2000, 250),
+    ];
+    // Log à 507 Hz → Nyquist ~253 Hz : la zone morte doit être signalée.
+    const slow = renderToStaticMarkup(createElement(SpectrumChart, { axes, sampleRateHz: 507 }));
+    expect(slow).toContain('non mesurable');
+    expect(slow).toContain('507');
+    // Log rapide (Nyquist >= 1 kHz) ou cadence inconnue : pas de zone morte.
+    const fast = renderToStaticMarkup(createElement(SpectrumChart, { axes, sampleRateHz: 4000 }));
+    expect(fast).not.toContain('non mesurable');
+    const unknown = renderToStaticMarkup(createElement(SpectrumChart, { axes }));
+    expect(unknown).not.toContain('non mesurable');
   });
 
   it('StepResponseChart retourne un <svg> même avec tous les axes null', () => {

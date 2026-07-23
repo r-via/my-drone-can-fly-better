@@ -114,6 +114,17 @@ export function TimerIcon({ className }: { className?: string }) {
   );
 }
 
+export function ShareIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>
+      <circle cx="18" cy="5" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="6" cy="12" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="18" cy="19" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M8.4 10.8l7.2-4.2M8.4 13.2l7.2 4.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
 export function CopyIcon({ className }: { className?: string }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>

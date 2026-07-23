@@ -227,7 +227,11 @@ export function analyzeFilters(fd: FlightData): FilterMetrics {
       const f = bandRms(specFilt, lo, hiEff);
       return { lo, hi: hiEff, db: u > 0 && f > 0 ? 20 * Math.log10(u / f) : 0 };
     });
-    return { attenuationDb, residualHfRms: bandRms(specFilt, 100, hfHi) };
+    return {
+      attenuationDb,
+      residualHfRms: bandRms(specFilt, 100, hfHi),
+      motorBandUnfiltRms: bandRms(specUnfilt, 120, Math.min(350, nyq)),
+    };
   });
 
   return { available: true, axes: axes as [FilterAxisMetrics, FilterAxisMetrics, FilterAxisMetrics] };

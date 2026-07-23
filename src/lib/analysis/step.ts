@@ -5,6 +5,28 @@
 //   h = Re(ifft(G)),  step = cumsum(h)
 // La courbe est la réponse à un échelon unitaire de setpoint : AUCUNE
 // normalisation - settleValue ≈ 1 signifie que le PID suit la consigne.
+//
+// Ce même G(f) EST la fonction de transfert en boucle fermée T(f) consigne →
+// gyro. On en tire deux indicateurs fréquentiels sans transformée supplémentaire
+// (cf. betaflight-chirp-core, qui les calcule sur un log chirp) :
+//   Ms  = max|S| = max|1 - T|  amplification maximale d'une perturbation
+//   Mt  = max|T|               résonance de la boucle fermée
+// Ms est le meilleur indicateur scalaire de stabilité disponible ici : il ne
+// dépend ni du plateau de la courbe (fragile) ni d'un modèle de boucle ouverte
+// (L = T/(1-T), bien trop bruité pour une marge de phase honnête).
+//
+// AUCUNE RÈGLE NE LE CONSOMME, et c'est délibéré. Mesuré sur les 60 logs du
+// parc : Ms n'est calculable que sur 34 % des axes déjà jugés fiables, et sur
+// les 13 axes où il dépassait 1.5, 12 avaient déjà un overshoot > 25 %. Il ne
+// nourrissait donc quasiment aucun verdict neuf, tout en héritant du bruit de
+// la déconvolution sur les logs où celle-ci peine. La raison est physique et
+// pas corrigeable ici : un manche humain n'excite la boucle que jusqu'à ~25 Hz
+// (médiane du parc), alors que le point faible d'un multirotor se situe plus
+// haut - c'est précisément pour ça que betaflight-chirp-core exige un chirp.
+// La mesure reste calculée parce qu'elle est validée contre la théorie (voir
+// tests/step.test.ts) et qu'elle est sans dimension, donc comparable d'un vol
+// à l'autre : c'est l'entrée de la comparaison passe N-1 / passe N, où elle a
+// un sens qu'elle n'a pas sur un log isolé.
 import { fft, ifft, nextPow2 } from '../dsp/dsp';
 
 import type { AxisStepResponse, FlightData, StepResponseMetrics } from '../types';
@@ -48,6 +70,55 @@ const WINDOW_PLATEAU_MAX = 1.5;
 const GYRO_ABERRATION_LIMIT = 5000;
 /** Plateau ≤ cette valeur (ou non fini) = réponse pathologique → métriques null. */
 const PATHOLOGICAL_SETTLE = 0.1;
+/**
+ * Bande d'évaluation de Ms/Mt. Le bas rejoint LAMBDA_FLOOR_HZ : en dessous,
+ * T ≈ gain statique, aucune information de stabilité. Le haut n'est qu'un
+ * plafond de sécurité - la vraie limite est MS_MIN_SNR ci-dessous.
+ */
+const MS_BAND_LO_HZ = 2;
+const MS_BAND_HI_HZ = 90;
+/**
+ * Là où le manche n'a pas mis d'énergie, la déconvolution ne mesure rien : le
+ * dénominateur de Wiener se réduit à λ et T devient un rapport de bruits. Sur
+ * les logs du parc ça produisait des Ms de 10 à 57 Hz, un chiffre que personne
+ * ne peut défendre. On ne garde donc que les fréquences où |X|² ≥ 10·λ, soit
+ * |X| ≥ 3 % du maximum : la régularisation y pèse moins de 10 % et l'estimation
+ * est celle du signal, pas du plancher. La bande utile devient une PROPRIÉTÉ DU
+ * VOL et non une constante - c'est aussi pour cela qu'elle est publiée avec la
+ * mesure : Ms n'est un minorant que sur ce que le pilote a réellement excité.
+ */
+const MS_MIN_SNR = 10;
+/**
+ * Si la bande utile ne monte pas jusque-là, le vol n'a pas excité la zone où
+ * un multirotor croise 0 dB : on ne publie rien plutôt qu'un Ms mesuré sur la
+ * seule traîne basse fréquence, qui vaudrait toujours « boucle amortie ».
+ */
+const MS_MIN_TOP_HZ = 12;
+/**
+ * Garde-fou théorique, et le plus solide dont on dispose : l'intégrale de Bode
+ * impose max|S| ≥ 1 à toute boucle fermée réelle. Mesurer moins ne veut pas dire
+ * « boucle exceptionnelle », ça veut dire que la bande observée s'arrête AVANT
+ * le point faible - on n'a regardé que la zone où le quad suit parfaitement.
+ * Un Ms sous ce plancher est donc une non-mesure, pas un bon résultat.
+ */
+const MS_THEORETICAL_FLOOR = 1;
+/**
+ * Lissage en fréquence avant de chercher le pic. Un bin isolé peut sortir du
+ * bruit de déconvolution là où l'énergie manche est faible ; un pic physique de
+ * boucle fermée est large de plusieurs Hz. Prendre le max d'une moyenne
+ * glissante de ±1.5 Hz supprime le premier sans entamer le second.
+ */
+const MS_SMOOTH_HZ = 1.5;
+
+/**
+ * En dessous de ~30 % de fenêtres excitées, la déconvolution sort du bruit
+ * (mesuré sur lr4 s6 : quality 0.07 → overshoot fantôme de 163 %). Exporté
+ * parce que tout consommateur des métriques step doit appliquer LE MÊME seuil :
+ * un axe que le moteur de règles refuse de juger ne doit pas réapparaître dans
+ * une comparaison de passes, sans quoi le rapport se contredit d'un panneau à
+ * l'autre.
+ */
+export const MIN_STEP_QUALITY = 0.3;
 
 /**
  * Estime la réponse indicielle par axe (roll, pitch, yaw) via déconvolution
@@ -112,6 +183,28 @@ function deconvolveAxis(
   const accSane = new Float64Array(nResp);
   const accAll = new Float64Array(nResp);
 
+  // T(f) sur la bande Ms/Mt, accumulé en complexe avec les mêmes poids que la
+  // courbe : ifft et cumsum étant linéaires, la moyenne des courbes est
+  // exactement la courbe de la moyenne des G. Les deux vues restent cohérentes.
+  const bLo = Math.max(1, Math.ceil((MS_BAND_LO_HZ * nfft) / fs));
+  const bHi = Math.min(halfBin, Math.floor((MS_BAND_HI_HZ * nfft) / fs));
+  const nBand = Math.max(0, bHi - bLo + 1);
+  const bandRe = new Float64Array(nBand);
+  const bandIm = new Float64Array(nBand);
+  const bandXX = new Float64Array(nBand); // |X|² par bin, pour la bande utile
+  const accSaneG = {
+    re: new Float64Array(nBand),
+    im: new Float64Array(nBand),
+    xx: new Float64Array(nBand),
+    lambda: 0,
+  };
+  const accAllG = {
+    re: new Float64Array(nBand),
+    im: new Float64Array(nBand),
+    xx: new Float64Array(nBand),
+    lambda: 0,
+  };
+
   let total = 0;
   let excited = 0;
   let sane = 0;
@@ -158,6 +251,12 @@ function deconvolveAxis(
     }
     const lambda = WIENER_REG_FACTOR * maxPow;
 
+    // |X|² sur la bande, capturé avant que la boucle suivante n'écrase (xr, xi).
+    for (let j = 0; j < nBand; j++) {
+      const b = bLo + j;
+      bandXX[j] = xr[b] * xr[b] + xi[b] * xi[b];
+    }
+
     // G = Y·conj(X) / (|X|² + λ) - écrit en place dans (xr, xi).
     for (let b = 0; b < nfft; b++) {
       const denom = xr[b] * xr[b] + xi[b] * xi[b] + lambda;
@@ -165,6 +264,11 @@ function deconvolveAxis(
       const gIm = (yi[b] * xr[b] - yr[b] * xi[b]) / denom;
       xr[b] = gRe;
       xi[b] = gIm;
+    }
+    // Capture de T(f) sur la bande AVANT l'ifft, qui écrase (xr, xi).
+    for (let j = 0; j < nBand; j++) {
+      bandRe[j] = xr[bLo + j];
+      bandIm[j] = xi[bLo + j];
     }
     ifft(xr, xi);
 
@@ -185,10 +289,22 @@ function deconvolveAxis(
     const plateau = pCount > 0 ? pSum / pCount : NaN;
 
     for (let k = 0; k < nResp; k++) accAll[k] += energy * stepBuf[k];
+    for (let j = 0; j < nBand; j++) {
+      accAllG.re[j] += energy * bandRe[j];
+      accAllG.im[j] += energy * bandIm[j];
+      accAllG.xx[j] += energy * bandXX[j];
+    }
+    accAllG.lambda += energy * lambda;
     weightAll += energy;
     if (Number.isFinite(plateau) && plateau >= WINDOW_PLATEAU_MIN && plateau <= WINDOW_PLATEAU_MAX) {
       sane++;
       for (let k = 0; k < nResp; k++) accSane[k] += energy * stepBuf[k];
+      for (let j = 0; j < nBand; j++) {
+        accSaneG.re[j] += energy * bandRe[j];
+        accSaneG.im[j] += energy * bandIm[j];
+        accSaneG.xx[j] += energy * bandXX[j];
+      }
+      accSaneG.lambda += energy * lambda;
       weightSane += energy;
     }
   }
@@ -209,7 +325,120 @@ function deconvolveAxis(
     step[k] = acc[k] / weightSum;
   }
 
-  return { t, y: step, quality, ...computeMetrics(step, fs, kSettle) };
+  const metrics = computeMetrics(step, fs, kSettle);
+  // Une courbe pathologique (plateau quasi nul) donne T ≈ 0 sur toute la bande,
+  // donc Ms ≈ 1 : « boucle parfaitement amortie » alors que rien ne suit la
+  // consigne. On ne publie Ms/Mt que quand la réponse a un plateau exploitable.
+  const accG = useSane ? accSaneG : accAllG;
+  const sensitivity =
+    metrics.settleValue === null
+      ? NO_SENSITIVITY
+      : sensitivityPeaks(accG, weightSum, bLo, nfft, fs);
+
+  return { t, y: step, quality, ...metrics, ...sensitivity };
+}
+
+interface SensitivityMetrics {
+  ms: number | null;
+  msFreqHz: number | null;
+  mtDb: number | null;
+  mtFreqHz: number | null;
+  msBandTopHz: number | null;
+}
+
+const NO_SENSITIVITY: SensitivityMetrics = {
+  ms: null,
+  msFreqHz: null,
+  mtDb: null,
+  mtFreqHz: null,
+  msBandTopHz: null,
+};
+
+interface TransferAccumulator {
+  re: Float64Array;
+  im: Float64Array;
+  xx: Float64Array;
+  lambda: number;
+}
+
+/**
+ * Ms = max|1-T| et Mt = max|T| sur la bande réellement excitée par le manche.
+ * `bLo` est le premier bin de la bande, nécessaire pour retrouver les Hz.
+ */
+function sensitivityPeaks(
+  acc: TransferAccumulator,
+  weightSum: number,
+  bLo: number,
+  nfft: number,
+  fs: number,
+): SensitivityMetrics {
+  const n = acc.re.length;
+  if (n === 0 || weightSum <= 0) return NO_SENSITIVITY;
+
+  // Bande utile : on monte tant que le manche domine la régularisation. On
+  // s'arrête au PREMIER décrochage et pas au dernier bin valide - au-delà d'un
+  // trou, l'énergie qui revient est du bruit isolé, pas une bande continue.
+  const radius = Math.max(1, Math.round((MS_SMOOTH_HZ * nfft) / fs));
+  const xxSmooth = movingAverage(acc.xx, radius);
+  const floor = MS_MIN_SNR * acc.lambda; // même pondération des deux côtés
+  let top = -1;
+  for (let j = 0; j < n; j++) {
+    if (xxSmooth[j] < floor) break;
+    top = j;
+  }
+  const freqOf = (j: number): number => ((bLo + j) * fs) / nfft;
+  if (top < 0 || freqOf(top) < MS_MIN_TOP_HZ) return NO_SENSITIVITY;
+
+  const magT = new Float64Array(top + 1);
+  const magS = new Float64Array(top + 1);
+  for (let j = 0; j <= top; j++) {
+    const tr = acc.re[j] / weightSum;
+    const ti = acc.im[j] / weightSum;
+    if (!Number.isFinite(tr) || !Number.isFinite(ti)) return NO_SENSITIVITY;
+    magT[j] = Math.hypot(tr, ti);
+    magS[j] = Math.hypot(1 - tr, ti); // |S| = |1 - T|
+  }
+
+  const peakS = smoothedPeak(magS, radius);
+  if (!(peakS.value >= MS_THEORETICAL_FLOOR)) return NO_SENSITIVITY;
+
+  const peakT = smoothedPeak(magT, radius);
+  const mtDb = peakT.value > 0 ? 20 * Math.log10(peakT.value) : NaN;
+  const mtOk = Number.isFinite(mtDb);
+  return {
+    ms: peakS.value,
+    msFreqHz: freqOf(peakS.index),
+    mtDb: mtOk ? mtDb : null,
+    mtFreqHz: mtOk ? freqOf(peakT.index) : null,
+    msBandTopHz: freqOf(top),
+  };
+}
+
+/** Moyenne glissante de ±`radius` bins (bords tronqués, pas de padding). */
+function movingAverage(v: Float64Array, radius: number): Float64Array {
+  const out = new Float64Array(v.length);
+  for (let j = 0; j < v.length; j++) {
+    const lo = Math.max(0, j - radius);
+    const hi = Math.min(v.length - 1, j + radius);
+    let sum = 0;
+    for (let k = lo; k <= hi; k++) sum += v[k];
+    out[j] = sum / (hi - lo + 1);
+  }
+  return out;
+}
+
+/** Max de la moyenne glissante : un bin isolé ne fait pas un pic de boucle. */
+function smoothedPeak(mag: Float64Array, radius: number): { value: number; index: number } {
+  const smooth = movingAverage(mag, radius);
+  let best = -Infinity;
+  let bestIdx = 0;
+  for (let j = 0; j < smooth.length; j++) {
+    if (smooth[j] > best) {
+      best = smooth[j];
+      bestIdx = j;
+    }
+  }
+  return { value: best, index: bestIdx };
 }
 
 interface StepCurveMetrics {

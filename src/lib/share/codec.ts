@@ -384,7 +384,7 @@ const SCHEMA_KEYS = [
   'curve', 'x0', 'x1', 'scale', 'q', 'motorFundamentalHz', 'axes',
   'riseTimeMs', 'overshootPct', 'segments',
   // Ajouts ultérieurs : toujours en fin de liste, jamais au milieu.
-  'trimmed',
+  'trimmed', 'scoreExempt',
 ] as const;
 
 const TO_SHORT = new Map<string, string>(SCHEMA_KEYS.map((k, i) => [k, i.toString(36)]));
@@ -447,6 +447,8 @@ interface PackedFinding {
   fixText?: Tmpl;
   /** Jamais dans le dictionnaire : les lignes CLI sont codées dans les règles. */
   fixCli?: string[];
+  /** Constat sans effet sur le score (choix d'école, pas un défaut mesuré). */
+  scoreExempt?: boolean;
 }
 
 interface SharePayload {
@@ -561,8 +563,10 @@ export async function encodeSession(
       sagV: round(power?.sagV ?? 0, 3),
       vbatMin: round(power?.vbatMin ?? 0, 3),
       vbatMax: round(power?.vbatMax ?? 0, 3),
-      ampMax: power?.ampMax == null ? null : round(power.ampMax, 2),
-      ampAvg: power?.ampAvg == null ? null : round(power.ampAvg, 2),
+      // Canal courant HS : on n'expédie pas des ampères de capteur dans un lien.
+      // Le lecteur verra n/a sur la tuile ; le finding encodé porte le pourquoi.
+      ampMax: power?.ampMax == null || power.ampImplausible ? null : round(power.ampMax, 2),
+      ampAvg: power?.ampAvg == null || power.ampImplausible ? null : round(power.ampAvg, 2),
     },
     findings: findings.map((f, i) => packFinding(f, alignSpy(spied, f, i), dict, profile.id)),
     spectrum:
@@ -641,6 +645,7 @@ function packFinding(real: Finding, spy: Finding | null, dict: Dict, profileId: 
     put('fixText', real.fix.text, spy?.fix?.text);
     if (real.fix.cli?.length) packed.fixCli = real.fix.cli;
   }
+  if (real.scoreExempt) packed.scoreExempt = true;
   return packed;
 }
 
@@ -707,6 +712,7 @@ function unpackFinding(f: PackedFinding, dict: Dict, profileId: DroneProfileId):
   if (fixText || f.fixCli?.length) {
     finding.fix = { text: fixText, ...(f.fixCli?.length ? { cli: f.fixCli } : {}) };
   }
+  if (f.scoreExempt === true) finding.scoreExempt = true;
   return finding;
 }
 
@@ -748,6 +754,8 @@ function neutralAnalysis(p: SharePayload): SessionAnalysis {
           sagV: v.sagV,
           ampAvg: v.ampAvg,
           ampMax: v.ampMax,
+          ampP99: null,
+          ampImplausible: false,
           mahEstimate: null,
           perCellMinSustained: v.cells > 0 ? v.vbatMin / v.cells : 0,
           implausibleSamples: 0,
@@ -815,6 +823,13 @@ function unpackStep(packed: SharePayload['step']): StepResponseMetrics | null {
       overshootPct: ax.overshootPct,
       settleValue: null,
       quality: 1,
+      // Ms/Mt ne voyagent pas dans le lien : ils n'alimentent aucun graphe, et
+      // le finding qui les cite est déjà encodé avec son evidence chiffrée.
+      ms: null,
+      msFreqHz: null,
+      mtDb: null,
+      mtFreqHz: null,
+      msBandTopHz: null,
     };
   });
   return { axes: [axes[0], axes[1], axes[2]] };

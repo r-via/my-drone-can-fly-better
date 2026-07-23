@@ -125,6 +125,7 @@ export interface SpectrumChartLabels {
   bandMotors: string;
   xAxis: string;
   motorLine: (hz: string) => string;
+  beyondNyquist: (hz: string) => string;
 }
 
 const DEFAULT_LABELS: SpectrumChartLabels = {
@@ -135,18 +136,24 @@ const DEFAULT_LABELS: SpectrumChartLabels = {
   bandMotors: 'moteurs',
   xAxis: 'Fréquence (Hz)',
   motorLine: (hz) => `moteurs ~${hz} Hz`,
+  beyondNyquist: (hz) => `non mesurable - log enregistré à ${hz} Hz`,
 };
 
 export function SpectrumChart(props: {
   axes: [AxisSpectrum, AxisSpectrum, AxisSpectrum];
   motorFundamentalHz?: number | null;
+  /** Cadence d'enregistrement du log : tout ce qui dépasse sa moitié (Nyquist)
+      est physiquement invisible au spectre - la zone est hachurée. */
+  sampleRateHz?: number | null;
   title?: string;
   labels?: SpectrumChartLabels;
 }): JSX.Element {
   const L = props.labels ?? DEFAULT_LABELS;
   const W = 640;
-  const H = 300;
-  const pad = { top: 46, right: 12, bottom: 34, left: 14 };
+  // L'en-tête empile titre, note d'échelle et libellés de bandes : le haut du
+  // cadre laisse la place à trois lignes qui respirent (le tracé garde 220 px).
+  const H = 312;
+  const pad = { top: 58, right: 12, bottom: 34, left: 14 };
   const plotW = W - pad.left - pad.right;
   const plotH = H - pad.top - pad.bottom;
   const { paths, ticksX, bands } = buildSpectrumPaths(props.axes, plotW, plotH);
@@ -155,6 +162,12 @@ export function SpectrumChart(props: {
   const motorX =
     fMotor != null && fMotor > 0 && fMotor <= FREQ_MAX_HZ
       ? pad.left + (fMotor / FREQ_MAX_HZ) * plotW
+      : null;
+  const nyquistHz =
+    props.sampleRateHz != null && props.sampleRateHz > 0 ? props.sampleRateHz / 2 : null;
+  const nyquistX =
+    nyquistHz != null && nyquistHz < FREQ_MAX_HZ * 0.98
+      ? pad.left + (nyquistHz / FREQ_MAX_HZ) * plotW
       : null;
   const bandFills = [
     'var(--chart-band-resonance, rgba(230, 103, 103, 0.08))',
@@ -169,10 +182,10 @@ export function SpectrumChart(props: {
       aria-label={L.ariaLabel(title)}
       fontFamily={FONT}
     >
-      <text x={pad.left} y={18} fontSize={13} fontWeight={600} fill={INK}>
+      <text x={pad.left} y={20} fontSize={13} fontWeight={600} fill={INK}>
         {title}
       </text>
-      <text x={pad.left} y={32} fontSize={9} fill={INK_AXIS}>
+      <text x={pad.left} y={36} fontSize={9} fill={INK_AXIS}>
         {L.scaleNote}
       </text>
 
@@ -181,8 +194,8 @@ export function SpectrumChart(props: {
         const x = W - pad.right - (3 - i) * 62;
         return (
           <g key={name}>
-            <rect x={x} y={13} width={14} height={3} rx={1.5} fill={SERIES_COLORS[i]} />
-            <text x={x + 18} y={18} fontSize={10} fill={INK_DIM}>
+            <rect x={x} y={15} width={14} height={3} rx={1.5} fill={SERIES_COLORS[i]} />
+            <text x={x + 18} y={20} fontSize={10} fill={INK_DIM}>
               {name}
             </text>
           </g>
@@ -201,8 +214,8 @@ export function SpectrumChart(props: {
           />
           <text
             x={pad.left + (b.x1 + b.x2) / 2}
-            y={pad.top - 5}
-            fontSize={8.5}
+            y={pad.top - 7}
+            fontSize={9}
             fill={INK_AXIS}
             textAnchor="middle"
           >
@@ -210,6 +223,40 @@ export function SpectrumChart(props: {
           </text>
         </g>
       ))}
+
+      {/* Au-delà de Nyquist (moitié de la cadence du log), le spectre ne peut
+          physiquement rien montrer : hachures pour dire « pas de données »,
+          et non « rien d'anormal mesuré ». */}
+      {nyquistX != null && (
+        <g>
+          <defs>
+            <pattern
+              id="nyq-hatch"
+              width={6}
+              height={6}
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(45)"
+            >
+              <line x1={0} y1={0} x2={0} y2={6} stroke={GRID} strokeWidth={2.5} />
+            </pattern>
+          </defs>
+          <rect
+            x={nyquistX}
+            y={pad.top}
+            width={pad.left + plotW - nyquistX}
+            height={plotH}
+            fill="url(#nyq-hatch)"
+          />
+          <line
+            x1={nyquistX}
+            y1={pad.top}
+            x2={nyquistX}
+            y2={pad.top + plotH}
+            stroke={BASELINE}
+            strokeWidth={1}
+          />
+        </g>
+      )}
 
       {/* Grille verticale (hairline, en retrait) + axe X */}
       {ticksX.map((t) => (
@@ -288,6 +335,24 @@ export function SpectrumChart(props: {
           paintOrder="stroke"
         >
           {L.motorLine(String(Math.round(fMotor as number)))}
+        </text>
+      )}
+
+      {/* Libellé de la zone Nyquist, dessiné en dernier avec halo surface :
+          la ligne moteur pointillée peut traverser la zone, sans halo le texte
+          devenait illisible sur les hachures. */}
+      {nyquistX != null && pad.left + plotW - nyquistX > 110 && (
+        <text
+          x={(nyquistX + pad.left + plotW) / 2}
+          y={pad.top + plotH / 2}
+          fontSize={10}
+          fill={INK_AXIS}
+          textAnchor="middle"
+          stroke="var(--chart-surface, #1a1a19)"
+          strokeWidth={3.5}
+          paintOrder="stroke"
+        >
+          {L.beyondNyquist(String(Math.round(props.sampleRateHz as number)))}
         </text>
       )}
     </svg>

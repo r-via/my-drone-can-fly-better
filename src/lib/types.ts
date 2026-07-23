@@ -73,6 +73,15 @@ export interface PowerMetrics {
   sagV: number;
   ampAvg: number | null;
   ampMax: number | null;
+  /** Pic de courant soutenu (p99) : référence robuste face aux pointes ADC. */
+  ampP99: number | null;
+  /**
+   * Vrai quand le canal courant décroche comme le canal vbat : pointes isolées
+   * très au-dessus du pic soutenu, sur un vol où vbat est déjà incohérent.
+   * ampMax est alors une lecture de capteur, pas un courant - l'afficher comme
+   * un fait induirait en erreur (mesuré 326 A sur un AIO F722).
+   */
+  ampImplausible: boolean;
   mahEstimate: number | null; // intégrale du courant
   /**
    * Tension par cellule mini SOUTENUE (min d'une médiane glissante 1 s), par
@@ -160,6 +169,21 @@ export interface AxisStepResponse {
   overshootPct: number | null; // (peak-1)*100 si peak>1
   settleValue: number | null; // valeur moyenne 200-500 ms (doit être ~1)
   quality: number; // 0..1 part de fenêtres exploitables (assez d'excitation stick)
+  /**
+   * Pic de sensibilité Ms = max|1-T| sur 2-60 Hz : de combien la boucle amplifie
+   * au pire une perturbation. Toujours ≥ ~1 ; ≲1.5 amorti, ~2 limite, >2 ça sonne.
+   */
+  ms: number | null;
+  msFreqHz: number | null; // fréquence du pic Ms (le point fragile de la boucle)
+  /** Pic de sensibilité complémentaire Mt = max|T| en dB : résonance boucle fermée. */
+  mtDb: number | null;
+  mtFreqHz: number | null;
+  /**
+   * Haut de la bande réellement excitée par le manche, donc plafond de validité
+   * de Ms/Mt : au-dessus, le vol ne dit rien de la boucle. Ms est un MINORANT
+   * sur cette bande - à citer avec la mesure.
+   */
+  msBandTopHz: number | null;
 }
 
 export interface StepResponseMetrics {
@@ -231,6 +255,10 @@ export interface FilterAxisMetrics {
   attenuationDb: Array<{ lo: number; hi: number; db: number }>;
   /** Bruit résiduel au-dessus de 100 Hz dans le gyro filtré (fuite de filtre). */
   residualHfRms: number;
+  /** Bruit BRUT dans la plage moteur 120-350 Hz (amplitude spectrale Welch).
+   *  Sert de gate à filters-weak : un ratio d'atténuation n'a de sens que s'il
+   *  y a du bruit à atténuer. */
+  motorBandUnfiltRms: number;
 }
 
 export interface FilterMetrics {
@@ -315,6 +343,10 @@ export interface Finding {
     text: string; // action recommandée
     cli?: string[]; // lignes CLI à copier (sans "save")
   };
+  /** Vrai pour un constat qui ne doit pas coûter de points au score /100 :
+   *  un choix d'école assumé (ex. feedforward coupé partout) est mentionné
+   *  mais n'est pas un défaut mesuré. */
+  scoreExempt?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -356,6 +388,9 @@ export interface ProfileThresholds {
   oscMinAmpPct: number;
   /** RMS résiduel >100 Hz dans le gyro filtré. */
   residualHfWarn: number;
+  /** Plancher de bruit BRUT 120-350 Hz sous lequel filters-weak ne juge pas un
+   *  axe : sans bruit moteur à retirer, une faible atténuation est normale. */
+  motorBandRawFloor: number;
 }
 
 export type DroneProfileId = 'pico' | 'lr4' | 'chimera7' | 'generic';

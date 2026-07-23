@@ -3,6 +3,7 @@
 import { readFile } from 'node:fs/promises';
 
 import { initWasm, parseFile } from '../src/lib/bbl/parse.ts';
+import { buildComparisons, splitCommonCaveats } from '../src/lib/compare.ts';
 import { detectLocaleFromEnv, getDict, isLocale } from '../src/lib/i18n/index.ts';
 import { buildReport } from '../src/lib/report.ts';
 
@@ -46,7 +47,10 @@ for (const file of report.files) {
       const vbat = p.implausibleSamples > 0
         ? dict.system.cliVbatUnusable(String(p.cells), String(p.implausibleSamples))
         : dict.system.cliVbatRange(String(p.cells), p.vbatMax.toFixed(2), p.vbatMin.toFixed(2), p.sagV.toFixed(2));
-      console.log(`  ${vbat}  ${dict.system.cliCurrentMax(p.ampMax?.toFixed(1) ?? '?')}`);
+      const amp = p.ampImplausible
+        ? dict.system.cliCurrentUnreliable
+        : dict.system.cliCurrentMax(p.ampMax?.toFixed(1) ?? '?');
+      console.log(`  ${vbat}  ${amp}`);
     }
     for (const f of sr.findings) {
       // f.category est la clé d'enum (français) : l'UI la traduit via
@@ -58,5 +62,62 @@ for (const file of report.files) {
         for (const line of f.fix.cli ?? []) console.log(`        ${line}`);
       }
     }
+  }
+}
+
+// --- Comparaison de passes -------------------------------------------------
+// N'apparaît que quand plusieurs vols du même quad sont donnés : c'est le seul
+// cadre où un delta de tune veut dire quelque chose (voir src/lib/compare.ts).
+
+const c = dict.compare;
+// Même dédoublonnage que le panneau web : un caveat identique sur toutes les
+// paires (ex. « regroupés par carte ») s'imprime une fois, pas huit.
+const { common, perPair: comparisons } = splitCommonCaveats(
+  buildComparisons(report.files.flatMap((f) => f.sessionReports)),
+);
+
+const AXES = ['Roll', 'Pitch', 'Yaw'];
+/** Valeur formatée, avec l'axe d'où elle vient quand il y en a un. */
+const fmt = (v, digits, axis) =>
+  v === null ? c.metricUnavailable : `${v.toFixed(digits)}${axis === null ? '' : ` ${AXES[axis]}`}`;
+/**
+ * Delta signé. Le verdict bien/mal n'est apposé que sur les indicateurs qu'un
+ * réglage pilote : un témoin (`neutral`) est affiché sans jugement.
+ */
+function fmtDelta(m) {
+  if (m.delta === null) return '';
+  const sign = m.delta > 0 ? '+' : '';
+  const flat = Math.abs(m.delta) < 10 ** -m.digits / 2;
+  const mark =
+    m.better === 'neutral' ? '·' : flat ? '=' : (m.delta < 0) === (m.better === 'lower') ? '✅' : '⚠️ ';
+  return `${sign}${m.delta.toFixed(m.digits)} ${mark}`;
+}
+
+if (common.length > 0) {
+  console.log(`\n═══ ${c.title} ═══`);
+  for (const cav of common) console.log(`  ⚠️  ${c.caveats[cav.id](...cav.args)}`);
+}
+
+for (const cmp of comparisons) {
+  const label = (ref) => c.sessionLabel(ref.fileName, String(ref.sessionIndex + 1));
+  console.log(`\n═══ ${c.title} : ${c.heading(label(cmp.before), label(cmp.after))} ═══`);
+
+  for (const cav of cmp.caveats) console.log(`  ⚠️  ${c.caveats[cav.id](...cav.args)}`);
+
+  if (cmp.tuneChanges.length === 0) {
+    console.log(`  ${c.noTuneChange}`);
+  } else {
+    console.log(`\n  ${c.tuneTitle}`);
+    for (const t of cmp.tuneChanges) {
+      console.log(`    ${t.driver ? '▸' : ' '} ${t.key.padEnd(34)} ${t.before} → ${t.after}`);
+    }
+    if (cmp.tuneChanges.some((t) => t.driver)) console.log(`    ${c.driverNote}`);
+  }
+
+  console.log(`\n  ${c.metricsTitle}`);
+  for (const m of cmp.metrics) {
+    console.log(
+      `    ${c.metrics[m.id].padEnd(28)} ${fmt(m.before, m.digits, m.beforeAxis).padStart(12)} → ${fmt(m.after, m.digits, m.afterAxis).padStart(12)}  ${fmtDelta(m)}`,
+    );
   }
 }

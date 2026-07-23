@@ -113,6 +113,8 @@ export const rules = {
     title: (axis: string) => `Stabilisation décalée sur ${axis}`,
     detail:
       "Après le transitoire, la réponse ne se stabilise pas à 1 (la consigne) : le taux atteint dérive par rapport à la demande. C'est typiquement l'I-term (trop bas si <1, trop haut ou en lutte si >1) ou un feedforward mal calibré.",
+    noFfNote:
+      " Sans feedforward sur cet axe, la réponse converge plus lentement : une stabilisation un peu sous la consigne dans la fenêtre de mesure est en partie attendue, l'I finit de combler l'écart au-delà.",
     evidence: (axis: string, settleValue: string, qualityNote: string) =>
       `Valeur de stabilisation ${axis} = ${settleValue} (attendu entre 0.85 et 1.15)${qualityNote}`,
     fix: (axis: string) =>
@@ -174,6 +176,15 @@ export const rules = {
     fix: 'Vérifie le pack utilisé - un surplus de cellules peut griller ESC/moteurs, un déficit écrase les perfs.',
   },
 
+  batteryNotLogged: {
+    title: 'Batterie absente du log',
+    detail:
+      "Le log ne contient ni tension ni courant : le champ BATTERY est désactivé dans les réglages blackbox. Ce n'est pas une panne, la carte n'enregistre simplement pas ces mesures - tous les verdicts batterie (sag, pack vidé, capteur) sont sans objet sur ce log.",
+    evidence: (mask: string) =>
+      `fields_disabled_mask = ${mask} (bit BATTERY actif) - aucun champ vbat/amperage dans les trames`,
+    fix: "Réactive l'enregistrement batterie pour retrouver les verdicts sag et tension sur les prochains logs.",
+  },
+
   yoyoDetected: {
     titleWarn: 'Yoyo détecté (oscillation de poussée)',
     titleInfo: 'Indice de yoyo (à confirmer)',
@@ -229,12 +240,16 @@ export const rules = {
   },
 
   batteryReadingsImplausible: {
-    title: 'Mesures batterie incohérentes',
-    detail:
-      "Le log contient des tensions physiquement impossibles : au-dessus de la tension à vide alors que le drone tire beaucoup de courant. Sous charge une batterie ne peut que descendre. C'est l'ADC vbat qui décroche pendant les transitoires de courant, pas le pack qui remonte. Tant que c'est le cas, ni le sag ni la tension mini ne sont mesurables sur ce vol, et les verdicts batterie ont été retirés plutôt que de t'annoncer un pack mort à tort.",
+    title: 'Mesure d’alimentation de la carte défaillante',
+    detail: (currentNote: string) =>
+      `Le log contient des tensions physiquement impossibles : au-dessus de la tension à vide alors que le drone tire beaucoup de courant. Sous charge une batterie ne peut que descendre : c'est l'ADC de la carte qui décroche pendant les transitoires, pas le pack qui remonte.${currentNote} Ce n'est ni un problème de pack ni un problème de tune : c'est le circuit de mesure d'alimentation de la carte. Et tant qu'il ment, la compensation de sag et les alarmes de tension de Betaflight travaillent sur ces valeurs fausses - ne te fie pas au beeper batterie pour poser. Les verdicts batterie de ce rapport ont été retirés plutôt que de t'annoncer un pack mort à tort.`,
+    /** Ajouté quand le canal courant décroche lui aussi (pointes ADC isolées). */
+    currentNote: (ampMax: string, ampP99: string) =>
+      ` La mesure de courant décroche pareil : ${ampMax} A lus en pointe alors que le pic soutenu du vol est d'environ ${ampP99} A - une pointe pareille est une lecture de capteur, pas un courant.`,
     evidence: (count: number, vmax: string, vmin: string) =>
       `${count} échantillon(s) au-dessus de la tension de repos sous forte charge ; plage lue ${vmin} à ${vmax} V`,
-    fix: "Vérifie le filtrage de la mesure vbat (condensateur sur l'entrée), les soudures du fil de puissance et le réglage vbat_scale. Refais un vol pour confirmer avant de conclure quoi que ce soit sur le pack.",
+    fix: (scales: string) =>
+      `Vérifie le filtrage de la mesure vbat (condensateur sur l'entrée), les soudures des fils de puissance et le réglage ${scales}. Refais un vol pour confirmer avant de conclure quoi que ce soit sur le pack.`,
   },
 
   gpsLowSats: {

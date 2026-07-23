@@ -33,6 +33,7 @@ const PROFILE: DroneProfile = {
     oscRatioWarn: 6,
     oscRatioCrit: 12,
     oscMinAmpPct: 15,
+    motorBandRawFloor: 100,
   },
 };
 
@@ -70,6 +71,13 @@ describe('lintConfig sur config mal réglée', () => {
     expect(found).toContain('antigravity-off');
     expect(found).toContain('motor-limit');
     expect(found).toContain('vbat-warning');
+  });
+
+  it('ff-zero est un choix assumé : mentionné mais exempté du score', () => {
+    const ffZero = findings.find((f) => f.id === 'ff-zero');
+    expect(ffZero?.scoreExempt).toBe(true);
+    // Les autres lints restent comptés : l'exemption est propre à ff-zero.
+    expect(findings.find((f) => f.id === 'antigravity-off')?.scoreExempt).toBeUndefined();
   });
 
   it('ne déclenche pas les règles non applicables', () => {

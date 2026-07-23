@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAnalyzer } from '@/lib/analyze-client';
 import { useLocale } from '@/lib/i18n/locale';
 import { ShareDecodeError, decodeSession } from '@/lib/share/codec';
+import Credits from '@/components/Credits';
 import ReportView from '@/components/ReportView';
 import UploadZone from '@/components/UploadZone';
 import { AlertIcon } from '@/components/icons';
@@ -148,7 +149,9 @@ export default function Page() {
           aria-hidden="true"
           className="size-8 animate-spin rounded-full border-2 border-line border-t-accent shadow-[0_0_18px_-4px_var(--accent-glow)]"
         />
-        <p className="font-mono text-sm text-ink">
+        {/* [overflow-wrap:anywhere] : un nom de fichier blackbox est un seul
+            « mot » de 50+ caractères, sans ça il déborde de la carte en mobile. */}
+        <p className="max-w-full font-mono text-sm text-ink [overflow-wrap:anywhere]">
           {analyzer.status === 'working' ? (analyzer.step ?? t.workingFallback) : t.readingFiles}
         </p>
         <p className="text-xs text-ink-3">{t.privacyNote}</p>
@@ -210,6 +213,8 @@ export default function Page() {
           {t.analyzeButton(files.length)}
         </button>
       </section>
+
+      <Credits />
     </div>
   );
 }

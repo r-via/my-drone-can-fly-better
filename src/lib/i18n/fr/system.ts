@@ -18,6 +18,7 @@ export const system = {
   cliVbatRange: (cells: string, max: string, min: string, sag: string) =>
     `${cells}S ${max}→${min} V (sag ${sag} V)`,
   cliCurrentMax: (amps: string) => `courant max ${amps} A`,
+  cliCurrentUnreliable: 'courant : capteur non fiable, valeur écartée',
   headersUnreadable: 'Headers illisibles (session corrompue ?)',
   dataVersionUnsupported: 'Version de données inconnue du décodeur (fragment de log corrompu ?)',
   decoderRejected: (raw: string) => `Décodage impossible : ${raw}`,

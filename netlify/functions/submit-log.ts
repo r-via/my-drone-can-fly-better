@@ -11,6 +11,10 @@ interface ShareMeta {
   craftNames?: string[];
   locale?: string;
   fileCount?: number;
+  /** Présents quand le client a gzippé puis découpé un gros log (voir ShareLogToggle). */
+  originalName?: string;
+  part?: number;
+  parts?: number;
 }
 
 function parseMeta(raw: FormDataEntryValue | null): ShareMeta {
@@ -69,11 +73,19 @@ export default async (req: Request): Promise<Response> => {
     });
   }
 
+  const multiPart = typeof meta.parts === 'number' && meta.parts > 1;
   const lines = [
     '**New shared log (opt-in)**',
+    multiPart && meta.originalName
+      ? `Part ${meta.part}/${meta.parts} of \`${meta.originalName}\``
+      : null,
     meta.craftNames?.length ? `Craft: \`${meta.craftNames.join(', ')}\`` : null,
     meta.locale ? `Locale: ${meta.locale}` : null,
     meta.fileCount ? `Files: ${meta.fileCount}` : null,
+    // Rappel sur le dernier morceau seulement, pour ne pas répéter la consigne.
+    multiPart && meta.part === meta.parts
+      ? 'Reassemble: `cat <name>.gz.part* > log.gz && gunzip log.gz`'
+      : null,
   ].filter((line): line is string => Boolean(line));
 
   outgoing.append('payload_json', JSON.stringify({ content: lines.join('\n').slice(0, 1900) }));

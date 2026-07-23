@@ -113,6 +113,8 @@ export const zh: Dict = {
       title: (axis: string) => `${axis} 轴稳态偏移`,
       detail:
         '瞬态过后，响应没有稳定在 1（目标值）：实际角速度相对指令存在偏差。典型原因是 I-term（<1 说明太低，>1 说明太高或在打架）或 feedforward 校准不当。',
+      noFfNote:
+        ' 该轴没有 feedforward 时响应收敛更慢：测量窗口内稳态略低于目标值在一定程度上是预期的，I-term 会在窗口之外补上差距。',
       evidence: (axis: string, settleValue: string, qualityNote: string) =>
         `${axis} 稳态值 = ${settleValue}（预期在 0.85 到 1.15 之间）${qualityNote}`,
       fix: (axis: string) =>
@@ -174,6 +176,15 @@ export const zh: Dict = {
       fix: '核对所用电池 - 电芯多了可能烧掉电调/电机，少了则性能大打折扣。',
     },
 
+    batteryNotLogged: {
+      title: '日志中没有电池数据',
+      detail:
+        '日志既没有电压也没有电流：blackbox 设置里关闭了 BATTERY 字段。这不是故障，只是飞控没有记录这些数据 - 本日志中所有电池相关判定（压降、放电过度、传感器）都不适用。',
+      evidence: (mask: string) =>
+        `fields_disabled_mask = ${mask}（BATTERY 位已置）- 帧中没有 vbat/amperage 字段`,
+      fix: '重新启用电池记录，下次的日志就能恢复压降和电压判定。',
+    },
+
     yoyoDetected: {
       titleWarn: '检测到悠悠球效应（推力震荡）',
       titleInfo: '疑似悠悠球效应（待确认）',
@@ -229,12 +240,15 @@ export const zh: Dict = {
     },
 
     batteryReadingsImplausible: {
-      title: '电池读数不合理',
-      detail:
-        '日志里出现了物理上不可能的电压：在大电流放电时读数却高于空载电压。带载时电池只可能往下掉。这是 vbat 的 ADC 在电流瞬变时失准，而不是电池自己回升。只要存在这种情况，本次飞行的电压跌落和最低电压都无法测量，因此电池相关判定被撤下，而不是错误地告诉你电池已经报废。',
+      title: '飞控的电源检测电路故障',
+      detail: (currentNote: string) =>
+        `日志里出现了物理上不可能的电压：大电流放电时电压反而高于空载电压。带载时电池只可能往下掉：这是飞控 ADC 在瞬态时失准，不是电池在回升。${currentNote}这既不是电池问题也不是调参问题：是飞控的电源检测电路。只要它还在说谎，Betaflight 的压降补偿和低压报警读到的就是这些假值 - 降落时不要指望电池蜂鸣器。本报告的电池判定已被撤销，以免误报电池报废。`,
+      currentNote: (ampMax: string, ampP99: string) =>
+        `电流测量同样失准：峰值读到 ${ampMax} A，而全程持续峰值只有约 ${ampP99} A - 这样的尖峰是传感器读数，不是真实电流。`,
       evidence: (count: number, vmax: string, vmin: string) =>
-        `${count} 个采样在大负载下高于静置电压；读到的范围 ${vmin} 到 ${vmax} V`,
-      fix: '检查 vbat 采样的滤波（输入端电容）、电源线焊点，以及 vbat_scale 设置。在对电池下任何结论之前，再飞一次确认。',
+        `${count} 个采样在大负载下高于静息电压；读数范围 ${vmin} 到 ${vmax} V`,
+      fix: (scales: string) =>
+        `检查 vbat 测量的滤波（输入端电容）、动力线焊点，以及 ${scales} 设置。重飞一次确认后，再对电池下任何结论。`,
     },
 
     gpsLowSats: {
@@ -419,6 +433,7 @@ export const zh: Dict = {
     cliVbatRange: (cells: string, max: string, min: string, sag: string) =>
       `${cells}S ${max}→${min} V（电压跌落 ${sag} V）`,
     cliCurrentMax: (amps: string) => `最大电流 ${amps} A`,
+    cliCurrentUnreliable: '电流：传感器不可靠，读数已忽略',
     headersUnreadable: '头部无法读取（会话损坏？）',
     dataVersionUnsupported: '解码器无法识别的数据版本（日志片段损坏？）',
     decoderRejected: (raw: string) => `无法解码：${raw}`,
@@ -457,6 +472,11 @@ export const zh: Dict = {
       updateAvailable: '有新版本',
       updateReload: '重新加载',
       updateDismiss: '稍后',
+    },
+
+    credits: {
+      title: '鸣谢',
+      intro: '感谢帮助本站不断进步的飞手们：测试、分享日志、报告问题和好点子。',
     },
 
     // 随语言变化的单位（Mo/Ko ↔ MB/KB）。
@@ -559,14 +579,32 @@ export const zh: Dict = {
     report: {
       title: '飞行报告',
       newAnalysis: '新的分析',
+    flightsAria: '已分析的飞行',
       fileAria: (fileName: string): string => `报告 ${fileName}`,
       validSessions: (count: number): string => `${count} 个有效会话`,
       skippedSessions: (count: number): string => `${count} 个已忽略`,
       skippedSession: (index: string, error: string, size: string): string =>
         `会话 ${index} 已忽略 - ${error}（${size}）`,
+      skippedOrphanSummary: (count: number): string =>
+        `${count} 个已忽略会话 - 这些文件没有可用的飞行`,
+      skippedInFileSummary: (count: number): string =>
+        `本文件另有 ${count} 个已忽略会话`,
       sessionLabel: (index: string): string => `会话 ${index}`,
       sessionSublabel: (duration: string, start: string): string => `${duration} · t+${start}`,
       noUsableSession: '这个文件里没有可用的会话 - 原因见上方。',
+      axisNotEvaluated: (label: string): string => `${label}：未评估 - 日志中缺少数据`,
+      scoreCappedNote: '有一个轴未测量（灰色扇区），得分上限为 95。',
+      axisNoData: '未评估 - 缺少数据',
+      axisShare: (pct: number): string => `占总分 ${pct}%`,
+      axisGoto: '点击跳转到该轴的判定',
+      axisDetails: {
+        securite: '飞行中触发 failsafe。',
+        vibrations: '原始 gyro 机械噪声、机架共振、桨叶/电机不平衡。',
+        filtres: '电机频段降噪、滤波后残留噪声、高频泄漏。',
+        pid: '指令跟随、阶跃响应（超调、迟缓、稳态）、震荡、prop wash、悠悠球效应。',
+        moteurs: '饱和、电机出力不均、失步。',
+        batterie: '负载压降、过度放电、传感器合理性、电芯数。',
+      },
       profileTag: (label: string): string => `配置档 ${label}`,
       tileDuration: '会话时长',
       tileSampleRate: '采样率',
@@ -576,6 +614,7 @@ export const zh: Dict = {
       batteryNoVbat: '无 vbat 测量',
       tileMaxCurrent: '最大电流',
       currentAvg: (avg: string): string => `平均 ${avg} A`,
+      currentUnreliable: '传感器不可靠，读数已忽略',
       tileSaturation: '电机饱和',
       tileFlightTime: '飞行时间',
       flightTimeHint: '真正离地的油门时间',
@@ -619,9 +658,10 @@ export const zh: Dict = {
         '把这次分析用到的原始 .bbl 日志发给 Rémi（本站开发者），发到一个私密频道。这能帮他发现规则漏掉的真实案例。点击按钮之前不会发送任何内容。',
       buttonLabel: (count: number): string => (count > 1 ? `分享这 ${count} 个日志` : '分享这个日志'),
       sending: '发送中…',
+      sendingPart: (done: number, total: number): string => `发送中 ${done}/${total}…`,
       sent: '日志已发送，谢谢！',
       error: '发送失败 - 请稍后重试。',
-      tooLarge: '日志太大，无法自动分享。',
+      tooLarge: '日志总量超过 100 MB - 太大，无法自动分享。',
     },
 
     shareLink: {
@@ -644,6 +684,63 @@ export const zh: Dict = {
       decodeErrorVersion: '这个链接来自更新版本的网站。请刷新页面后重新索取。',
     },
 
+    chartHelp: {
+      buttonLabel: '怎么看这张图',
+      buttonAria: (chart: string): string => `怎么看：${chart}`,
+      closeAria: '关闭帮助',
+      readTitle: '怎么看',
+      examplesTitle: '示例',
+      goodTag: '良好',
+      badTag: '有问题',
+      timeline: {
+        title: '飞行时间轴',
+        intro:
+          '这条横带从左到右讲述整段飞行：飞机当时的状态（地面、低油门、飞行中）、叠加的电池电压曲线，以及检测到的异常事件。',
+        points: [
+          '每种颜色代表一种状态：绿色块是真正在飞的时间段。',
+          '黄线是电池电压：飞行中应当缓慢而平稳地下降。',
+          '警告三角标记检测到的异常：位置表示时间，标签是测得的频率。',
+          '黄线骤降说明电池在负载下电压崩塌（电池老化或负载过大）。',
+        ],
+        examples: {
+          good: '连续飞行，电压平缓下降，没有任何标记：一切正常。',
+          bad: '飞行中出现警告标记，电压一段段跳水：有需要处理的异常，电池状态不佳。',
+        },
+      },
+      spectrum: {
+        title: '陀螺仪频谱',
+        intro:
+          '无人机总会有些振动。这张图把振动按频率（Hz）排开：左边是慢振动，右边是快振动。峰越高，振动越强。',
+        points: [
+          '在「电机」虚线附近有一个窄峰是正常的：那是螺旋桨的转速。',
+          '「共振」区必须保持低平：这里鼓起来说明机架在共振（画面果冻）。',
+          '其余位置曲线应贴着底部（「噪声底」）。',
+          '三种颜色是三个轴（Roll、Pitch、Yaw）：形状应当相近。',
+          '如果曲线在到达右边缘前就断了（斜线阴影「无法测量」区），说明日志记录太慢：频谱看不到记录频率一半以上的内容。提高 blackbox_sample_rate 才能覆盖整个范围。',
+        ],
+        examples: {
+          good: '噪声底低而平，只在电机频率处有一个窄峰：机况健康。',
+          bad: '共振区有宽包且噪声底偏高：机械振动，检查桨叶、轴承和螺丝。',
+        },
+      },
+      step: {
+        title: '阶跃响应',
+        intro:
+          '我们模拟一次干脆的打杆，看飞机如何执行指令。虚线「目标 1.0」就是下达的指令：理想曲线快速升到目标并停在那里。',
+        points: [
+          '曲线应快速爬向目标：爬得越早，响应越快。',
+          '略微冲过目标（超调 ~15% 以内）可以接受。',
+          '过峰后曲线应平稳落在目标线上，不再起伏。',
+          '反复回弹说明每次打杆后飞机都在震荡：调参过于激进。',
+        ],
+        examples: {
+          good: '干脆上升，轻微超调，然后稳稳落在目标线上：调参均衡。',
+          bad: '大幅超调后反复回弹：飞机过度反应并震荡（P 过高或 D 过低）。',
+          badSlow: '上升绵软，很晚才到目标：飞机跟不上打杆（P 偏低或滤波过重）。',
+        },
+      },
+    },
+
     // SVG 图表 - 以 `labels` prop 传入的扁平对象（纯组件，无 hook）。
     charts: {
       spectrum: {
@@ -654,6 +751,7 @@ export const zh: Dict = {
         bandMotors: '电机',
         xAxis: '频率（Hz）',
         motorLine: (hz: string): string => `电机 ~${hz} Hz`,
+        beyondNyquist: (hz: string): string => `无法测量 - 日志记录频率 ${hz} Hz`,
       },
       step: {
         title: '阶跃响应（0-500 ms）',
@@ -676,6 +774,52 @@ export const zh: Dict = {
           `在 ${times} 标记了 ${count} 个事件`,
         eventsLegend: '检测到振荡',
       },
+    },
+  },
+
+  compare: {
+    title: '多次调参对比',
+    tabLabel: '对比',
+    tabCount: (n: number): string => `${n} 组`,
+    heading: (before: string, after: string) => `${before} → ${after}`,
+    sessionLabel: (fileName: string, session: string) => `${fileName} 第 ${session} 段`,
+    noTuneChange: '这两次飞行之间没有改动任何设置：下面的差异来自飞行本身，而不是调参。',
+    summaryNoChange: '设置无改动',
+    summaryChanges: (n: number) => `改动了 ${n} 项设置`,
+    caveatsCount: (n: number) => `${n} 条注意事项`,
+    tuneTitle: '改动了什么',
+    metricsTitle: '测量结果怎么说',
+    driverNote: '简化滑块排在前面：是它们重新计算了下方列出的增益，而不是反过来。',
+    deltaUnavailable: '轴不同',
+    metricUnavailable: '不适用',
+
+    metrics: {
+      filtNoise: '滤波后噪声 (deg/s)',
+      unfiltNoise: '原始噪声 (deg/s)',
+      tracking: '跟随误差 (deg/s)',
+      overshoot: '超调 (%)',
+      riseTime: '上升时间 (ms)',
+      ms: '灵敏度峰值 Ms',
+      residualHf: '100 Hz 以上残留',
+      propwash: '桨洗 (deg/s)',
+      saturation: '电机饱和 (%)',
+    },
+
+    caveats: {
+      inferredCraft: (board: string) =>
+        `日志里没有机架名称，改按飞控板（${board}）分组：设置 craft_name 即可消除疑问。若这些飞行来自同一飞控板上的两台不同机器，则对比没有意义。`,
+      firmware: (before: string, after: string) =>
+        `固件不同（${before} → ${after}）：调参无法在大版本之间照搬，参数名称和含义都会变。设置对比不可靠。`,
+      sampleRate: (before: string, after: string) =>
+        `采样率不同（${before} → ${after} Hz）：残留噪声和频谱在这两个日志之间没有可比性。`,
+      duration: (before: string, after: string) =>
+        `时长相差很大（${before} s → ${after} s）：较短的一次遇到的情况更少，最差值必然偏低。`,
+      stickRange: (before: string, after: string) =>
+        `打杆幅度不同（峰值 ${before} → ${after} deg/s）：飞得更温和本身就会降低超调和桨洗，与设置无关。`,
+      mechanical: (before: string, after: string) =>
+        `原始陀螺数据变了（${before} → ${after} deg/s RMS）。它不受调参影响：两次飞行之间机械上有变化（桨、轴承、螺丝）。因此滤波后噪声的差异不再只反映滤波本身。`,
+      battery: (before: string, after: string) =>
+        `单节压降相差很大（${before} → ${after} V）且未启用补偿：同样的目标值给不出同样的推力。请开启 vbat_sag_compensation，或在电量相近时重飞。`,
     },
   },
 };

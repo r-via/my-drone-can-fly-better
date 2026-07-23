@@ -66,6 +66,16 @@ const IMPLAUSIBLE_MARGIN_V_PER_CELL = 0.05;
 const SUSTAINED_WINDOW_S = 1;
 /** Pas d'avance de cette fenêtre (s). */
 const SUSTAINED_STEP_S = 0.25;
+/**
+ * Canal courant suspect : ampMax au-delà de ce multiple du pic soutenu (p99).
+ * Un vrai punch dure des dizaines de ms et laisse une trace dans le p99 ; une
+ * pointe ADC est un échantillon isolé. Mesuré : GEPRC F722 AIO malade à ratio
+ * 5.2 (326 A pour un p99 de 63), racer sain à 1.3 (98 A pour 74). Le plancher
+ * évite de suspecter un log de whoop où tout le courant tient en dessous de
+ * 30 A, bruit compris.
+ */
+const AMP_SPIKE_RATIO = 2.5;
+const AMP_SPIKE_FLOOR_A = 30;
 
 /** Médiane des valeurs retenues par `keep` ; null si aucune. */
 function medianOf(x: ArrayLike<number>, keep: (v: number) => boolean): number | null {
@@ -115,21 +125,35 @@ export function analyzePower(fd: FlightData): PowerMetrics | null {
 
   let vbatMax = 0;
   let vbatMin = Infinity;
+  const positives: number[] = [];
   for (let i = 0; i < vb.length; i++) {
     const v = vb[i];
     if (v <= 0) continue; // échantillons ADC invalides
     if (v > vbatMax) vbatMax = v;
     if (v < vbatMin) vbatMin = v;
+    positives.push(v);
   }
-  if (vbatMax <= 0) return null; // pas de vbat exploitable
+  if (vbatMax <= 0 || positives.length === 0) return null; // pas de vbat exploitable
 
-  // Plus petit nombre de cellules qui garde vbatMax sous 4.35 V/cellule (LiHV).
-  // round(v/4.2) se trompait sur un pack entamé : 22.56 V → 5S (4.51 V/cell,
-  // physiquement impossible) au lieu de 6S à 3.76 V/cell.
-  const cells = Math.max(1, Math.ceil(vbatMax / 4.35));
+  // Détection du nombre de cellules : plus petit compte qui garde la tension
+  // sous 4.35 V/cellule (LiHV). round(v/4.2) se trompait sur un pack entamé :
+  // 22.56 V → 5S (4.51 V/cell impossible) au lieu de 6S à 3.76.
+  //
+  // On divise le PIC ROBUSTE (p99), pas le max absolu : sur une carte au canal
+  // vbat bruité, la tension fait des sauts VERS LE HAUT pendant les pointes de
+  // courant (mesuré sur GEPRC F722 AIO : +1 V à 57 A, impossible pour une vraie
+  // batterie sous charge). Ces pics isolés poussaient vbatMax au-dessus d'un
+  // multiple de 4.35 et faisaient détecter 5S sur un pack 4S. Le p99 ignore le
+  // 1 % le plus haut : sur un log sain il égale le max (aucun effet), sur un log
+  // à pics il retombe sur la vraie tension pack. Le verdict batterie signale les
+  // pics par ailleurs (implausibleSamples).
+  positives.sort((a, b) => a - b);
+  const vbatPeak = positives[Math.floor(0.99 * (positives.length - 1))];
+  const cells = Math.max(1, Math.ceil(vbatPeak / 4.35));
 
   let ampAvg: number | null = null;
   let ampMax: number | null = null;
+  let ampP99: number | null = null;
   let mahEstimate: number | null = null;
   const amp = fd.amperage;
   if (amp && amp.length > 0) {
@@ -141,6 +165,8 @@ export function analyzePower(fd: FlightData): PowerMetrics | null {
     }
     ampAvg = sum / amp.length;
     ampMax = max;
+    const sorted = [...amp].sort((a, b) => a - b);
+    ampP99 = sorted[Math.floor(0.99 * (sorted.length - 1))];
     // Intégrale trapèze du courant (A) sur le temps (s) → A·s, puis /3.6 → mAh.
     // dt clampé à 1 s : une pause d'enregistrement (désarmé) ne doit pas
     // compter comme de la consommation au courant du moment.
@@ -198,6 +224,16 @@ export function analyzePower(fd: FlightData): PowerMetrics | null {
   const perCellMinSustained =
     (grid.med.length > 0 ? Math.min(...grid.med) : (medianOf(vb, (v) => v > 0) ?? 0)) / cells;
 
+  // Canal courant : suspect UNIQUEMENT quand vbat est déjà incohérent (mêmes
+  // transitoires, même ADC de carte qui décroche) ET que le max est une pointe
+  // isolée sans commune mesure avec le pic soutenu. Une échelle ibata_scale
+  // simplement mal réglée (courant faux mais lisse) n'est pas détectable ici.
+  const ampImplausible =
+    implausibleSamples > 0 &&
+    ampMax !== null &&
+    ampP99 !== null &&
+    ampMax > Math.max(AMP_SPIKE_FLOOR_A, AMP_SPIKE_RATIO * ampP99);
+
   return {
     cells,
     perCellMinSustained,
@@ -209,6 +245,8 @@ export function analyzePower(fd: FlightData): PowerMetrics | null {
     sagV,
     ampAvg,
     ampMax,
+    ampP99,
+    ampImplausible,
     mahEstimate,
   };
 }

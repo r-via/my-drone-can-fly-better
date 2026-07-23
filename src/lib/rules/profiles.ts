@@ -27,6 +27,10 @@ const GENERIC_THRESHOLDS: ProfileThresholds = {
   oscRatioCrit: 12, // au-delà le mixer part en butée, perte d'autorité
   oscMinAmpPct: 15, // sous 15 % de la plage moteur, l'oscillation ne coûte pas d'autorité
   residualHfWarn: 150, // amplitude spectrale Welch >100 Hz ; sain mesuré 20-130 sur le parc, ~2× le pire
+  // Mesuré sur le parc : quads propres (JeNo tune final 50-77, LR4 40-48) vs
+  // bruités (GEPRC 138-181, racer 352-688). Sous 100, le ratio d'atténuation
+  // punit les gyros déjà propres - faux positif signalé par un pilote.
+  motorBandRawFloor: 100,
 };
 
 const PICO: DroneProfile = {

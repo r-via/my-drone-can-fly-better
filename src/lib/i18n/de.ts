@@ -111,6 +111,8 @@ export const de: Dict = {
       title: (axis: string) => `Versetztes Einschwingen auf ${axis}`,
       detail:
         'Nach dem Transienten pendelt sich die Antwort nicht bei 1 (dem Setpoint) ein: die erreichte Rate driftet gegenüber der Vorgabe. Typisch ist der I-Term (zu niedrig bei <1, zu hoch oder im Kampf bei >1) oder ein schlecht kalibrierter Feedforward.',
+      noFfNote:
+        ' Ohne Feedforward auf dieser Achse konvergiert die Antwort langsamer: ein Einschwingen leicht unter dem Setpoint im Messfenster ist teilweise zu erwarten, der I-Term schließt die Lücke danach.',
       evidence: (axis: string, settleValue: string, qualityNote: string) =>
         `Einschwingwert ${axis} = ${settleValue} (erwartet zwischen 0.85 und 1.15)${qualityNote}`,
       fix: (axis: string) =>
@@ -172,6 +174,15 @@ export const de: Dict = {
       fix: 'Prüfe den verwendeten Pack - zu viele Zellen können ESC/Motoren grillen, zu wenige würgen die Performance ab.',
     },
 
+    batteryNotLogged: {
+      title: 'Batterie fehlt im Log',
+      detail:
+        'Das Log enthält weder Spannung noch Strom: das BATTERY-Feld ist in den Blackbox-Einstellungen deaktiviert. Nichts ist kaputt, die Karte zeichnet diese Messwerte schlicht nicht auf - alle Batterie-Verdikte (Sag, leerer Pack, Sensor) sind für dieses Log gegenstandslos.',
+      evidence: (mask: string) =>
+        `fields_disabled_mask = ${mask} (BATTERY-Bit gesetzt) - kein vbat/amperage-Feld in den Frames`,
+      fix: 'Aktiviere das Batterie-Logging wieder, um bei den nächsten Logs die Sag- und Spannungs-Verdikte zurückzubekommen.',
+    },
+
     yoyoDetected: {
       titleWarn: 'Yoyo erkannt (Schuboszillation)',
       titleInfo: 'Yoyo-Verdacht (zu bestätigen)',
@@ -227,12 +238,15 @@ export const de: Dict = {
     },
 
     batteryReadingsImplausible: {
-      title: 'Unplausible Akkumesswerte',
-      detail:
-        'Das Log enthält physikalisch unmögliche Spannungen: über der Leerlaufspannung, während der Quad viel Strom zieht. Unter Last kann ein Akku nur fallen. Das ist der vbat-ADC, der bei Stromtransienten aussteigt, nicht der Akku, der sich erholt. Solange das so ist, sind weder Sag noch Minimalspannung in diesem Flug messbar, deshalb wurden die Akku-Urteile zurückgehalten statt dir fälschlich einen toten Akku zu melden.',
+      title: 'Die Spannungs-/Strommessung des Boards versagt',
+      detail: (currentNote: string) =>
+        `Das Log enthält physikalisch unmögliche Spannungen: über der Leerlaufspannung, während der Copter viel Strom zieht. Unter Last kann eine Batterie nur sinken: da bricht der ADC des Boards bei Transienten ein, nicht der Akku, der sich erholt.${currentNote} Das ist weder ein Akku- noch ein Tune-Problem: es ist die Versorgungsmessung des Boards. Und solange sie lügt, arbeiten Betaflights Sag-Kompensation und Spannungsalarme mit genau diesen falschen Werten - verlass dich zum Landen nicht auf den Batterie-Beeper. Die Batterie-Urteile dieses Berichts wurden zurückgehalten, statt dir fälschlich einen toten Akku zu melden.`,
+      currentNote: (ampMax: string, ampP99: string) =>
+        ` Die Strommessung bricht genauso ein: ${ampMax} A als Spitze gelesen, während die gehaltene Spitze des Flugs bei etwa ${ampP99} A liegt - so eine Spitze ist ein Sensorwert, kein Strom.`,
       evidence: (count: number, vmax: string, vmin: string) =>
         `${count} Sample(s) über der Ruhespannung unter hoher Last; gelesener Bereich ${vmin} bis ${vmax} V`,
-      fix: 'Prüf die Filterung der vbat-Messung (Kondensator am Eingang), die Lötstellen der Stromzuleitung und die Einstellung vbat_scale. Flieg nochmal, bevor du irgendetwas über den Akku schließt.',
+      fix: (scales: string) =>
+        `Prüf die Filterung der vbat-Messung (Kondensator am Eingang), die Lötstellen der Stromkabel und die Einstellung ${scales}. Flieg zur Bestätigung erneut, bevor du irgendetwas über den Akku schließt.`,
     },
 
     gpsLowSats: {
@@ -415,6 +429,7 @@ export const de: Dict = {
     cliVbatRange: (cells: string, max: string, min: string, sag: string) =>
       `${cells}S ${max}→${min} V (Sag ${sag} V)`,
     cliCurrentMax: (amps: string) => `max. Strom ${amps} A`,
+    cliCurrentUnreliable: 'Strom: Sensor unzuverlässig, Wert verworfen',
     headersUnreadable: 'Header unlesbar (Session beschädigt?)',
     dataVersionUnsupported: 'Datenversion dem Decoder unbekannt (beschädigtes Log-Fragment?)',
     decoderRejected: (raw: string) => `Dekodierung nicht möglich: ${raw}`,
@@ -450,6 +465,12 @@ export const de: Dict = {
       updateAvailable: 'Neue Version verfügbar',
       updateReload: 'Neu laden',
       updateDismiss: 'Später',
+    },
+
+    credits: {
+      title: 'Danksagung',
+      intro:
+        'Danke an die Piloten, die die Seite vorangebracht haben: Tests, geteilte Logs, gemeldete Bugs und gute Ideen.',
     },
 
     units: {
@@ -543,15 +564,37 @@ export const de: Dict = {
     report: {
       title: 'Flugbericht',
       newAnalysis: 'Neue Analyse',
+    flightsAria: 'Analysierte Flüge',
       fileAria: (fileName: string): string => `Bericht ${fileName}`,
       validSessions: (count: number): string =>
         `${count} ${count > 1 ? 'gültige Sessions' : 'gültige Session'}`,
       skippedSessions: (count: number): string => `${count} ignoriert`,
       skippedSession: (index: string, error: string, size: string): string =>
         `Session ${index} ignoriert - ${error} (${size})`,
+      skippedOrphanSummary: (count: number): string =>
+        count > 1
+          ? `${count} ignorierte Sessions - Dateien ohne nutzbaren Flug`
+          : `1 ignorierte Session - Datei ohne nutzbaren Flug`,
+      skippedInFileSummary: (count: number): string =>
+        count > 1
+          ? `${count} weitere ignorierte Sessions in dieser Datei`
+          : `1 weitere ignorierte Session in dieser Datei`,
       sessionLabel: (index: string): string => `Session ${index}`,
       sessionSublabel: (duration: string, start: string): string => `${duration} · t+${start}`,
       noUsableSession: 'Keine nutzbare Session in dieser Datei - siehe Gründe oben.',
+      axisNotEvaluated: (label: string): string => `${label}: nicht bewertet - Daten fehlen im Log`,
+      scoreCappedNote: 'Score auf 95 gedeckelt: eine Achse wurde nicht gemessen (graues Segment).',
+      axisNoData: 'nicht bewertet - Daten fehlen',
+      axisShare: (pct: number): string => `${pct} % des Scores`,
+      axisGoto: 'Klick: zu den Verdikten dieser Achse springen',
+      axisDetails: {
+        securite: 'Failsafe im Flug ausgelöst.',
+        vibrations: 'Mechanisches Rauschen des rohen Gyros, Rahmenresonanz, Unwucht von Prop/Motor.',
+        filtres: 'Dämpfung des Motorrauschens, Restrauschen nach dem Filtern, Hochfrequenz-Leckage.',
+        pid: 'Setpoint-Folgung, Sprungantwort (Überschwingen, Trägheit, Einschwingen), Oszillationen, Prop wash, Yoyo.',
+        moteurs: 'Sättigung, Ungleichgewicht zwischen Motoren, Desyncs.',
+        batterie: 'Sag unter Last, Tiefentladung, Sensorplausibilität, Zellenzahl.',
+      },
       profileTag: (label: string): string => `Profil ${label}`,
       tileDuration: 'Session-Dauer',
       tileSampleRate: 'Sampling',
@@ -561,6 +604,7 @@ export const de: Dict = {
       batteryNoVbat: 'keine vbat-Messung',
       tileMaxCurrent: 'Max. Strom',
       currentAvg: (avg: string): string => `Durchschnitt ${avg} A`,
+      currentUnreliable: 'Sensor unzuverlässig, Wert verworfen',
       tileSaturation: 'Motor-Sättigung',
       tileFlightTime: 'Flugzeit',
       flightTimeHint: 'Throttle tatsächlich in der Luft',
@@ -604,9 +648,10 @@ export const de: Dict = {
       buttonLabel: (count: number): string =>
         count > 1 ? `${count} Logs teilen` : 'Dieses Log teilen',
       sending: 'Wird gesendet…',
+      sendingPart: (done: number, total: number): string => `Sende ${done}/${total}…`,
       sent: 'Log gesendet - danke!',
       error: 'Senden fehlgeschlagen - versuch es später noch mal.',
-      tooLarge: 'Log zu groß, um automatisch geteilt zu werden.',
+      tooLarge: 'Über 100 MB Logs - zu groß für den automatischen Versand.',
     },
 
     shareLink: {
@@ -632,6 +677,64 @@ export const de: Dict = {
         'Dieser Link stammt aus einer neueren Version der Seite. Lade die Seite neu und frag ihn noch einmal an.',
     },
 
+    chartHelp: {
+      buttonLabel: 'Lesehilfe',
+      buttonAria: (chart: string): string => `Lesehilfe: ${chart}`,
+      closeAria: 'Hilfe schließen',
+      readTitle: 'So liest du sie',
+      examplesTitle: 'Beispiele',
+      goodTag: 'Gut',
+      badTag: 'Nicht gut',
+      timeline: {
+        title: 'Die Flug-Timeline',
+        intro:
+          'Dieser Streifen erzählt die Session von links nach rechts: was der Quad gerade tat (am Boden, wenig Gas, im Flug), darüber die Akkuspannung und die erkannten Vorfälle.',
+        points: [
+          'Jede Farbe ist ein Zustand: die grünen Blöcke sind die Momente wirklich im Flug.',
+          'Die gelbe Linie ist die Akkuspannung: sie soll im Flug langsam und gleichmäßig sinken.',
+          'Ein Warndreieck markiert einen erkannten Vorfall: die Position sagt wann, das Etikett die gemessene Frequenz.',
+          'Ein steiler Absturz der gelben Linie heißt: der Akku bricht unter Last ein (verschlissen oder überfordert).',
+        ],
+        examples: {
+          good: 'Durchgehender Flug, Spannung in sanfter Neigung, keine Marker: nichts zu melden.',
+          bad: 'Warnmarker mitten im Flug und ruckartig einbrechende Spannung: Vorfälle beheben, der Akku leidet.',
+        },
+      },
+      spectrum: {
+        title: 'Das Gyro-Spektrum',
+        intro:
+          'Ein Quad vibriert immer ein wenig. Dieses Diagramm sortiert die Vibrationen nach Frequenz (in Hz): links die langsamen, rechts die schnellen. Je höher ein Peak, desto stärker die Vibration.',
+        points: [
+          'Ein schmaler Peak nahe der gestrichelten „Motoren“-Linie ist normal: das ist die Drehung der Propeller.',
+          'Das „Resonanz“-Band muss niedrig bleiben: ein Buckel dort ist der Rahmen, der mitschwingt (Jello im Bild).',
+          'Überall sonst soll die Kurve unten am „Boden“ kleben.',
+          'Die drei Farben sind die drei Achsen (Roll, Pitch, Yaw): sie sollten sich ähneln.',
+          'Enden die Kurven vor dem rechten Rand (schraffierte Zone „nicht messbar“), wurde das Log zu langsam aufgezeichnet: oberhalb der halben Aufzeichnungsrate kann das Spektrum nichts sehen. Zeichne schneller auf (blackbox_sample_rate), um den ganzen Bereich abzudecken.',
+        ],
+        examples: {
+          good: 'Niedriger, flacher Boden, ein einziger schmaler Peak bei der Motorfrequenz: gesunder Quad.',
+          bad: 'Breiter Buckel im Resonanzband und belasteter Boden: mechanische Vibrationen - Propeller, Lager und Verschraubung prüfen.',
+        },
+      },
+      step: {
+        title: 'Die Sprungantwort',
+        intro:
+          'Wir simulieren einen zackigen Stick-Ausschlag und schauen, wie der Quad dem Befehl folgt. Die gestrichelte Linie „Ziel 1.0“ ist genau der Befehl: die ideale Kurve steigt schnell dorthin und bleibt dort.',
+        points: [
+          'Die Kurve soll schnell Richtung Ziel steigen: je früher, desto schneller reagiert der Quad.',
+          'Ein leichtes Überschwingen über das Ziel (unter ~15 %) ist in Ordnung.',
+          'Nach der Spitze soll sich die Kurve ohne Wellen auf die Ziellinie legen.',
+          'Wiederholte Schwinger heißen: der Quad oszilliert nach jedem Befehl, der Tune ist zu nervös.',
+        ],
+        examples: {
+          good: 'Zackiger Anstieg, leichtes Überschwingen, dann legt sich die Kurve aufs Ziel: ausgewogener Tune.',
+          bad: 'Starkes Überschwingen mit Nachschwingern: der Quad überreagiert und oszilliert (P zu hoch oder D zu niedrig).',
+          badSlow:
+            'Träger Anstieg, der das Ziel erst sehr spät erreicht: der Quad hängt den Sticks hinterher (P zu niedrig oder Filter zu schwer).',
+        },
+      },
+    },
+
     charts: {
       spectrum: {
         title: 'Gyro-Spektrum (0-1 kHz)',
@@ -641,6 +744,7 @@ export const de: Dict = {
         bandMotors: 'Motoren',
         xAxis: 'Frequenz (Hz)',
         motorLine: (hz: string): string => `Motoren ~${hz} Hz`,
+        beyondNyquist: (hz: string): string => `nicht messbar - Log mit ${hz} Hz aufgezeichnet`,
       },
       step: {
         title: 'Step Response (0-500 ms)',
@@ -663,6 +767,54 @@ export const de: Dict = {
           `${count} Event(s) markiert bei ${times}`,
         eventsLegend: 'Oszillation erkannt',
       },
+    },
+  },
+
+  compare: {
+    title: 'Vergleich der Durchgänge',
+    tabLabel: 'Vergleich',
+    tabCount: (n: number): string => `${n} ${n > 1 ? 'Paare' : 'Paar'}`,
+    heading: (before: string, after: string) => `${before} → ${after}`,
+    sessionLabel: (fileName: string, session: string) => `${fileName} Session ${session}`,
+    noTuneChange:
+      'Zwischen diesen beiden Flügen wurde keine Einstellung geändert: die Unterschiede unten kommen vom Fliegen, nicht vom Tune.',
+    summaryNoChange: 'keine Einstellung geändert',
+    summaryChanges: (n: number) => `${n} ${n > 1 ? 'Einstellungen geändert' : 'Einstellung geändert'}`,
+    caveatsCount: (n: number) => `${n} ${n > 1 ? 'Vorbehalte' : 'Vorbehalt'}`,
+    tuneTitle: 'Was sich geändert hat',
+    metricsTitle: 'Was die Messung dazu sagt',
+    driverNote:
+      'Die vereinfachten Regler stehen oben: sie berechnen die darunter gelisteten Gains neu, nicht umgekehrt.',
+    deltaUnavailable: 'andere Achsen',
+    metricUnavailable: 'n/v',
+
+    metrics: {
+      filtNoise: 'Gefiltertes Rauschen (deg/s)',
+      unfiltNoise: 'Rohes Rauschen (deg/s)',
+      tracking: 'Folgefehler (deg/s)',
+      overshoot: 'Überschwingen (%)',
+      riseTime: 'Anstiegszeit (ms)',
+      ms: 'Empfindlichkeitsgipfel Ms',
+      residualHf: 'Rest >100 Hz',
+      propwash: 'Propwash (deg/s)',
+      saturation: 'Motorsättigung (%)',
+    },
+
+    caveats: {
+      inferredCraft: (board: string) =>
+        `Flüge nach Board (${board}) gruppiert, weil die Logs keinen Craft-Namen tragen: setz einen craft_name, um den Zweifel auszuräumen. Stammen diese Flüge von zwei verschiedenen Maschinen auf demselben Board, ist der Vergleich sinnlos.`,
+      firmware: (before: string, after: string) =>
+        `Anderes Firmware (${before} → ${after}): ein Tune lässt sich nicht zwischen Hauptversionen übertragen, und Parameter ändern Namen oder Bedeutung. Der Einstellungsvergleich ist nicht verlässlich.`,
+      sampleRate: (before: string, after: string) =>
+        `Andere Abtastrate (${before} → ${after} Hz): Restrauschen und Spektrum sind zwischen diesen Logs nicht vergleichbar.`,
+      duration: (before: string, after: string) =>
+        `Sehr unterschiedliche Dauer (${before} s → ${after} s): der kürzere Flug hat weniger Situationen gesehen, seine Spitzenwerte fallen zwangsläufig niedriger aus.`,
+      stickRange: (before: string, after: string) =>
+        `Andere Knüppelforderung (${before} → ${after} deg/s Maximum): ein ruhigerer Flug senkt Überschwingen und Propwash, ohne dass eine Einstellung beteiligt wäre.`,
+      mechanical: (before: string, after: string) =>
+        `Das rohe Gyro hat sich verändert (${before} → ${after} deg/s RMS). Es reagiert nicht auf den Tune: zwischen den beiden Flügen hat sich mechanisch etwas bewegt (Propeller, Lager, Schrauben). Unterschiede im gefilterten Rauschen messen damit nicht mehr allein die Filterung.`,
+      battery: (before: string, after: string) =>
+        `Sehr unterschiedlicher Sag pro Zelle (${before} → ${after} V) ohne aktive Kompensation: derselbe Sollwert ergibt nicht denselben Schub. Aktiviere vbat_sag_compensation oder flieg erneut bei vergleichbarem Akkustand.`,
     },
   },
 };

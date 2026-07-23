@@ -72,7 +72,21 @@ function makeStep(over: Partial<AxisStepResponse> = {}): AxisStepResponse {
   // profil, et il ne se déclenche qu'en l'absence de warn/crit. La courbe, elle,
   // garde un dépassement marqué pour que le test de tracé ait quelque chose à
   // vérifier - les règles lisent les scalaires, pas la courbe.
-  return { t, y, riseTimeMs: 30, peakValue: 1.1, overshootPct: 10, settleValue: 1, quality: 0.8, ...over };
+  return {
+    t,
+    y,
+    riseTimeMs: 30,
+    peakValue: 1.1,
+    overshootPct: 10,
+    settleValue: 1,
+    quality: 0.8,
+    ms: 1.2,
+    msFreqHz: 28,
+    mtDb: 0.9,
+    mtFreqHz: 24,
+    msBandTopHz: 26,
+    ...over,
+  };
 }
 
 function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
@@ -100,6 +114,8 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
       sagV: 1.2,
       ampAvg: 10,
       ampMax: 40,
+      ampP99: 38,
+      ampImplausible: false,
       mahEstimate: 800,
       perCellMinSustained: 3.8,
       implausibleSamples: 0,
@@ -141,9 +157,9 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
     filters: {
       available: true,
       axes: [
-        { attenuationDb: [{ lo: 120, hi: 350, db: 25 }], residualHfRms: 0.5 },
-        { attenuationDb: [{ lo: 120, hi: 350, db: 24 }], residualHfRms: 0.6 },
-        { attenuationDb: [{ lo: 120, hi: 350, db: 26 }], residualHfRms: 0.4 },
+        { attenuationDb: [{ lo: 120, hi: 350, db: 25 }], residualHfRms: 0.5, motorBandUnfiltRms: 200 },
+        { attenuationDb: [{ lo: 120, hi: 350, db: 24 }], residualHfRms: 0.6, motorBandUnfiltRms: 200 },
+        { attenuationDb: [{ lo: 120, hi: 350, db: 26 }], residualHfRms: 0.4, motorBandUnfiltRms: 200 },
       ],
     },
     timeline: {

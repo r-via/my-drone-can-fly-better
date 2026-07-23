@@ -5,6 +5,7 @@
 // sans dict explicite, la référence française est utilisée (comportement legacy).
 
 import { eventSeverity, qualifyingEvents } from '../analysis/oscillation';
+import { MIN_STEP_QUALITY } from '../analysis/step';
 import { parseNum, suggestAntiGravity, suggestSliderBump } from '../cli/config';
 import { fr } from '../i18n/fr';
 import { AXIS_NAMES } from '../types';
@@ -195,7 +196,13 @@ export function evaluateSession(
         120,
         350,
       );
-      if (attPeakAxis !== null && attPeakAxis < 15) {
+      // Même gate que filters-weak : ne suspecter le filtre RPM que si la bande
+      // moteur contient réellement du bruit à atténuer sur cet axe.
+      if (
+        attPeakAxis !== null &&
+        attPeakAxis < 15 &&
+        analysis.filters.axes[dp.axis].motorBandUnfiltRms >= t.motorBandRawFloor
+      ) {
         rpmNote = r.motorNoisePeak.rpmNoteWeakAttenuation(f1(attPeakAxis));
       }
     }
@@ -223,6 +230,11 @@ export function evaluateSession(
     let weakest: WorstAxis | null = null;
     for (let i = 0; i < atts.length; i++) {
       const a = atts[i];
+      // Gate sur le bruit BRUT de la bande : un ratio d'atténuation ne juge le
+      // filtrage que s'il y a du bruit moteur à retirer. Sur un quad propre le
+      // ratio est mécaniquement faible et ce n'est pas un défaut (faux positif
+      // mesuré sur un tune final sain : brut 50-77, filtré 17-22, 9.6 dB).
+      if (analysis.filters.axes[i].motorBandUnfiltRms < t.motorBandRawFloor) continue;
       if (a !== null && (weakest === null || a < weakest.value)) {
         weakest = { axis: i as Axis, value: a };
       }
@@ -302,10 +314,8 @@ export function evaluateSession(
 
   // --- step-overshoot / step-slow / step-settle-off --------------------------
   if (analysis.step) {
-    // En dessous de ~30 % de fenêtres excitées, la déconvolution sort du bruit
-    // (mesuré sur lr4 s6 : quality 0.07 → overshoot fantôme de 163 %). On ne
-    // juge que les axes fiables, avec mention de confiance entre 30 et 50 %.
-    const MIN_STEP_QUALITY = 0.3;
+    // On ne juge que les axes fiables (seuil partagé avec la comparaison de
+    // passes), avec mention de confiance entre 30 et 50 %.
     const stepAxes = analysis.step.axes.map((ax) => (ax && ax.quality >= MIN_STEP_QUALITY ? ax : null));
     const qualityNote = (axis: Axis): string => {
       const q = stepAxes[axis]?.quality ?? 0;
@@ -374,12 +384,21 @@ export function evaluateSession(
     for (let i = 0; i < stepAxes.length; i++) {
       const ax = stepAxes[i];
       if (ax && ax.settleValue !== null && (ax.settleValue < 0.85 || ax.settleValue > 1.15)) {
+        // Sévérité graduée : rater la borne de peu (0.80-0.85 / 1.15-1.20) est
+        // une info, pas le même verdict qu'un vrai décalage - un 0.84 prenait
+        // le même warn qu'un 0.60 (effet falaise signalé par un pilote).
+        const sev: Severity =
+          ax.settleValue < 0.8 || ax.settleValue > 1.2 ? 'warn' : 'info';
+        // Sans feedforward sur l'axe, la réponse converge plus lentement : une
+        // stabilisation un peu sous la consigne dans la fenêtre 200-500 ms est
+        // en partie la signature du choix no-FF, pas forcément un I trop bas.
+        const noFf = cfgNum(['f_roll', 'f_pitch', 'f_yaw'][i]) === 0;
         findings.push({
           id: 'step-settle-off',
-          severity: 'warn',
+          severity: sev,
           category: 'pid',
           title: r.stepSettleOff.title(AXIS_NAMES[i]),
-          detail: r.stepSettleOff.detail,
+          detail: r.stepSettleOff.detail + (noFf ? r.stepSettleOff.noFfNote : ''),
           evidence: r.stepSettleOff.evidence(
             AXIS_NAMES[i],
             f2(ax.settleValue),
@@ -465,18 +484,33 @@ export function evaluateSession(
     // ADC, ils tombent ensemble.
     const vbatUsable = p.implausibleSamples === 0;
     if (!vbatUsable) {
+      // Les deux canaux (tension ET courant) qui décrochent = le sensing
+      // d'alimentation de la carte est HS, pas un caprice d'un seul ADC. On
+      // passe en critique : tant que c'est cassé, la compensation de sag et
+      // les alarmes de tension de Betaflight lisent ces valeurs fausses - le
+      // pilote peut vider un pack sans jamais entendre l'alarme.
+      const ampBad = p.ampImplausible && p.ampMax !== null && p.ampP99 !== null;
       findings.push({
         id: 'battery-readings-implausible',
-        severity: 'warn',
+        severity: ampBad ? 'crit' : 'warn',
         category: 'batterie',
         title: r.batteryReadingsImplausible.title,
-        detail: r.batteryReadingsImplausible.detail,
+        detail: r.batteryReadingsImplausible.detail(
+          ampBad
+            ? r.batteryReadingsImplausible.currentNote(f0(p.ampMax!), f0(p.ampP99!))
+            : '',
+        ),
         evidence: r.batteryReadingsImplausible.evidence(
           p.implausibleSamples,
           f2(p.vbatMax),
           f2(p.vbatMin),
         ),
-        fix: { text: r.batteryReadingsImplausible.fix },
+        // Noms de paramètres CLI, identiques dans toutes les langues.
+        fix: {
+          text: r.batteryReadingsImplausible.fix(
+            ampBad ? 'vbat_scale / ibata_scale' : 'vbat_scale',
+          ),
+        },
       });
     }
     const sagPerCell = p.sagV / p.cells;
@@ -524,6 +558,27 @@ export function evaluateSession(
           profile.expectedCells,
         ),
         fix: { text: r.batteryCellsUnexpected.fix },
+      });
+    }
+  }
+
+  // --- battery-not-logged : champ BATTERY désactivé dans la config blackbox --
+  // Sans lui, « pas de mesure vbat » laisse croire à un capteur muet alors que
+  // c'est un réglage. Bit 3 du fields_disabled_mask = FIELD_SELECT_BATTERY
+  // (vérifié sur le parc : mask 0 → vbatLatest présent, bit 3 → absent).
+  // Compte dans le score (info) : un vol sans données batterie n'est pas
+  // entièrement vérifié, un 100/100 serait trompeur.
+  if (analysis.power === null) {
+    const mask = cfgNum('fields_disabled_mask');
+    if (mask !== null && (mask & 8) !== 0) {
+      findings.push({
+        id: 'battery-not-logged',
+        severity: 'info',
+        category: 'batterie',
+        title: r.batteryNotLogged.title,
+        detail: r.batteryNotLogged.detail,
+        evidence: r.batteryNotLogged.evidence(String(mask)),
+        fix: { text: r.batteryNotLogged.fix, cli: ['set blackbox_disable_bat = OFF'] },
       });
     }
   }

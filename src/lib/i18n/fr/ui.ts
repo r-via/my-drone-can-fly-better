@@ -21,6 +21,13 @@ export const ui = {
     updateDismiss: 'Plus tard',
   },
 
+  // Remerciements (page d'accueil) - les pseudos sont dans src/lib/credits.ts.
+  credits: {
+    title: 'Remerciements',
+    intro:
+      'Merci aux pilotes qui ont fait avancer le site : tests, logs partagés, bugs remontés et bonnes idées.',
+  },
+
   // Unités dépendantes de la langue (Mo/Ko ↔ MB/KB).
   units: {
     mega: 'Mo',
@@ -121,6 +128,7 @@ export const ui = {
   report: {
     title: 'Rapport de vol',
     newAnalysis: 'Nouvelle analyse',
+    flightsAria: 'Vols analysés',
     fileAria: (fileName: string): string => `Rapport ${fileName}`,
     validSessions: (count: number): string =>
       `${count} ${count > 1 ? 'sessions valides' : 'session valide'}`,
@@ -128,9 +136,34 @@ export const ui = {
       `${count} ${count > 1 ? 'ignorées' : 'ignorée'}`,
     skippedSession: (index: string, error: string, size: string): string =>
       `Session ${index} ignorée - ${error} (${size})`,
+    /** Bloc global sous les onglets : fichiers dont aucune session n'est exploitable. */
+    skippedOrphanSummary: (count: number): string =>
+      count > 1
+        ? `${count} sessions ignorées - fichiers sans vol exploitable`
+        : `1 session ignorée - fichier sans vol exploitable`,
+    /** Bloc du vol affiché : sessions écartées du même fichier. */
+    skippedInFileSummary: (count: number): string =>
+      count > 1
+        ? `${count} autres sessions ignorées dans ce fichier`
+        : `1 autre session ignorée dans ce fichier`,
     sessionLabel: (index: string): string => `Session ${index}`,
     sessionSublabel: (duration: string, start: string): string => `${duration} · t+${start}`,
     noUsableSession: 'Aucune session exploitable dans ce fichier - voir les raisons ci-dessus.',
+    /** Tranche grise de la jauge et chip grisée : axe sans données dans le log. */
+    axisNotEvaluated: (label: string): string => `${label} : non évaluée - données absentes du log`,
+    scoreCappedNote: "Score plafonné à 95 : un axe n'est pas mesuré (zone grise).",
+    /** Tooltip d'une tranche de la jauge. */
+    axisNoData: 'non évaluée - données absentes',
+    axisShare: (pct: number): string => `${pct} % du score`,
+    axisGoto: 'Clic : voir les verdicts de cet axe',
+    axisDetails: {
+      securite: 'Failsafe déclenché en vol.',
+      vibrations: 'Bruit mécanique du gyro brut, résonance châssis, balourd hélice/moteur.',
+      filtres: 'Atténuation du bruit moteur, bruit résiduel après filtrage, fuites hautes fréquences.',
+      pid: 'Suivi de consigne, réponse indicielle (dépassement, lenteur, stabilisation), oscillations, prop wash, yoyo.',
+      moteurs: 'Saturation, déséquilibre entre moteurs, désynchronisations.',
+      batterie: 'Sag sous charge, décharge profonde, cohérence du capteur, nombre de cellules.',
+    },
     profileTag: (label: string): string => `profil ${label}`,
     tileDuration: 'Durée de session',
     tileSampleRate: 'Échantillonnage',
@@ -140,6 +173,7 @@ export const ui = {
     batteryNoVbat: 'pas de mesure vbat',
     tileMaxCurrent: 'Courant max',
     currentAvg: (avg: string): string => `moyenne ${avg} A`,
+    currentUnreliable: 'capteur non fiable, valeur ignorée',
     tileSaturation: 'Saturation moteurs',
     tileFlightTime: 'Temps de vol',
     flightTimeHint: "throttle réellement en l'air",
@@ -184,9 +218,10 @@ export const ui = {
     buttonLabel: (count: number): string =>
       count > 1 ? `Partager les ${count} logs` : 'Partager ce log',
     sending: 'Envoi en cours…',
+    sendingPart: (done: number, total: number): string => `Envoi ${done}/${total}…`,
     sent: 'Log envoyé - merci !',
     error: "Échec de l'envoi - réessaie plus tard.",
-    tooLarge: 'Log trop volumineux pour être partagé automatiquement.',
+    tooLarge: 'Plus de 100 Mo de logs - trop volumineux pour un envoi automatique.',
   },
 
   shareLink: {
@@ -211,6 +246,65 @@ export const ui = {
     decodeErrorVersion: "Ce lien vient d'une version plus récente du site. Recharge la page, puis redemande-le.",
   },
 
+  // ChartHelp - bouton « Comment lire » + panneau latéral pédagogique par graphe.
+  chartHelp: {
+    buttonLabel: 'Comment lire',
+    buttonAria: (chart: string): string => `Comment lire : ${chart}`,
+    closeAria: "Fermer l'aide",
+    readTitle: 'Comment la lire',
+    examplesTitle: 'Exemples',
+    goodTag: 'Bien',
+    badTag: 'Pas bien',
+    timeline: {
+      title: 'La timeline du vol',
+      intro:
+        'Cette frise raconte la session de gauche à droite : ce que faisait le quad (au sol, gaz bas, en vol), la tension batterie en surimpression, et les incidents détectés.',
+      points: [
+        'Chaque couleur est un état : les blocs verts sont les moments réellement en vol.',
+        'La ligne jaune est la tension batterie : elle doit descendre doucement et régulièrement pendant le vol.',
+        "Un triangle d'alerte marque un incident détecté : sa position dit quand, son étiquette la fréquence mesurée.",
+        "Une chute brutale de la ligne jaune = la batterie s'écroule sous la charge (batterie fatiguée ou trop sollicitée).",
+      ],
+      examples: {
+        good: 'Vol continu, tension en pente douce, aucun marqueur : rien à signaler.',
+        bad: "Marqueurs d'alerte en plein vol et tension qui plonge par à-coups : incidents à corriger, batterie qui souffre.",
+      },
+    },
+    spectrum: {
+      title: 'Le spectre gyro',
+      intro:
+        'Un quad vibre toujours un peu. Ce graphe trie ces vibrations par fréquence (en Hz) : à gauche les lentes, à droite les rapides. Plus un pic est haut, plus la vibration est forte.',
+      points: [
+        "Un pic fin près de la ligne pointillée « moteurs » est normal : c'est la rotation des hélices.",
+        "La zone « résonance » doit rester basse : une bosse ici, c'est le châssis qui vibre (le jello à l'image).",
+        'Partout ailleurs, la courbe doit rester collée en bas (le « plancher »).',
+        'Les trois couleurs sont les trois axes (Roll, Pitch, Yaw) : ils doivent avoir la même allure.',
+        "Si les courbes s'arrêtent avant le bord droit (zone hachurée « non mesurable »), le log est enregistré trop lentement : le spectre ne peut rien voir au-delà de la moitié de la cadence d'enregistrement. Logue plus vite (blackbox_sample_rate) pour couvrir toute la plage.",
+      ],
+      examples: {
+        good: 'Plancher bas et plat, un seul pic fin à la fréquence des moteurs : quad sain.',
+        bad: 'Grosse bosse dans la zone résonance et plancher chargé : vibrations mécaniques - vérifie hélices, roulements et fixations.',
+      },
+    },
+    step: {
+      title: 'La réponse indicielle',
+      intro:
+        "On simule un coup de stick franc et on regarde comment le quad suit l'ordre. La ligne pointillée « cible 1.0 » est exactement l'ordre demandé : la courbe idéale y monte vite et y reste.",
+      points: [
+        'La courbe doit grimper vite vers la cible : plus elle monte tôt, plus le quad répond vite.',
+        'Un léger dépassement au-dessus de la cible (moins de ~15 %) est acceptable.',
+        'Après le pic, la courbe doit se poser sur la ligne cible sans faire de vagues.',
+        'Des rebonds répétés = le quad oscille après chaque ordre : tune trop nerveux.',
+      ],
+      examples: {
+        good: 'Montée franche, léger dépassement, puis la courbe se pose sur la cible : tune équilibré.',
+        bad: 'Gros dépassement puis rebonds : le quad sur-réagit et oscille (P trop haut ou D trop bas).',
+        badSlow:
+          "Montée molle qui n'atteint la cible que très tard : le quad traîne derrière les sticks (P faible ou filtrage trop lourd).",
+      },
+    },
+  },
+
   // Graphes SVG - objets plats passés en prop `labels` (composants purs, sans hook).
   charts: {
     spectrum: {
@@ -221,6 +315,7 @@ export const ui = {
       bandMotors: 'moteurs',
       xAxis: 'Fréquence (Hz)',
       motorLine: (hz: string): string => `moteurs ~${hz} Hz`,
+      beyondNyquist: (hz: string): string => `non mesurable - log enregistré à ${hz} Hz`,
     },
     step: {
       title: 'Réponse indicielle (0–500 ms)',

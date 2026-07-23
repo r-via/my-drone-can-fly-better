@@ -59,6 +59,11 @@ function makeStep(over: Partial<AxisStepResponse> = {}): AxisStepResponse {
     overshootPct: 10,
     settleValue: 1.0,
     quality: 0.8,
+    ms: 1.2, // boucle amortie : sous msWarn (1.5)
+    msFreqHz: 28,
+    mtDb: 0.9,
+    mtFreqHz: 24,
+    msBandTopHz: 26,
     ...over,
   };
 }
@@ -75,6 +80,8 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
       sagV: 1.2, // 0.2 V/cellule : sain
       ampAvg: 10,
       ampMax: 40,
+      ampP99: 38,
+      ampImplausible: false,
       mahEstimate: 800,
       perCellMinSustained: 3.8,
       implausibleSamples: 0,
@@ -121,9 +128,9 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
     filters: {
       available: true,
       axes: [
-        { attenuationDb: [{ lo: 120, hi: 350, db: 25 }], residualHfRms: 0.5 },
-        { attenuationDb: [{ lo: 120, hi: 350, db: 24 }], residualHfRms: 0.6 },
-        { attenuationDb: [{ lo: 120, hi: 350, db: 26 }], residualHfRms: 0.4 },
+        { attenuationDb: [{ lo: 120, hi: 350, db: 25 }], residualHfRms: 0.5, motorBandUnfiltRms: 200 },
+        { attenuationDb: [{ lo: 120, hi: 350, db: 24 }], residualHfRms: 0.6, motorBandUnfiltRms: 200 },
+        { attenuationDb: [{ lo: 120, hi: 350, db: 26 }], residualHfRms: 0.4, motorBandUnfiltRms: 200 },
       ],
     },
     timeline: { segments: [], flightTimeS: 110, throttleMaxUs: 1600 },
@@ -280,7 +287,11 @@ describe('evaluateSession', () => {
     const a = makeAnalysis((x) => {
       if (!x.spectrum || !x.filters.axes) throw new Error('spectrum/filters requis');
       x.spectrum.dominantPeak = { freqHz: 137, axis: 1, nearestMotor: 2, distanceHz: 1 };
-      x.filters.axes[1] = { attenuationDb: [{ lo: 120, hi: 350, db: 8 }], residualHfRms: 0.6 };
+      x.filters.axes[1] = {
+        attenuationDb: [{ lo: 120, hi: 350, db: 8 }],
+        residualHfRms: 0.6,
+        motorBandUnfiltRms: 200, // au-dessus du plancher : la faible atténuation est jugée
+      };
     });
     const findings = evaluateSession(a, chimera);
     checkShape(findings);
@@ -290,6 +301,30 @@ describe('evaluateSession', () => {
     expect(peak?.evidence).toContain('137');
     expect(peak?.detail).toMatch(/RPM/); // atténuation 8 dB < 15 → filtre RPM suspecté off
     // filters-weak déclenche aussi (8 dB < 15 dB)
+    expect(ids(findings)).toContain('filters-weak');
+  });
+
+  it('quad propre : atténuation faible mais brut sous le plancher → pas de filters-weak', () => {
+    // Cas réel signalé (JeNo 5" tune final) : brut 50-77, filtré 17-22, ratio
+    // ~10 dB. Blackbox Explorer le juge parfait - il n'y a rien à filtrer.
+    const a = makeAnalysis((x) => {
+      if (!x.filters.axes) throw new Error('filters requis');
+      x.filters.axes[0] = { attenuationDb: [{ lo: 120, hi: 350, db: 9.6 }], residualHfRms: 17, motorBandUnfiltRms: 50 };
+      x.filters.axes[1] = { attenuationDb: [{ lo: 120, hi: 350, db: 11.6 }], residualHfRms: 20, motorBandUnfiltRms: 77 };
+      x.filters.axes[2] = { attenuationDb: [{ lo: 120, hi: 350, db: 10.3 }], residualHfRms: 22, motorBandUnfiltRms: 72 };
+    });
+    const findings = evaluateSession(a, chimera);
+    checkShape(findings);
+    expect(ids(findings)).not.toContain('filters-weak');
+  });
+
+  it('quad bruité : même atténuation, brut au-dessus du plancher → filters-weak', () => {
+    const a = makeAnalysis((x) => {
+      if (!x.filters.axes) throw new Error('filters requis');
+      x.filters.axes[0] = { attenuationDb: [{ lo: 120, hi: 350, db: 9.6 }], residualHfRms: 34, motorBandUnfiltRms: 150 };
+    });
+    const findings = evaluateSession(a, chimera);
+    checkShape(findings);
     expect(ids(findings)).toContain('filters-weak');
   });
 
@@ -329,6 +364,37 @@ describe('evaluateSession', () => {
     expect(findings.find((fd) => fd.id === 'log-quality')?.fix?.cli).toEqual([
       'set blackbox_sample_rate = 1/1',
     ]);
+  });
+
+  it('mesure vbat seule HS → battery-readings-implausible en warn, fix vbat_scale', () => {
+    const a = makeAnalysis((x) => {
+      if (x.power) x.power.implausibleSamples = 500;
+    });
+    const findings = evaluateSession(a, chimera);
+    checkShape(findings);
+    const fd = findings.find((y) => y.id === 'battery-readings-implausible');
+    expect(fd).toBeDefined();
+    expect(fd?.severity).toBe('warn');
+    expect(fd?.fix?.text).toContain('vbat_scale');
+    expect(fd?.fix?.text).not.toContain('ibata_scale');
+  });
+
+  it('vbat ET courant HS → escalade crit, fix vbat_scale / ibata_scale', () => {
+    const a = makeAnalysis((x) => {
+      if (x.power) {
+        x.power.implausibleSamples = 500;
+        x.power.ampMax = 326; // lecture de capteur, pas un courant
+        x.power.ampP99 = 62;
+        x.power.ampImplausible = true;
+      }
+    });
+    const findings = evaluateSession(a, chimera);
+    checkShape(findings);
+    const fd = findings.find((y) => y.id === 'battery-readings-implausible');
+    expect(fd).toBeDefined();
+    expect(fd?.severity).toBe('crit');
+    expect(fd?.detail).toContain('326');
+    expect(fd?.fix?.text).toContain('ibata_scale');
   });
 
   it('mauvais pack : 4S sur le pico → battery-cells-unexpected', () => {

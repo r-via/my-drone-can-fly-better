@@ -420,7 +420,9 @@ export function lintConfig(
     });
   }
 
-  // ff-zero - feedforward coupé sur tous les axes renseignés.
+  // ff-zero - feedforward coupé sur tous les axes renseignés. Zéro PARTOUT est
+  // précisément la signature d'un choix délibéré (« team no FF »), pas d'un
+  // oubli : on le mentionne mais ça ne coûte pas de points au score.
   const ffKeys = ['f_roll', 'f_pitch', 'f_yaw', 'ff_weight'];
   const ffPresent = ffKeys.filter((k) => v[k] !== undefined);
   if (ffPresent.length > 0 && ffPresent.every((k) => num(k) === 0)) {
@@ -432,6 +434,7 @@ export function lintConfig(
       detail: L.ffZero.detail,
       evidence: ffPresent.map((k) => `${k} = ${v[k]}`).join(', '),
       fix: { text: L.ffZero.fix },
+      scoreExempt: true,
     });
   }
 
