@@ -644,7 +644,7 @@ export const de: Dict = {
     shareLog: {
       title: 'Hilf mit, das Tool zu verbessern',
       description:
-        'Schickt das/die rohe(n) .bbl-Log(s) dieser Analyse an Rémi (den Dev der Seite), in einen privaten Kanal. Hilft, echte Fälle zu finden, die die Regeln übersehen. Es wird nichts gesendet, bevor du auf den Button klickst.',
+        'Schickt das/die rohe(n) .bbl-Log(s) dieser Analyse an Rémi (den Dev der Seite): die Datei landet im privaten Speicher der Seite und ein Download-Link wird in einen privaten Kanal gepostet. Hilft, echte Fälle zu finden, die die Regeln übersehen. Es wird nichts gesendet, bevor du auf den Button klickst.',
       buttonLabel: (count: number): string =>
         count > 1 ? `${count} Logs teilen` : 'Dieses Log teilen',
       sending: 'Wird gesendet…',

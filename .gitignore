@@ -6,3 +6,6 @@ next-env.d.ts
 
 # env files (secrets - never commit)
 .env*.local
+
+# Local Netlify folder
+.netlify

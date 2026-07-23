@@ -29,9 +29,10 @@ npm test           # 125 tests, including goldens vs the reference Python script
 
 Node 20 or newer (Next 15 and the WASM parser both need it).
 
-The "share this log" opt-in at the bottom of a report calls a Netlify Function
-(`netlify/functions/submit-log.ts`), which `next dev` alone does not run. To
-exercise it locally, use the
+The "share this log" opt-in at the bottom of a report calls a Netlify Edge
+Function (`netlify/edge-functions/submit-log.ts`), which `next dev` alone does
+not run. Same for the OG share preview (`netlify/functions/share-preview.ts`).
+To exercise them locally, use the
 [Netlify CLI](https://docs.netlify.com/cli/get-started/):
 
 ```bash
@@ -230,15 +231,20 @@ Static export, no server needed for the analysis itself. `netlify.toml` holds
 the whole config: `npm run build`, publish `out/`, functions in
 `netlify/functions`.
 
-The one server-side piece is optional. `netlify/functions/submit-log.ts` is a
-proxy behind the "help improve the tool" opt-in at the bottom of a report: it
-relays the raw `.bbl` to a private Discord webhook, caps the payload at 7.5 MB,
-and reads `DISCORD_WEBHOOK_URL` from the environment so the webhook never
-reaches the client bundle. The client calls the native function path
-(`/.netlify/functions/submit-log`), which works in production and under
-`netlify dev` without a redirect rule. Without the environment variable the
-endpoint answers `not_configured` and the rest of the site is unaffected.
-Nothing leaves the browser unless the user explicitly asks for it.
+The server-side pieces are optional. `netlify/edge-functions/submit-log.ts`
+sits behind the "help improve the tool" opt-in at the bottom of a report: the
+client gzips the raw `.bbl` (native CompressionStream) and streams it in a
+single request (edge functions have no 6 MB body cap, unlike synchronous
+functions). The file lands in the private `shared-logs` Netlify Blobs store,
+and the Discord webhook receives a plain message with a download link served
+by `netlify/edge-functions/log-download.ts` (`/api/log/<uuid>` - the
+unguessable id is the access control). No chunking, no attachment-size limit.
+`DISCORD_WEBHOOK_URL` comes from the environment so the webhook never reaches
+the client bundle; without it the endpoint answers `not_configured` and the
+rest of the site is unaffected. `netlify/functions/share-preview.ts` serves
+the OG preview for `/s` share links (title and description come from the query
+string; the report itself stays in the URL fragment, which crawlers never
+see). Nothing leaves the browser unless the user explicitly asks for it.
 
 ### Offline
 

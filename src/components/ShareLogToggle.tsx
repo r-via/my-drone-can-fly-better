@@ -13,24 +13,12 @@ export interface ShareLogToggleProps {
 type Status = 'idle' | 'sending' | 'sent' | 'error' | 'too-large';
 
 /**
- * Taille d'un morceau envoyé : sous la limite de payload d'une fonction Netlify
- * (6 Mo) et très en dessous de la pièce jointe d'un webhook Discord (8 Mo).
- * Un log plus gros est gzippé puis découpé en N morceaux envoyés séquentiellement,
- * chacun dans son propre message Discord (`.gz.partXX-of-NN`, réassemblage par cat).
+ * Garde-fou aligné sur l'Edge Function submit-log. L'upload est streamé (pas
+ * de plafond de fonction synchrone) et le fichier finit dans le store Blobs du
+ * site avec un lien posté sur le salon - aucune limite de pièce jointe Discord,
+ * donc aucun découpage : un fichier = une requête.
  */
-const CHUNK_BYTES = 5_000_000;
-
-/** Garde-fou : au-delà, même découpé, l'envoi spammerait le salon. */
 const MAX_TOTAL_BYTES = 100_000_000;
-
-/** Un morceau à poster : un fragment de fichier (gzippé si utile) + son contexte. */
-interface UploadJob {
-  blob: Blob;
-  name: string;
-  originalName: string;
-  part: number;
-  parts: number;
-}
 
 /**
  * Gzip via CompressionStream (natif navigateur). Fallback : fichier brut si
@@ -45,26 +33,6 @@ async function compress(f: File): Promise<{ blob: Blob; name: string }> {
   } catch {
     return { blob: f, name: f.name };
   }
-}
-
-/** Découpe chaque fichier compressé en morceaux ≤ CHUNK_BYTES. */
-function buildJobs(prepared: Array<{ blob: Blob; name: string }>, files: File[]): UploadJob[] {
-  const jobs: UploadJob[] = [];
-  prepared.forEach((p, fi) => {
-    const parts = Math.max(1, Math.ceil(p.blob.size / CHUNK_BYTES));
-    for (let i = 0; i < parts; i++) {
-      const nn = String(parts).padStart(2, '0');
-      const ii = String(i + 1).padStart(2, '0');
-      jobs.push({
-        blob: p.blob.slice(i * CHUNK_BYTES, (i + 1) * CHUNK_BYTES),
-        name: parts > 1 ? `${p.name}.part${ii}-of-${nn}` : p.name,
-        originalName: files[fi].name,
-        part: i + 1,
-        parts,
-      });
-    }
-  });
-  return jobs;
 }
 
 export default function ShareLogToggle({ files, craftNames }: ShareLogToggleProps) {
@@ -87,27 +55,18 @@ export default function ShareLogToggle({ files, craftNames }: ShareLogToggleProp
     }
     setStatus('sending');
     try {
-      const prepared = await Promise.all(files.map(compress));
-      const jobs = buildJobs(prepared, files);
-      for (let i = 0; i < jobs.length; i++) {
-        setProgress({ done: i + 1, total: jobs.length });
-        const j = jobs[i];
-        const body = new FormData();
-        body.append('file0', j.blob, j.name);
-        body.append(
-          'meta',
-          JSON.stringify({
-            craftNames,
-            locale,
-            fileCount: files.length,
-            originalName: j.originalName,
-            part: j.part,
-            parts: j.parts,
-          }),
-        );
-        // Chemin natif des Netlify Functions - fonctionne sans redirect dédié,
-        // que ce soit en prod ou via `netlify dev` en local (voir README).
-        const res = await fetch('/.netlify/functions/submit-log', { method: 'POST', body });
+      for (let i = 0; i < files.length; i++) {
+        setProgress({ done: i + 1, total: files.length });
+        const { blob, name } = await compress(files[i]);
+        const qs = new URLSearchParams({
+          name,
+          craft: craftNames.join(', '),
+          locale,
+        });
+        const res = await fetch(`/api/submit-log?${qs.toString()}`, {
+          method: 'POST',
+          body: blob,
+        });
         if (!res.ok) throw new Error('upstream');
       }
       setStatus('sent');

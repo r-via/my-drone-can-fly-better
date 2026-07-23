@@ -645,7 +645,7 @@ export const es: Dict = {
     shareLog: {
       title: 'Ayudar a mejorar la herramienta',
       description:
-        'Envía el/los log(s) .bbl bruto(s) de este análisis a Rémi (el dev del sitio), a un canal privado. Sirve para detectar casos reales que las reglas no pillan. No se envía nada hasta que pulses el botón.',
+        'Envía el/los log(s) .bbl bruto(s) de este análisis a Rémi (el dev del sitio): el archivo se deposita en el almacenamiento privado del sitio y se publica un enlace de descarga en un canal privado. Sirve para detectar casos reales que las reglas no pillan. No se envía nada hasta que pulses el botón.',
       buttonLabel: (count: number): string =>
         count > 1 ? `Compartir los ${count} logs` : 'Compartir este log',
       sending: 'Enviando…',

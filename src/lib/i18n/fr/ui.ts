@@ -214,7 +214,7 @@ export const ui = {
   shareLog: {
     title: "Aider à améliorer l'outil",
     description:
-      "Envoie le(s) log(s) .bbl brut(s) de cette analyse à Rémi (dev du site), sur un salon privé. Ça sert à repérer des cas réels que les règles ratent. Rien n'est envoyé tant que tu n'as pas cliqué sur le bouton.",
+      "Envoie le(s) log(s) .bbl brut(s) de cette analyse à Rémi (dev du site) : le fichier est déposé sur le stockage privé du site et un lien de téléchargement est posté sur un salon privé. Ça sert à repérer des cas réels que les règles ratent. Rien n'est envoyé tant que tu n'as pas cliqué sur le bouton.",
     buttonLabel: (count: number): string =>
       count > 1 ? `Partager les ${count} logs` : 'Partager ce log',
     sending: 'Envoi en cours…',

@@ -656,7 +656,7 @@ export const en: Dict = {
     shareLog: {
       title: 'Help improve the tool',
       description:
-        "Sends the raw .bbl log(s) from this analysis to Rémi (the site's dev), on a private channel. Helps catch real-world cases the rules miss. Nothing is sent unless you click the button.",
+        "Sends the raw .bbl log(s) from this analysis to Rémi (the site's dev): the file goes to the site's private storage and a download link is posted on a private channel. Helps catch real-world cases the rules miss. Nothing is sent unless you click the button.",
       buttonLabel: (count: number): string =>
         count > 1 ? `Share the ${count} logs` : 'Share this log',
       sending: 'Sending…',
