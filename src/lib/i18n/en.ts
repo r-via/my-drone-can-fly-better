@@ -674,7 +674,7 @@ export const en: Dict = {
     shareLink: {
       title: 'Share this report',
       description:
-        'The whole report fits inside the link itself: nothing is stored on a server, and your .bbl never leaves your machine. Whoever opens it sees this report in their own language.',
+        'Copies a short link to this report, valid for 15 days. Only the computed report (scores, verdicts, charts) is stored on the server - never your .bbl, which stays on your machine. Whoever opens it sees this report in their own language.',
       button: 'Copy link',
       copied: 'Copied to clipboard',
       copiedSr: 'Share link copied to clipboard',
@@ -691,7 +691,7 @@ export const en: Dict = {
       bannerCta: 'Analyse my log',
       decodeErrorMalformed: 'This share link is incomplete or damaged.',
       decodeErrorVersion: 'This link comes from a newer version of the site. Reload the page, then ask for it again.',
-      fetchError: 'Report not found: this short link does not exist or is no longer available.',
+      fetchError: 'Report not found: this short link does not exist or has expired (share links live for 15 days).',
     },
 
     chartHelp: {

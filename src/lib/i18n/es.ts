@@ -663,7 +663,7 @@ export const es: Dict = {
     shareLink: {
       title: 'Compartir este informe',
       description:
-        'El informe entero cabe en el propio enlace: no se guarda nada en ningún servidor y tu .bbl no sale de tu máquina. Quien lo abra verá este informe en su propio idioma.',
+        'Copia un enlace corto a este informe, válido durante 15 días. Solo se guarda en el servidor el informe calculado (puntuaciones, veredictos, curvas) - nunca tu .bbl, que no sale de tu máquina. Quien lo abra verá este informe en su propio idioma.',
       button: 'Copiar enlace',
       copied: 'Copiado al portapapeles',
       copiedSr: 'Enlace de compartir copiado al portapapeles',
@@ -680,7 +680,7 @@ export const es: Dict = {
       bannerCta: 'Analizar mi log',
       decodeErrorMalformed: 'Este enlace para compartir está incompleto o dañado.',
       decodeErrorVersion: 'Este enlace viene de una versión más reciente del sitio. Recarga la página y vuelve a pedirlo.',
-      fetchError: 'Informe no encontrado: este enlace corto no existe o ya no está disponible.',
+      fetchError: 'Informe no encontrado: este enlace corto no existe o ha caducado (los enlaces para compartir duran 15 días).',
     },
 
     chartHelp: {

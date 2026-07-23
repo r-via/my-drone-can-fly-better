@@ -662,7 +662,7 @@ export const de: Dict = {
     shareLink: {
       title: 'Diesen Bericht teilen',
       description:
-        'Der ganze Bericht steckt im Link selbst: nichts wird auf einem Server abgelegt, und dein .bbl verlässt deinen Rechner nicht. Wer ihn öffnet, sieht diesen Bericht in seiner eigenen Sprache.',
+        'Kopiert einen 15 Tage gültigen Kurzlink zu diesem Bericht. Nur der berechnete Bericht (Scores, Urteile, Kurven) wird auf dem Server abgelegt - nie dein .bbl, das deinen Rechner nicht verlässt. Wer ihn öffnet, sieht diesen Bericht in seiner eigenen Sprache.',
       button: 'Link kopieren',
       copied: 'In die Zwischenablage kopiert',
       copiedSr: 'Teilen-Link in die Zwischenablage kopiert',
@@ -680,7 +680,7 @@ export const de: Dict = {
       decodeErrorMalformed: 'Dieser Teilen-Link ist unvollständig oder beschädigt.',
       decodeErrorVersion:
         'Dieser Link stammt aus einer neueren Version der Seite. Lade die Seite neu und frag ihn noch einmal an.',
-      fetchError: 'Bericht nicht gefunden: dieser Kurzlink existiert nicht oder ist nicht mehr verfügbar.',
+      fetchError: 'Bericht nicht gefunden: dieser Kurzlink existiert nicht oder ist abgelaufen (Teilen-Links gelten 15 Tage).',
     },
 
     chartHelp: {

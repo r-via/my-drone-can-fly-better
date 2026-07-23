@@ -672,7 +672,7 @@ export const zh: Dict = {
     shareLink: {
       title: '分享这份报告',
       description:
-        '整份报告都装在链接本身里：不会存到任何服务器，你的 .bbl 也不会离开你的电脑。打开链接的人会看到这份报告的本地语言版本。',
+        '复制这份报告的短链接，有效期 15 天。服务器上只保存计算出的报告（评分、结论、曲线），绝不保存你的 .bbl，它不会离开你的电脑。打开链接的人会看到这份报告的本地语言版本。',
       button: '复制链接',
       copied: '已复制到剪贴板',
       copiedSr: '分享链接已复制到剪贴板',
@@ -687,7 +687,7 @@ export const zh: Dict = {
       bannerCta: '分析我的日志',
       decodeErrorMalformed: '这个分享链接不完整或已损坏。',
       decodeErrorVersion: '这个链接来自更新版本的网站。请刷新页面后重新索取。',
-      fetchError: '找不到报告：这个短链接不存在或已不可用。',
+      fetchError: '找不到报告：这个短链接不存在或已过期（分享链接有效期 15 天）。',
     },
 
     chartHelp: {

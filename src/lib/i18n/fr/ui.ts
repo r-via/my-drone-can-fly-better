@@ -233,7 +233,7 @@ export const ui = {
   shareLink: {
     title: 'Partager ce rapport',
     description:
-      "Le rapport entier tient dans le lien lui-même : rien n'est déposé sur un serveur, et ton .bbl ne quitte pas ta machine. Qui l'ouvre voit ce rapport dans sa propre langue.",
+      "Copie un lien court vers ce rapport, valable 15 jours. Seul le rapport calculé (scores, verdicts, courbes) est déposé sur le serveur - jamais ton .bbl, qui ne quitte pas ta machine. Qui l'ouvre voit ce rapport dans sa propre langue.",
     button: 'Copier le lien',
     copied: 'Copié dans le presse-papiers',
     copiedSr: 'Lien de partage copié dans le presse-papiers',
@@ -250,7 +250,8 @@ export const ui = {
     bannerCta: 'Analyser mon log',
     decodeErrorMalformed: 'Ce lien de partage est incomplet ou abîmé.',
     decodeErrorVersion: "Ce lien vient d'une version plus récente du site. Recharge la page, puis redemande-le.",
-    fetchError: "Rapport introuvable : ce lien court n'existe pas ou n'est plus disponible.",
+    fetchError:
+      "Rapport introuvable : ce lien court n'existe pas ou a expiré (un lien de partage vit 15 jours).",
   },
 
   // ChartHelp - bouton « Comment lire » + panneau latéral pédagogique par graphe.
