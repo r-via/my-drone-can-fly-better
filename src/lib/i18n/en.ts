@@ -742,6 +742,7 @@ export const en: Dict = {
           'A slight overshoot above the target (under ~15%) is acceptable.',
           'After the peak, the curve should settle on the target line without waves.',
           'Repeated bounces mean the quad oscillates after every input: the tune is too aggressive.',
+          'A dimmed dashed curve is not judged: the flight has too little stick input to measure it reliably, its shape may be a pure artifact.',
         ],
         examples: {
           good: 'Sharp rise, slight overshoot, then the curve settles on the target: balanced tune.',
@@ -771,6 +772,8 @@ export const en: Dict = {
         targetLine: 'target 1.0',
         xAxis: 'Time (ms)',
         axisMissing: (axis: string): string => `${axis} (n/a)`,
+        axisUnreliable: (axis: string): string => `${axis}*`,
+        unreliableNote: '* dimmed curve: not enough stick input, axis not judged',
         noData: 'Not enough stick input to estimate the response.',
       },
       timeline: {

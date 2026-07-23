@@ -738,6 +738,7 @@ export const zh: Dict = {
           '略微冲过目标（超调 ~15% 以内）可以接受。',
           '过峰后曲线应平稳落在目标线上，不再起伏。',
           '反复回弹说明每次打杆后飞机都在震荡：调参过于激进。',
+          '淡色虚线曲线不参与评判：这段飞行的打杆激励太少，无法可靠测量，其形状可能纯属伪影。',
         ],
         examples: {
           good: '干脆上升，轻微超调，然后稳稳落在目标线上：调参均衡。',
@@ -766,6 +767,8 @@ export const zh: Dict = {
         targetLine: '目标 1.0',
         xAxis: '时间（ms）',
         axisMissing: (axis: string): string => `${axis}（n/a）`,
+        axisUnreliable: (axis: string): string => `${axis}*`,
+        unreliableNote: '* 淡色曲线：摇杆激励不足，该轴未参与评判',
         noData: '摇杆激励不足，无法估计响应。',
       },
       timeline: {

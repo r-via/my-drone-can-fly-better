@@ -731,6 +731,7 @@ export const de: Dict = {
           'Ein leichtes Überschwingen über das Ziel (unter ~15 %) ist in Ordnung.',
           'Nach der Spitze soll sich die Kurve ohne Wellen auf die Ziellinie legen.',
           'Wiederholte Schwinger heißen: der Quad oszilliert nach jedem Befehl, der Tune ist zu nervös.',
+          'Eine blasse, gestrichelte Kurve wird nicht bewertet: der Flug enthält zu wenig Stick-Anregung für eine zuverlässige Messung, ihre Form kann ein reines Artefakt sein.',
         ],
         examples: {
           good: 'Zackiger Anstieg, leichtes Überschwingen, dann legt sich die Kurve aufs Ziel: ausgewogener Tune.',
@@ -759,6 +760,8 @@ export const de: Dict = {
         targetLine: 'Ziel 1.0',
         xAxis: 'Zeit (ms)',
         axisMissing: (axis: string): string => `${axis} (n/a)`,
+        axisUnreliable: (axis: string): string => `${axis}*`,
+        unreliableNote: '* blasse Kurve: zu wenig Stick-Anregung, Achse nicht bewertet',
         noData: 'Nicht genug Stick-Anregung, um die Antwort zu schätzen.',
       },
       timeline: {

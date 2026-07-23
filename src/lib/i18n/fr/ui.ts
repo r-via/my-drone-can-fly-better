@@ -303,6 +303,7 @@ export const ui = {
         'Un léger dépassement au-dessus de la cible (moins de ~15 %) est acceptable.',
         'Après le pic, la courbe doit se poser sur la ligne cible sans faire de vagues.',
         'Des rebonds répétés = le quad oscille après chaque ordre : tune trop nerveux.',
+        "Une courbe estompée en pointillé n'est pas jugée : le vol ne contient pas assez de coups de sticks pour la mesurer de façon fiable, sa forme peut être un pur artefact.",
       ],
       examples: {
         good: 'Montée franche, léger dépassement, puis la courbe se pose sur la cible : tune équilibré.',
@@ -332,6 +333,8 @@ export const ui = {
       targetLine: 'cible 1.0',
       xAxis: 'Temps (ms)',
       axisMissing: (axis: string): string => `${axis} (n/a)`,
+      axisUnreliable: (axis: string): string => `${axis}*`,
+      unreliableNote: '* courbe estompée : excitation stick insuffisante, axe non jugé',
       noData: "Pas assez d'excitation stick pour estimer la réponse.",
     },
     timeline: {

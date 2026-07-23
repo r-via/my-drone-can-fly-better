@@ -731,6 +731,7 @@ export const es: Dict = {
           'Un ligero rebase por encima del objetivo (menos de ~15 %) es aceptable.',
           'Tras el pico, la curva debe asentarse en la línea objetivo sin hacer olas.',
           'Rebotes repetidos significan que el quad oscila tras cada orden: tune demasiado nervioso.',
+          'Una curva atenuada y discontinua no se evalúa: el vuelo tiene muy poca excitación de stick para medirla con fiabilidad, su forma puede ser puro artefacto.',
         ],
         examples: {
           good: 'Subida franca, ligero rebase y la curva se asienta en el objetivo: tune equilibrado.',
@@ -759,6 +760,8 @@ export const es: Dict = {
         targetLine: 'objetivo 1.0',
         xAxis: 'Tiempo (ms)',
         axisMissing: (axis: string): string => `${axis} (n/a)`,
+        axisUnreliable: (axis: string): string => `${axis}*`,
+        unreliableNote: '* curva atenuada: excitación de stick insuficiente, eje no evaluado',
         noData: 'No hay suficiente excitación de stick para estimar la respuesta.',
       },
       timeline: {

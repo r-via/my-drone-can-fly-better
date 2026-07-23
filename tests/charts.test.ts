@@ -161,6 +161,14 @@ describe('buildStepPaths', () => {
     expect(ticksY.map((t) => t.label)).toContain('2');
   });
 
+  it('un axe sous MIN_STEP_QUALITY ne dicte pas l’échelle Y', () => {
+    // Pic artefact à 2.0 sur un axe non fiable : yMax reste 1.5 (piloté par
+    // l'axe fiable à 1.2), la courbe artefact sera écrêtée, pas l'échelle.
+    const artefact = { ...makeStep(2.0), quality: 0.05 };
+    const { targetY } = buildStepPaths([artefact, makeStep(1.2), null], W, H);
+    expect(targetY).toBeCloseTo(H / 3, 1);
+  });
+
   it('la ligne cible coïncide avec le tick Y "1"', () => {
     const { targetY, ticksY } = buildStepPaths([makeStep(1.3), makeStep(1.2), makeStep(1.05)], W, H);
     const tick1 = ticksY.find((t) => t.label === '1');

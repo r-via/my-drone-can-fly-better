@@ -10,6 +10,7 @@
 
 import * as React from 'react';
 import type { JSX } from 'react';
+import { MIN_STEP_QUALITY } from '../../lib/analysis/step';
 import type { AxisStepResponse } from '../../lib/types';
 import { AXIS_NAMES } from '../../lib/types';
 
@@ -71,10 +72,12 @@ export function buildStepPaths(
   ticksX: Array<{ x: number; label: string }>;
   ticksY: Array<{ y: number; label: string }>;
 } {
-  // Y : 0 → max(1.5, pic observé sur les axes disponibles).
+  // Y : 0 → max(1.5, pic observé sur les axes FIABLES). Un axe sous
+  // MIN_STEP_QUALITY est un artefact de déconvolution : son pic ne doit pas
+  // dicter l'échelle des axes jugés - sa courbe (estompée) est écrêtée à yMax.
   let peak = 0;
   for (const ax of axes) {
-    if (!ax) continue;
+    if (!ax || ax.quality < MIN_STEP_QUALITY) continue;
     const n = Math.min(ax.t.length, ax.y.length);
     for (let i = 0; i < n; i++) {
       if (ax.t[i] <= X_MAX_S && ax.y[i] > peak) peak = ax.y[i];
@@ -103,6 +106,8 @@ export interface StepChartLabels {
   targetLine: string;
   xAxis: string;
   axisMissing: (axis: string) => string;
+  axisUnreliable: (axis: string) => string;
+  unreliableNote: string;
   noData: string;
 }
 
@@ -113,6 +118,8 @@ const DEFAULT_LABELS: StepChartLabels = {
   targetLine: 'cible 1.0',
   xAxis: 'Temps (ms)',
   axisMissing: (axis) => `${axis} (n/a)`,
+  axisUnreliable: (axis) => `${axis}*`,
+  unreliableNote: '* courbe estompée : excitation stick insuffisante, axe non jugé',
   noData: "Pas assez d'excitation stick pour estimer la réponse.",
 };
 
@@ -128,6 +135,14 @@ export function StepResponseChart(props: {
   const plotH = H - pad.top - pad.bottom;
   const { paths, targetY, ticksX, ticksY } = buildStepPaths(props.axes, plotW, plotH);
   const hasAny = paths.some((p) => p !== null);
+  // Même seuil que le moteur de règles (rules/engine.ts) : un axe sous
+  // MIN_STEP_QUALITY n'est pas jugé - le tracer plein trait à côté des exemples
+  // « Bien / Pas bien » ferait prendre un artefact de déconvolution pour un
+  // verdict. Estompé + pointillé + mention en légende.
+  const unreliable = props.axes.map(
+    (ax, i) => paths[i] !== null && ax !== null && ax.quality < MIN_STEP_QUALITY,
+  );
+  const hasUnreliable = unreliable.some(Boolean);
 
   return (
     <svg
@@ -154,13 +169,25 @@ export function StepResponseChart(props: {
               height={3}
               rx={1.5}
               fill={present ? SERIES_COLORS[i] : GRID}
+              opacity={unreliable[i] ? 0.35 : 1}
             />
-            <text x={x + 18} y={18} fontSize={10} fill={present ? INK_DIM : INK_AXIS}>
-              {present ? name : L.axisMissing(name)}
+            <text
+              x={x + 18}
+              y={18}
+              fontSize={10}
+              fill={present && !unreliable[i] ? INK_DIM : INK_AXIS}
+            >
+              {present ? (unreliable[i] ? L.axisUnreliable(name) : name) : L.axisMissing(name)}
             </text>
           </g>
         );
       })}
+
+      {hasUnreliable && (
+        <text x={pad.left} y={32} fontSize={9} fill={INK_AXIS}>
+          {L.unreliableNote}
+        </text>
+      )}
 
       {/* Zone d'overshoot (au-dessus de la cible 1.0) */}
       <rect
@@ -271,6 +298,8 @@ export function StepResponseChart(props: {
               fill="none"
               stroke={SERIES_COLORS[i]}
               strokeWidth={2}
+              strokeOpacity={unreliable[i] ? 0.35 : 1}
+              strokeDasharray={unreliable[i] ? '4 4' : undefined}
               strokeLinejoin="round"
               strokeLinecap="round"
             />
