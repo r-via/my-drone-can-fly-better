@@ -38,12 +38,12 @@ export const ui = {
   page: {
     heroTagline: 'Ton vol, décodé.',
     heroIntro:
-      "Glisse tes logs blackbox Betaflight : My Drone Can Fly Better les décode et te sort des verdicts chiffrés - vibrations, filtres, PID, moteurs, batterie - avec les commandes CLI prêtes à coller. Pas d'upload : du signal et des règles, tout est traçable.",
+      "Glisse tes logs blackbox Betaflight ou INAV : My Drone Can Fly Better les décode et te sort des verdicts chiffrés - vibrations, filtres, PID, moteurs, batterie - avec, sur Betaflight, les commandes CLI prêtes à coller. Pas d'upload : du signal et des règles, tout est traçable.",
     heroAria: 'Présentation',
     steps: [
       {
         title: 'Glisse tes logs',
-        text: '.bbl ou .bfl, direct depuis la carte SD ou la GUI. Plusieurs fichiers d’un coup si tu veux.',
+        text: '.bbl, .bfl ou .txt (INAV), direct depuis la carte SD ou la GUI. Plusieurs fichiers d’un coup si tu veux.',
       },
       {
         title: 'Analyse locale',
@@ -73,8 +73,8 @@ export const ui = {
   upload: {
     dropTitle: 'Glisse tes logs blackbox ici',
     dropBrowse: ' - ou clique pour parcourir',
-    dropHelp: '.bbl / .bfl · plusieurs fichiers acceptés · rien ne quitte ton navigateur',
-    rejected: (names: string): string => `Ignoré (ni .bbl ni .bfl) : ${names}`,
+    dropHelp: '.bbl / .bfl / .txt (INAV) · plusieurs fichiers acceptés · rien ne quitte ton navigateur',
+    rejected: (names: string): string => `Ignoré (ni .bbl, ni .bfl, ni .txt) : ${names}`,
     selectedFilesAria: 'Fichiers sélectionnés',
     removeFile: (name: string): string => `Retirer ${name}`,
   },
@@ -183,6 +183,9 @@ export const ui = {
     tileSaturation: 'Saturation moteurs',
     tileFlightTime: 'Temps de vol',
     flightTimeHint: "throttle réellement en l'air",
+    tileGps: 'GPS',
+    gpsTileHint: (min: string, max: string, hdop: string | null): string =>
+      `min ${min} / max ${max}${hdop !== null ? ` / HDOP ${hdop}` : ''}`,
     timelineCaption: 'Timeline du vol',
     timelineEventLine: (
       tStart: string,
@@ -324,6 +327,7 @@ export const ui = {
       bandMotors: 'moteurs',
       xAxis: 'Fréquence (Hz)',
       motorLine: (hz: string): string => `moteurs ~${hz} Hz`,
+      motorLineMissing: 'ligne moteurs indisponible - eRPM absent du log',
       beyondNyquist: (hz: string): string => `non mesurable - log enregistré à ${hz} Hz`,
     },
     step: {

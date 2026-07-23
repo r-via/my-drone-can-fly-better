@@ -2,6 +2,7 @@
 // fréquence, portage fidèle de analyze_pico.py) et prop wash (perte de
 // contrôle dans les descentes). 100 % déterministe, aucune IA.
 import { mean, movingAverage, std } from '../dsp/dsp';
+import { motorsValidFn, sampleRate } from './shared';
 import type { FlightData, PropwashEvent, PropwashMetrics, YoyoMetrics } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -47,15 +48,6 @@ const GYRO_ABERRATION_LIMIT = 5000;
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Fréquence d'échantillonnage : meta si valide, sinon estimée depuis time. */
-function sampleRate(fd: FlightData): number {
-  const fs = fd.meta.sampleRateHz;
-  if (Number.isFinite(fs) && fs > 0) return fs;
-  const n = fd.time.length;
-  const dur = n > 1 ? fd.time[n - 1] - fd.time[0] : 0;
-  return dur > 0 ? (n - 1) / dur : 1000;
-}
-
 /**
  * DFT directe (portage de analyze_pico.dft_power) : amplitude à chaque
  * fréquence demandée, normalisée par la longueur du signal.
@@ -79,22 +71,6 @@ function dftPower(sig: ArrayLike<number>, freqs: number[], fsHz: number): number
 // ---------------------------------------------------------------------------
 // YOYO - oscillation de poussée basse fréquence (cf. analyze_pico.py)
 // ---------------------------------------------------------------------------
-
-/**
- * Frame moteur saine : les 4 valeurs brutes dans [0, motorOutputHigh].
- * Le parseur WASM laisse passer quelques frames corrompues (valeurs 2^32…)
- * que orangebox droppait - on les exclut, sinon std(poussée) explose.
- */
-function motorsValidFn(fd: FlightData): (i: number) => boolean {
-  const hi = fd.meta.motorOutputHigh > 0 ? fd.meta.motorOutputHigh : 2047;
-  return (i: number) => {
-    for (let m = 0; m < 4; m++) {
-      const v = fd.motor[m][i];
-      if (!(v >= 0 && v <= hi)) return false;
-    }
-    return true;
-  };
-}
 
 export function analyzeYoyo(fd: FlightData): YoyoMetrics {
   const n = fd.time.length;

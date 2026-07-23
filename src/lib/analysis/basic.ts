@@ -1,6 +1,8 @@
 // Analyses de base d'une session blackbox - portage fidèle des stats de
 // analyze_shimera.py / analyze_pico.py (puissance, moteurs, bruit, suivi,
 // timeline, GPS, failsafe). Tout est déterministe, aucune IA.
+import { rmsDiff } from '../dsp/dsp';
+
 import type {
   AxisNoise,
   AxisTracking,
@@ -28,17 +30,6 @@ const TIMELINE_SLICE_S = 3;
 const IDLE_STICK_US = 1080;
 /** Poussée moyenne (%) au-dessus de laquelle une tranche est un vol. */
 const FLIGHT_THRUST_PCT = 5;
-
-/** Proxy bruit HF : RMS des écarts échantillon à échantillon. */
-function rmsDiff(x: ArrayLike<number>): number {
-  if (x.length < 2) return 0;
-  let sum = 0;
-  for (let i = 1; i < x.length; i++) {
-    const d = x[i] - x[i - 1];
-    sum += d * d;
-  }
-  return Math.sqrt(sum / (x.length - 1));
-}
 
 function motorPctFn(fd: FlightData): (m: number) => number {
   const lo = fd.meta.motorOutputLow;
@@ -434,22 +425,186 @@ export function analyzeTimeline(fd: FlightData): TimelineMetrics {
 // GPS + failsafe
 // ---------------------------------------------------------------------------
 
+/** Au-delà, un compte de sats est une frame corrompue (multi-constellation réel : ~40 max). */
+const GPS_MAX_PLAUSIBLE_SATS = 45;
+/** Écart à la médiane glissante au-delà duquel une frame G est jetée comme corrompue. */
+const GPS_SPIKE_SATS = 3;
+/** Demi-fenêtre de la médiane glissante de nettoyage (5 frames au total). */
+const GPS_SMOOTH_HALF = 2;
+/** Sats requis pour considérer l'accroche saine (aligné sur gps_rescue_min_sats). */
+const GPS_HEALTHY_SATS = 8;
+/** Chute retenue : au moins ce déficit vs la médiane des 10 frames précédentes. */
+const GPS_DROP_SATS = 3;
+/** Écart de throttle (µs) minimal entre buckets bas/haut pour oser une corrélation. */
+const GPS_THROTTLE_SPREAD_US = 60;
+/** Frames minimales par bucket throttle pour la corrélation. */
+const GPS_THROTTLE_MIN_FRAMES = 12;
+
+const GPS_EMPTY: GpsMetrics = {
+  available: false,
+  numSatMax: null,
+  numSatMin: null,
+  numSatMedian: null,
+  speedMaxMps: null,
+  corruptFrameRatio: null,
+  timeToHealthySatsS: null,
+  satDrops: [],
+  satsVsThrottle: null,
+  hdopMedian: null,
+  hdopWorst: null,
+};
+
+/** Médiane d'un tableau trié à la volée (copie locale). */
+function med(buf: number[]): number {
+  const s = [...buf].sort((a, b) => a - b);
+  const mid = s.length >> 1;
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/**
+ * Les frames G des logs réels sont truffées de valeurs corrompues (sat=0 isolé,
+ * sat=1042, temps négatifs) : décodeur et flash saturée confondus. Tout passe
+ * donc par un double filtre - plausibilité brute puis écart à la médiane
+ * glissante - avant la moindre statistique. Les indices retenus servent aussi
+ * à lire hdop et speed : une frame corrompue l'est sur tous ses champs.
+ */
 export function analyzeGps(fd: FlightData): GpsMetrics {
-  if (!fd.gps || fd.gps.numSat.length === 0) {
-    return { available: false, numSatMax: null, numSatMin: null, speedMaxMps: null };
+  if (!fd.gps || fd.gps.numSat.length === 0) return GPS_EMPTY;
+  const { time, numSat, speedMps, hdop } = fd.gps;
+  const n = numSat.length;
+
+  // Passe 1 : plausibilité brute.
+  const plausible: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (numSat[i] >= 0 && numSat[i] <= GPS_MAX_PLAUSIBLE_SATS) plausible.push(i);
   }
+  // Passe 2 : rejet des pointes vs médiane glissante sur les frames plausibles.
+  const kept: number[] = [];
+  const cleanSat: number[] = [];
+  for (let k = 0; k < plausible.length; k++) {
+    const win: number[] = [];
+    for (
+      let j = Math.max(0, k - GPS_SMOOTH_HALF);
+      j <= Math.min(plausible.length - 1, k + GPS_SMOOTH_HALF);
+      j++
+    ) {
+      win.push(numSat[plausible[j]]);
+    }
+    const m = med(win);
+    if (Math.abs(numSat[plausible[k]] - m) <= GPS_SPIKE_SATS) {
+      kept.push(plausible[k]);
+      cleanSat.push(numSat[plausible[k]]);
+    }
+  }
+  if (kept.length === 0) return { ...GPS_EMPTY, available: true, corruptFrameRatio: 1 };
+
+  const corruptFrameRatio = 1 - kept.length / n;
   let numSatMax = -Infinity;
   let numSatMin = Infinity;
-  for (let i = 0; i < fd.gps.numSat.length; i++) {
-    const s = fd.gps.numSat[i];
+  let speedMaxMps = 0;
+  for (let k = 0; k < kept.length; k++) {
+    const s = cleanSat[k];
     if (s > numSatMax) numSatMax = s;
     if (s < numSatMin) numSatMin = s;
+    const v = speedMps[kept[k]];
+    if (v >= 0 && v < 200 && v > speedMaxMps) speedMaxMps = v;
   }
-  let speedMaxMps = 0;
-  for (let i = 0; i < fd.gps.speedMps.length; i++) {
-    if (fd.gps.speedMps[i] > speedMaxMps) speedMaxMps = fd.gps.speedMps[i];
+  const numSatMedian = med(cleanSat);
+
+  // Premier instant d'accroche saine (8+ sats).
+  let timeToHealthySatsS: number | null = null;
+  for (let k = 0; k < kept.length; k++) {
+    if (cleanSat[k] >= GPS_HEALTHY_SATS) {
+      timeToHealthySatsS = time[kept[k]];
+      break;
+    }
   }
-  return { available: true, numSatMax, numSatMin, speedMaxMps };
+
+  // Chutes transitoires : déficit vs la médiane des 10 frames retenues
+  // précédentes, maintenu sur au moins 2 frames.
+  const satDrops: GpsMetrics['satDrops'] = [];
+  let k = 10;
+  while (k < kept.length && satDrops.length < 10) {
+    const trail = med(cleanSat.slice(k - 10, k));
+    if (cleanSat[k] <= trail - GPS_DROP_SATS) {
+      const start = k;
+      let floor = cleanSat[k];
+      while (k < kept.length && cleanSat[k] <= trail - GPS_DROP_SATS) {
+        if (cleanSat[k] < floor) floor = cleanSat[k];
+        k++;
+      }
+      if (k - start >= 2) {
+        satDrops.push({
+          timeS: time[kept[start]],
+          fromSats: trail,
+          toSats: floor,
+          durationS: Math.max(0, time[kept[Math.min(k, kept.length - 1)]] - time[kept[start]]),
+        });
+      }
+    } else {
+      k++;
+    }
+  }
+
+  // Corrélation sats/throttle : signature d'une interférence liée à la
+  // puissance (VTX, ESC, câblage) qui aveugle le récepteur quand ça pousse.
+  let satsVsThrottle: GpsMetrics['satsVsThrottle'] = null;
+  if (fd.throttle.length > 0 && kept.length >= GPS_THROTTLE_MIN_FRAMES * 2) {
+    const thrAt: number[] = [];
+    let ti = 0;
+    for (let j = 0; j < kept.length; j++) {
+      const t = time[kept[j]];
+      while (ti < fd.time.length - 1 && fd.time[ti] < t) ti++;
+      thrAt.push(fd.throttle[ti]);
+    }
+    const thrMed = med(thrAt);
+    const sorted = [...thrAt].sort((a, b) => a - b);
+    const p66 = sorted[Math.floor(sorted.length * 0.66)];
+    if (p66 - thrMed >= GPS_THROTTLE_SPREAD_US) {
+      const lowSats: number[] = [];
+      const highSats: number[] = [];
+      for (let j = 0; j < kept.length; j++) {
+        if (thrAt[j] <= thrMed) lowSats.push(cleanSat[j]);
+        else if (thrAt[j] >= p66) highSats.push(cleanSat[j]);
+      }
+      if (lowSats.length >= GPS_THROTTLE_MIN_FRAMES && highSats.length >= GPS_THROTTLE_MIN_FRAMES) {
+        const lowMedian = med(lowSats);
+        const highMedian = med(highSats);
+        satsVsThrottle = { lowMedian, highMedian, delta: highMedian - lowMedian };
+      }
+    }
+  }
+
+  // HDOP (INAV) : lu sur les mêmes frames retenues, en écartant les zéros
+  // (champ absent ou frame partielle).
+  let hdopMedian: number | null = null;
+  let hdopWorst: number | null = null;
+  if (hdop) {
+    const vals: number[] = [];
+    for (let j = 0; j < kept.length; j++) {
+      const v = hdop[kept[j]];
+      if (v > 0.2 && v < 50) vals.push(v);
+    }
+    if (vals.length >= 5) {
+      hdopMedian = med(vals);
+      const s = [...vals].sort((a, b) => a - b);
+      hdopWorst = s[Math.min(s.length - 1, Math.floor(s.length * 0.95))];
+    }
+  }
+
+  return {
+    available: true,
+    numSatMax,
+    numSatMin,
+    numSatMedian,
+    speedMaxMps,
+    corruptFrameRatio,
+    timeToHealthySatsS,
+    satDrops,
+    satsVsThrottle,
+    hdopMedian,
+    hdopWorst,
+  };
 }
 
 /** Phases failsafe bénignes : jamais déclenché ou valeur inconnue/vide. */

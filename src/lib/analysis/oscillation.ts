@@ -9,6 +9,7 @@
 //
 // 100 % déterministe, aucune IA.
 import { median, movingAverage, topPeaks, welchSpectrum } from '../dsp/dsp';
+import { motorsValidFn, sampleRate } from './shared';
 
 import type {
   FlightData,
@@ -80,29 +81,9 @@ const MAX_EVENTS = 10;
 // Helpers
 // ---------------------------------------------------------------------------
 
-function sampleRate(fd: FlightData): number {
-  const fs = fd.meta.sampleRateHz;
-  if (Number.isFinite(fs) && fs > 0) return fs;
-  const n = fd.time.length;
-  const dur = n > 1 ? fd.time[n - 1] - fd.time[0] : 0;
-  return dur > 0 ? (n - 1) / dur : 1000;
-}
-
 /** Largeur de boxcar réalisant la coupure fc, bornée à [1, n]. */
 function boxcarWidth(fsHz: number, fcHz: number, n: number): number {
   return Math.max(1, Math.min(n, Math.round((BOXCAR_CUTOFF_K * fsHz) / fcHz)));
-}
-
-/** Frame moteur saine : les 4 valeurs dans [0, motorOutputHigh + marge]. */
-function motorsValidFn(fd: FlightData): (i: number) => boolean {
-  const hi = (fd.meta.motorOutputHigh > 0 ? fd.meta.motorOutputHigh : 2047) + STOP_MARGIN;
-  return (i: number) => {
-    for (let m = 0; m < 4; m++) {
-      const v = fd.motor[m][i];
-      if (!(v >= 0 && v <= hi)) return false;
-    }
-    return true;
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +96,8 @@ export function analyzeOscillation(fd: FlightData): OscillationMetrics {
   if (n < MIN_FLIGHT_SAMPLES) return empty;
 
   const fs = sampleRate(fd);
-  const motorsValid = motorsValidFn(fd);
+  // STOP_MARGIN : un léger dépassement des butées est du vrai signal ici.
+  const motorsValid = motorsValidFn(fd, STOP_MARGIN);
   const hi = fd.meta.motorOutputHigh > 0 ? fd.meta.motorOutputHigh : 2047;
   const lo = fd.meta.motorOutputLow;
 

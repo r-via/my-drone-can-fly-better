@@ -27,7 +27,7 @@
 // tests/step.test.ts) et qu'elle est sans dimension, donc comparable d'un vol
 // à l'autre : c'est l'entrée de la comparaison passe N-1 / passe N, où elle a
 // un sens qu'elle n'a pas sur un log isolé.
-import { fft, ifft, nextPow2 } from '../dsp/dsp';
+import { fft, ifft, movingAverage, nextPow2 } from '../dsp/dsp';
 
 import type { AxisStepResponse, FlightData, StepResponseMetrics } from '../types';
 
@@ -379,7 +379,7 @@ function sensitivityPeaks(
   // s'arrête au PREMIER décrochage et pas au dernier bin valide - au-delà d'un
   // trou, l'énergie qui revient est du bruit isolé, pas une bande continue.
   const radius = Math.max(1, Math.round((MS_SMOOTH_HZ * nfft) / fs));
-  const xxSmooth = movingAverage(acc.xx, radius);
+  const xxSmooth = movingAverage(acc.xx, 2 * radius + 1);
   const floor = MS_MIN_SNR * acc.lambda; // même pondération des deux côtés
   let top = -1;
   for (let j = 0; j < n; j++) {
@@ -414,22 +414,9 @@ function sensitivityPeaks(
   };
 }
 
-/** Moyenne glissante de ±`radius` bins (bords tronqués, pas de padding). */
-function movingAverage(v: Float64Array, radius: number): Float64Array {
-  const out = new Float64Array(v.length);
-  for (let j = 0; j < v.length; j++) {
-    const lo = Math.max(0, j - radius);
-    const hi = Math.min(v.length - 1, j + radius);
-    let sum = 0;
-    for (let k = lo; k <= hi; k++) sum += v[k];
-    out[j] = sum / (hi - lo + 1);
-  }
-  return out;
-}
-
 /** Max de la moyenne glissante : un bin isolé ne fait pas un pic de boucle. */
 function smoothedPeak(mag: Float64Array, radius: number): { value: number; index: number } {
-  const smooth = movingAverage(mag, radius);
+  const smooth = movingAverage(mag, 2 * radius + 1);
   let best = -Infinity;
   let bestIdx = 0;
   for (let j = 0; j < smooth.length; j++) {

@@ -185,6 +185,21 @@ export const zh: Dict = {
       fix: '重新启用电池记录，下次的日志就能恢复压降和电压判定。',
     },
 
+    rpmNotLogged: {
+      title: '日志中没有电机转速数据',
+      detail: (cause: string) =>
+        `日志不包含 eRPM 遥测：电机的旋转频率未知。频谱上无法绘制"电机 ~X Hz"参考线，主导峰值无法归属到具体电机，desync 也无从察觉。${cause}`,
+      causeFieldDisabled:
+        'dshot_bidir = 1：遥测在飞行中正常工作（RPM 滤波器在运行），只是 blackbox 设置里没有勾选 RPM 字段。',
+      causeNoBidir: 'dshot_bidir = 0：飞控收不到电调的任何转速回传，飞行和日志中都没有。',
+      causeUnknown: '仅凭日志配置无法判断缺的是 DSHOT 遥测本身还是它的记录。',
+      evidence: (bidir: string) => `帧中没有 eRPM[0..3] 字段 - dshot_bidir = ${bidir}`,
+      fixFieldDisabled: '重新启用 eRPM 记录，下次的日志就能恢复电机参考线和峰值归属。',
+      fixNoBidir:
+        '如果你的电调支持（BLHeli_32、Bluejay、AM32），开启双向 DSHOT：它在飞行中驱动 RPM 滤波器，也向日志提供 eRPM。',
+      fixUnknown: '检查双向 DSHOT 是否开启，以及 blackbox 设置中是否勾选了 RPM 字段。',
+    },
+
     yoyoDetected: {
       titleWarn: '检测到悠悠球效应（推力震荡）',
       titleInfo: '疑似悠悠球效应（待确认）',
@@ -260,6 +275,43 @@ export const zh: Dict = {
       fix: '等到 8 颗以上卫星再起飞；让 GPS 天线远离图传和摄像头（干扰源）。',
     },
 
+    gpsAcquisitionSlow: {
+      title: 'GPS 定位不完整或过晚',
+      detail:
+        '起飞时接收机没有达到健康覆盖（8 颗及以上卫星），或直到本段后期才达到。定位未完成就触发 GPS rescue 风险很大。常见原因：上电后过早起飞、天线被遮挡，或电气噪声拖慢了搜星。',
+      evidence: (median: string, timeS: string | null) =>
+        timeS !== null
+          ? `记录开始 ${timeS} 秒后才达到 8 颗卫星（本段中位数：${median} 颗）`
+          : `整段记录从未达到 8 颗卫星（中位数：${median} 颗）`,
+      fix: '起飞前等 GPS 定位完成（OSD 显示 8+ 颗）。若停在地面搜星仍然很慢，把 GPS 天线移离图传和动力线：射频噪声会拉长同步时间。',
+    },
+
+    gpsSatDrops: {
+      title: '飞行中卫星数骤降',
+      detail:
+        '卫星数不时骤降又恢复：机架在机动中遮挡天线、接触不良，或瞬时干扰。每次骤降都会劣化定位；低于 5 颗时 3D 定位本身丢失，此时 rescue 等于盲飞。',
+      evidence: (count: string, from: string, to: string, atS: string) =>
+        `检测到 ${count} 次骤降，最严重的一次在 t=${atS} 秒从 ${from} 颗跌到 ${to} 颗`,
+      fix: '检查 GPS 天线的固定和线缆，保证天线视野开阔（高于机架、远离 HD 摄像头），然后再平稳飞一圈对比。',
+    },
+
+    gpsEmiThrottle: {
+      title: '油门升高时卫星数下降',
+      detail:
+        '油门一推卫星数就明显下降：这是电气噪声（图传、电调、动力线）致盲 GPS 接收机的典型特征。正是这种噪声让 GPS 在地面定位良好、一起飞却无法保持同步。',
+      evidence: (low: string, high: string) => `中位数：低油门 ${low} 颗，高油门 ${high} 颗`,
+      fix: '把 GPS 天线移离图传和电池/电调线（用支架或装到后板），把动力线绞合，然后卸桨解锁测试：推油门时卫星数不应变化。',
+    },
+
+    gpsHdopHigh: {
+      title: 'GPS 精度不佳（HDOP 偏高）',
+      detail:
+        'HDOP 一直偏高：即使锁定了卫星，位置仍不精确。可能是几何条件差（天空被遮挡），或天线附近的射频噪声劣化了信号。',
+      evidence: (median: string, worst: string | null) =>
+        `HDOP 中位数 ${median}${worst !== null ? ` / 最差 ${worst}` : ''}（健康值：< 2.5）`,
+      fix: '让天线视野开阔，并远离噪声源（图传、HD 摄像头、动力线）。HDOP 低于 1.5 后定位重新可靠。',
+    },
+
     failsafeTriggered: {
       title: '飞行中触发 Failsafe',
       detail:
@@ -279,6 +331,13 @@ export const zh: Dict = {
         `时长 ${durationS} 秒，采样率 ${rateHz} Hz`,
       fixLowRate: '下次调参记录时把 blackbox 调到全分辨率。',
       fixShortLog: '至少飞 30 秒并做多样化的动作，诊断才靠谱。',
+    },
+
+    inavLimited: {
+      title: 'INAV 日志：部分分析',
+      detail:
+        '这个日志来自 INAV：飞行指标（噪声、滤波、跟踪、阶跃响应、电机、电池）照常分析，但配置检查和 CLI 命令是 Betaflight 专用的，保持禁用。请通过 INAV Configurator 应用修改。',
+      evidence: (firmware: string) => `固件：${firmware}`,
     },
 
     allGood: {
@@ -314,6 +373,13 @@ export const zh: Dict = {
         notes: [
           '7" 大机架：盯紧 40-120 Hz 频段（机臂/摄像头共振，果冻的来源）。',
           '桨叶动平衡至关重要：电机基频上冒出的噪声峰在画面上一眼就能看出来。',
+        ],
+      },
+      akira: {
+        label: 'RRFPV RR Akira 9 英寸 X8（6S）',
+        notes: [
+          '共轴 X8：共 8 个电机，目前只有 M1-M4 进入电机分析。',
+          '起始阈值尚未实地校准：9 英寸长机臂的原始噪声提早预警，上升时间放宽。',
         ],
       },
       generic: {
@@ -434,15 +500,17 @@ export const zh: Dict = {
       `${cells}S ${max}→${min} V（电压跌落 ${sag} V）`,
     cliCurrentMax: (amps: string) => `最大电流 ${amps} A`,
     cliCurrentUnreliable: '电流：传感器不可靠，读数已忽略',
+    cliGpsSummary: (median: string, min: string, hdop: string | null) =>
+      `GPS ${median} 颗卫星（最低 ${min}${hdop !== null ? `，HDOP ${hdop}` : ''}）`,
     headersUnreadable: '头部无法读取（会话损坏？）',
     dataVersionUnsupported: '解码器无法识别的数据版本（日志片段损坏？）',
     decoderRejected: (raw: string) => `无法解码：${raw}`,
     noFramesDecoded: '没有解码出任何帧（数据损坏？）',
     essentialFieldsMissing: '缺少关键字段（gyroADC/setpoint/motor/rcCommand）',
-    firmwareTooOld: (version: string, minimum: string) =>
-      `固件太旧（Betaflight ${version}）- 解码器最低需要 ${minimum}`,
+    firmwareTooOld: (firmware: string, minimum: string) =>
+      `固件太旧（${firmware}）- 解码器最低需要 ${minimum}`,
     firmwareNotSupported: (flavour: string) =>
-      `不支持的固件：${flavour} - 只有 Betaflight 能可靠解码`,
+      `不支持的固件：${flavour} - 只有 Betaflight 和 INAV 能可靠解码`,
 
     // src/worker/analyze.worker.ts - 进度 + WASM 加载错误。
     wasmLoadFailed: (httpStatus: string) =>
@@ -489,12 +557,12 @@ export const zh: Dict = {
     page: {
       heroTagline: '你的飞行，解码给你看。',
       heroIntro:
-        '把你的 Betaflight 黑匣子日志拖进来：My Drone Can Fly Better 负责解码，并给出量化判定 - 振动、滤波、PID、电机、电池 - 附带可以直接粘贴的 CLI 命令。没有上传：只有信号和规则，一切可追溯。',
+        '把你的 Betaflight 或 INAV 黑匣子日志拖进来：My Drone Can Fly Better 负责解码，并给出量化判定 - 振动、滤波、PID、电机、电池 - Betaflight 还附带可以直接粘贴的 CLI 命令。没有上传：只有信号和规则，一切可追溯。',
       heroAria: '简介',
       steps: [
         {
           title: '拖入日志',
-          text: '.bbl 或 .bfl，直接从 SD 卡或 GUI 拿来。想一次丢多个文件也行。',
+          text: '.bbl、.bfl 或 .txt（INAV），直接从 SD 卡或 GUI 拿来。想一次丢多个文件也行。',
         },
         {
           title: '本地分析',
@@ -524,8 +592,8 @@ export const zh: Dict = {
     upload: {
       dropTitle: '把黑匣子日志拖到这里',
       dropBrowse: ' - 或点击浏览',
-      dropHelp: '.bbl / .bfl · 支持多个文件 · 什么都不会离开你的浏览器',
-      rejected: (names: string): string => `已忽略（既不是 .bbl 也不是 .bfl）：${names}`,
+      dropHelp: '.bbl / .bfl / .txt（INAV）· 支持多个文件 · 什么都不会离开你的浏览器',
+      rejected: (names: string): string => `已忽略（不是 .bbl、.bfl 或 .txt）：${names}`,
       selectedFilesAria: '已选文件',
       removeFile: (name: string): string => `移除 ${name}`,
     },
@@ -584,7 +652,7 @@ export const zh: Dict = {
     report: {
       title: '飞行报告',
       newAnalysis: '新的分析',
-    flightsAria: '已分析的飞行',
+      flightsAria: '已分析的飞行',
       fileAria: (fileName: string): string => `报告 ${fileName}`,
       validSessions: (count: number): string => `${count} 个有效会话`,
       skippedSessions: (count: number): string => `${count} 个已忽略`,
@@ -623,6 +691,9 @@ export const zh: Dict = {
       tileSaturation: '电机饱和',
       tileFlightTime: '飞行时间',
       flightTimeHint: '真正离地的油门时间',
+    tileGps: 'GPS',
+    gpsTileHint: (min: string, max: string, hdop: string | null): string =>
+      `最低 ${min} / 最高 ${max}${hdop !== null ? ` / HDOP ${hdop}` : ''}`,
       timelineCaption: '飞行时间线',
       timelineEventLine: (
         tStart: string,
@@ -758,6 +829,7 @@ export const zh: Dict = {
         bandMotors: '电机',
         xAxis: '频率（Hz）',
         motorLine: (hz: string): string => `电机 ~${hz} Hz`,
+        motorLineMissing: '无电机参考线 - 日志中没有 eRPM',
         beyondNyquist: (hz: string): string => `无法测量 - 日志记录频率 ${hz} Hz`,
       },
       step: {

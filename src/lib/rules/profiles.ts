@@ -86,6 +86,21 @@ const CHIMERA7: DroneProfile = {
   },
 };
 
+const AKIRA: DroneProfile = {
+  id: 'akira',
+  craftMatch: /akira/i, // craft name réel : "AKIRA" (RRFPV RR Akira 9" X8 6S, sous INAV)
+  motorPoles: 14, // moteurs classe 28xx ; sans eRPM dans les logs INAV, la valeur ne sert qu'au jour où ça change
+  expectedCells: 6,
+  thresholds: {
+    ...GENERIC_THRESHOLDS,
+    unfiltNoiseWarn: 20, // bras longs de 9" : jello facile, même vigilance que le 7"
+    unfiltNoiseCrit: 45,
+    riseTimeSlowMs: 90, // inertie d'un 9" X8 : montée encore plus lente qu'un 7"
+  },
+  // Seuils de départ non calibrés terrain : à resserrer avec les prochains vols.
+  // X8 : le log porte motor[0..7] mais FlightData n'en lit que 4 (voir limitations.md).
+};
+
 const GENERIC: DroneProfile = {
   id: 'generic',
   craftMatch: /./, // attrape tout : doit rester en dernier dans PROFILES
@@ -94,7 +109,7 @@ const GENERIC: DroneProfile = {
   thresholds: { ...GENERIC_THRESHOLDS },
 };
 
-export const PROFILES: DroneProfile[] = [PICO, LR4, CHIMERA7, GENERIC];
+export const PROFILES: DroneProfile[] = [PICO, LR4, CHIMERA7, AKIRA, GENERIC];
 
 /** Choisit le profil selon le craft name du log ; generic si absent ou inconnu. */
 export function pickProfile(craftName: string | undefined): DroneProfile {

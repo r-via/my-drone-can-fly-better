@@ -11,6 +11,8 @@ export interface SessionMeta {
   craftName?: string;
   boardInfo?: string;
   firmware: string; // chaîne originale, ex. "Betaflight 2025.12.2 (79065c96b) STM32F7X2"
+  /** Absent = betaflight (liens partagés antérieurs, metas synthétiques des tests). */
+  firmwareFamily?: 'betaflight' | 'inav';
   debugMode?: string;
   fieldNames: string[];
   sampleRateHz: number; // mesuré (médiane des dt)
@@ -18,7 +20,7 @@ export interface SessionMeta {
   frameCount: number;
   motorOutputLow: number; // header motorOutput (défaut 48)
   motorOutputHigh: number; // défaut 2047
-  /** Toutes les lignes "H clé:valeur" de la session (snapshot config Betaflight). */
+  /** Toutes les lignes "H clé:valeur" de la session (snapshot config du firmware). */
   headers: Record<string, string>;
   /** Frames au temps aberrant (re-base flash, wrap µs 32 bits) corrigées au dt nominal. */
   timeAnomalies?: number;
@@ -43,7 +45,15 @@ export interface FlightData {
   axisI: F32x3 | null;
   axisD: [Float32Array | null, Float32Array | null, Float32Array | null] | null;
   axisF: F32x3 | null;
-  gps: { time: Float64Array; numSat: Float32Array; speedMps: Float32Array } | null;
+  /** Séries G-frame. time est ancré sur la frame main précédente : l'horodatage
+   *  propre aux frames G est trop souvent corrompu pour être utilisable.
+   *  hdop est en unités x1 (2.4 = médiocre), null hors INAV. */
+  gps: {
+    time: Float64Array;
+    numSat: Float32Array;
+    speedMps: Float32Array;
+    hdop: Float32Array | null;
+  } | null;
   failsafePhaseCounts: Record<string, number>;
 }
 
@@ -282,11 +292,33 @@ export interface TimelineMetrics {
   throttleMaxUs: number;
 }
 
+/** Chute transitoire de satellites détectée sur la série nettoyée. */
+export interface GpsSatDrop {
+  timeS: number; // début de la chute (base temps du log)
+  fromSats: number; // médiane glissante juste avant
+  toSats: number; // plancher atteint pendant la chute
+  durationS: number;
+}
+
 export interface GpsMetrics {
   available: boolean;
+  /** min/max/médiane sur la série nettoyée : les frames G corrompues (sat=0,
+   *  sat=1042...) sont fréquentes dans les logs réels et fausseraient tout. */
   numSatMax: number | null;
   numSatMin: number | null;
+  numSatMedian: number | null;
   speedMaxMps: number | null;
+  /** Part (0..1) des frames G écartées par le filtre de plausibilité. */
+  corruptFrameRatio: number | null;
+  /** Premier instant avec 8+ sats (seuil sain pour le GPS rescue), null si jamais atteint. */
+  timeToHealthySatsS: number | null;
+  satDrops: GpsSatDrop[];
+  /** Sats médians à bas vs haut throttle : delta négatif marqué = signature
+   *  d'interférence liée à la puissance (VTX/ESC/câblage près de l'antenne). */
+  satsVsThrottle: { lowMedian: number; highMedian: number; delta: number } | null;
+  /** HDOP (INAV seulement) : médiane et pire valeur lissée de la session. */
+  hdopMedian: number | null;
+  hdopWorst: number | null;
 }
 
 export interface SessionAnalysis {
@@ -393,7 +425,7 @@ export interface ProfileThresholds {
   motorBandRawFloor: number;
 }
 
-export type DroneProfileId = 'pico' | 'lr4' | 'chimera7' | 'generic';
+export type DroneProfileId = 'pico' | 'lr4' | 'chimera7' | 'akira' | 'generic';
 
 // Le label et les notes affichés (particularités du drone) vivent dans le
 // dictionnaire i18n : dict.rules.profiles[id].{label, notes}.

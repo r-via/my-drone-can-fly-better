@@ -5,7 +5,7 @@ import { useState, type ChangeEvent, type DragEvent } from 'react';
 import { useLocale } from '@/lib/i18n/locale';
 import { AlertIcon, DroneIcon } from '@/components/icons';
 
-const ACCEPTED = /\.(bbl|bfl)$/i;
+const ACCEPTED = /\.(bbl|bfl|txt)$/i; // .txt : nom que donne INAV à ses logs blackbox
 
 function fmtBytes(n: number, mega: string, kilo: string): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} ${mega}`;
@@ -65,7 +65,7 @@ export default function UploadZone({ files, onFilesChange, disabled = false }: U
           id="bbl-input"
           type="file"
           multiple
-          accept=".bbl,.bfl"
+          accept=".bbl,.bfl,.txt"
           disabled={disabled}
           onChange={onInputChange}
           className="sr-only"

@@ -1,8 +1,11 @@
 // Adaptateur blackbox-log (WASM) → FlightData.
 // Particularités gérées ici :
-//  - le wrapper npm 0.2.2 refuse les firmwares > 4.4 : on réécrit la chaîne de
-//    version dans les headers (le format de frame est auto-décrit, validé
-//    contre orangebox sur les logs des 3 drones) ;
+//  - le wrapper npm 0.2.2 refuse les firmwares hors de sa fenêtre (Betaflight
+//    > 4.4, INAV hors 5.0-6.1) : on réécrit la chaîne de version dans les
+//    headers (le format de frame est auto-décrit, validé contre orangebox sur
+//    les logs des 3 drones et sur un log INAV 9) ;
+//  - INAV nomme et échelonne certains champs autrement que Betaflight :
+//    parseSession les mappe vers le contrat FlightData ;
 //  - un gros log fait détacher l'ArrayBuffer WASM : on ré-instancie un Parser
 //    frais par session ;
 //  - les sessions tronquées (coupure d'alim) sont signalées, pas fatales.
@@ -14,11 +17,39 @@ import type { Dict } from '../i18n/fr';
 import type { F32x3, F32x4, FlightData, ParsedFile, SessionMeta, SkippedSession } from '../types';
 
 const MAGIC = 'H Product:Blackbox flight data recorder';
-const FIRMWARE_MARKER = 'Firmware revision:Betaflight ';
-/** Plancher du décodeur WASM : il rejette explicitement 4.0 et 4.1. Mesuré, pas supposé. */
-const SUPPORTED_MIN: [number, number] = [4, 2];
-/** Dernière version que le wrapper accepte sans réécriture. */
-const NATIVE_MAX: [number, number] = [4, 4];
+
+/**
+ * Fenêtres de versions du wrapper WASM, mesurées (pas supposées) :
+ *  - Betaflight : rejette explicitement 4.0/4.1, accepte 4.2-4.4 nativement ;
+ *  - INAV : accepte 5.0.0 à 6.1.x nativement, rejette tout le reste.
+ * `supportedMin` est le plancher réel de décodage : en dessous, les headers
+ * diffèrent vraiment et aucun spoof ne rattrape le log. `nativeMax` est la
+ * dernière version acceptée sans réécriture : au-delà le format de frame reste
+ * lisible, seul le contrôle de version bloque, donc on spoofe vers `spoofTo`.
+ */
+interface FirmwareFamily {
+  flavour: 'Betaflight' | 'INAV';
+  marker: string; // préfixe exact de la ligne header, version juste derrière
+  supportedMin: [number, number];
+  nativeMax: [number, number];
+  spoofTo: string;
+}
+const FAMILIES: FirmwareFamily[] = [
+  {
+    flavour: 'Betaflight',
+    marker: 'Firmware revision:Betaflight ',
+    supportedMin: [4, 2],
+    nativeMax: [4, 4],
+    spoofTo: '4.4.2',
+  },
+  {
+    flavour: 'INAV',
+    marker: 'Firmware revision:INAV ',
+    supportedMin: [5, 0],
+    nativeMax: [6, 1],
+    spoofTo: '6.0.0',
+  },
+];
 /** Session sans assez de frames pour être autre chose qu'un blip d'armement. */
 const MIN_SESSION_FRAMES = 100;
 /**
@@ -56,33 +87,56 @@ function versionParts(ver: string): [number, number] | null {
   return m ? [Number(m[1]), Number(m[2])] : null;
 }
 
-/** Au-delà de 4.4 le wrapper refuse la version, alors que le format de frame reste lisible. */
-function needsSpoof(ver: string): boolean {
+/**
+ * Au-delà de nativeMax le wrapper refuse la version, alors que le format de
+ * frame reste lisible. En dessous de supportedMin on ne spoofe PAS : le rejet
+ * doit rester visible pour qu'unsupportedFirmware sorte « trop ancien » au lieu
+ * de décoder de travers un format réellement différent.
+ */
+function needsSpoof(ver: string, fam: FirmwareFamily): boolean {
   const p = versionParts(ver);
   if (!p) return true; // forme exotique : tenter le spoof plutôt que d'abandonner
   const [major, minor] = p;
-  return major > NATIVE_MAX[0] || (major === NATIVE_MAX[0] && minor > NATIVE_MAX[1]);
+  return major > fam.nativeMax[0] || (major === fam.nativeMax[0] && minor > fam.nativeMax[1]);
 }
 
-/** Réécrit toute version Betaflight trop récente (≥4.5, 2025.12…) en 4.4.2, à longueur constante. */
-export function spoofFirmware(buf: Uint8Array): { data: Uint8Array; original: string | null } {
+/**
+ * Réécrit toute version trop récente pour le wrapper à longueur constante :
+ * Betaflight ≥ 4.5 (dont 2025.12…) → 4.4.2, INAV ≥ 6.2 → 6.0.0.
+ * `originals` restitue chaque « flavour version » d'avant réécriture avec son
+ * offset dans le buffer : un fichier concaténé peut mélanger versions et même
+ * familles (flash onboard rejouée après un changement de firmware), chaque
+ * session doit retrouver LA sienne, pas celle de la première occurrence.
+ * `original` reste le premier marqueur du fichier en ordre d'octets.
+ */
+export function spoofFirmware(buf: Uint8Array): {
+  data: Uint8Array;
+  original: string | null;
+  originals: Array<{ offset: number; firmware: string }>;
+} {
   const data = buf.slice();
-  const marker = encode(FIRMWARE_MARKER);
-  let original: string | null = null;
-  let i = 0;
-  while ((i = indexOfBytes(data, marker, i)) !== -1) {
-    const vs = i + marker.length;
-    let ve = vs;
-    while (ve < data.length && data[ve] !== 0x20 && data[ve] !== 0x0a && data[ve] !== 0x0d) ve++;
-    const ver = new TextDecoder().decode(data.subarray(vs, ve));
-    original ??= ver;
-    if (needsSpoof(ver)) {
-      const repl = encode('4.4.2'.padEnd(ve - vs, ' '));
-      data.set(repl.subarray(0, ve - vs), vs);
+  const originals: Array<{ offset: number; firmware: string }> = [];
+  for (const fam of FAMILIES) {
+    const marker = encode(fam.marker);
+    let i = 0;
+    while ((i = indexOfBytes(data, marker, i)) !== -1) {
+      const vs = i + marker.length;
+      let ve = vs;
+      while (ve < data.length && data[ve] !== 0x20 && data[ve] !== 0x0a && data[ve] !== 0x0d) ve++;
+      const ver = new TextDecoder().decode(data.subarray(vs, ve));
+      originals.push({ offset: i, firmware: `${fam.flavour} ${ver}` });
+      // Slot plus court que le remplacement (version à 2 segments éditée à la
+      // main) : réécrire tronquerait en une version encore plus fausse. On
+      // laisse l'original, le décodeur la refusera avec la vraie chaîne.
+      if (needsSpoof(ver, fam) && ve - vs >= fam.spoofTo.length) {
+        const repl = encode(fam.spoofTo.padEnd(ve - vs, ' '));
+        data.set(repl.subarray(0, ve - vs), vs);
+      }
+      i = ve;
     }
-    i = ve;
   }
-  return { data, original };
+  originals.sort((a, b) => a.offset - b.offset);
+  return { data, original: originals[0]?.firmware ?? null, originals };
 }
 
 /**
@@ -90,24 +144,27 @@ export function spoofFirmware(buf: Uint8Array): { data: Uint8Array; original: st
  * brutes ("logs from Betaflight v4.1.0 are not supported", "headers required for
  * parsing are missing") par un message traduit.
  *
- * Sous 4.2 aucun spoof ne rattrape le log : les headers d'un 3.x sont réellement
- * différents, monter la version déclarée déplace juste l'erreur. Les forks
- * (EmuFlight, Rotorflight) décodent en silence de travers - vbat et compte de
- * cellules faux - donc ils sont refusés aussi.
+ * Sous supportedMin aucun spoof ne rattrape le log : les headers d'un Betaflight
+ * 3.x ou d'un vieil INAV sont réellement différents, monter la version déclarée
+ * déplace juste l'erreur. Les forks (EmuFlight, Rotorflight) décodent en silence
+ * de travers - vbat et compte de cellules faux - donc ils sont refusés aussi.
  *
  * Retourne le message d'erreur, ou null si la session peut être tentée.
+ * Reçoit le chunk déjà spoofé : les versions > nativeMax sont donc déjà
+ * redescendues dans la fenêtre, seul le plancher reste à contrôler ici.
  */
 export function unsupportedFirmware(chunk: Uint8Array, dict: Dict): string | null {
   const rev = extractHeaderText(chunk)['Firmware revision']?.trim() ?? '';
   const m = /^(\S+)\s+(\d+\.\d+(?:\.\d+)?)/.exec(rev);
   if (!m) return null; // forme inconnue : laisser le décodeur trancher
   const [, flavour, ver] = m;
-  if (flavour !== 'Betaflight') return dict.system.firmwareNotSupported(flavour);
+  const fam = FAMILIES.find((f) => f.flavour === flavour);
+  if (!fam) return dict.system.firmwareNotSupported(flavour);
   const p = versionParts(ver);
   if (!p) return null;
   const [major, minor] = p;
-  if (major < SUPPORTED_MIN[0] || (major === SUPPORTED_MIN[0] && minor < SUPPORTED_MIN[1])) {
-    return dict.system.firmwareTooOld(ver, SUPPORTED_MIN.join('.'));
+  if (major < fam.supportedMin[0] || (major === fam.supportedMin[0] && minor < fam.supportedMin[1])) {
+    return dict.system.firmwareTooOld(`${flavour} ${ver}`, fam.supportedMin.join('.'));
   }
   return null;
 }
@@ -196,7 +253,7 @@ export function rejectShortSession(meta: SessionMeta, dict: Dict = fr): string |
 /** Parse toutes les sessions d'un fichier .bbl. */
 export async function parseFile(fileName: string, buf: Uint8Array, dict: Dict = fr): Promise<ParsedFile> {
   if (!wasmModule) throw new Error('initWasm() doit être appelé avant parseFile()');
-  const { data: spoofed, original } = spoofFirmware(buf);
+  const { data: spoofed, originals } = spoofFirmware(buf);
   const chunks = splitSessions(spoofed);
   if (chunks.length === 0) {
     return {
@@ -217,7 +274,11 @@ export async function parseFile(fileName: string, buf: Uint8Array, dict: Dict = 
       continue;
     }
     try {
-      const fd = await parseSession(fileName, si, chunk.bytes, original, dict);
+      // Le firmware d'origine DE CETTE session : celui dont le marqueur tombe
+      // dans sa plage d'octets (un fichier concaténé peut en mélanger plusieurs).
+      const end = chunk.offset + chunk.bytes.length;
+      const own = originals.find((o) => o.offset >= chunk.offset && o.offset < end)?.firmware ?? null;
+      const fd = await parseSession(fileName, si, chunk.bytes, own, dict);
       const rejected = rejectShortSession(fd.meta, dict);
       if (rejected) {
         skipped.push({ index: si, fileName, sizeBytes: chunk.bytes.length, error: rejected });
@@ -250,6 +311,15 @@ async function parseSession(
   const h = file.parseHeaders(0);
   if (!h) throw new Error(dict.system.headersUnreadable);
 
+  // Dialecte INAV : mêmes frames, autres noms. axisRate est la consigne en
+  // deg/s (l'équivalent de setpoint), gyroRaw le gyro avant filtrage ; vbat,
+  // amperage et BaroAlt gardent les échelles centivolt/centiampère/cm de
+  // Betaflight (validé numériquement contre orangebox sur un log INAV 9).
+  const isInav = h.firmwareKind === 'INAV';
+  const N = isInav
+    ? { setpoint: 'axisRate', gyroUnfilt: 'gyroRaw', vbat: 'vbat', amperage: 'amperage', baroAlt: 'BaroAlt' }
+    : { setpoint: 'setpoint', gyroUnfilt: 'gyroUnfilt', vbat: 'vbatLatest', amperage: 'amperageLatest', baroAlt: 'baroAlt' };
+
   const rawHeaders = extractHeaderText(chunk);
   const fieldNames = [...h.mainFrameDef.keys()];
   const col: Record<string, number> = {};
@@ -258,9 +328,14 @@ async function parseSession(
 
   const rows: Row[] = [];
   const times: number[] = [];
-  const gpsTime: number[] = [];
+  // L'horodatage propre aux frames G est souvent corrompu (temps négatifs,
+  // sauts) : on ancre chaque frame G sur l'index de la dernière frame main
+  // décodée, et on lui donnera son temps monotone reconstruit plus bas.
+  const gpsAnchor: number[] = [];
   const gpsSat: number[] = [];
   const gpsSpeed: number[] = [];
+  const gpsHdop: number[] = [];
+  let gpsHasHdop = false;
   const failsafeCounts: Record<string, number> = {};
 
   const dp = h.getDataParser();
@@ -270,9 +345,12 @@ async function parseSession(
       rows.push([...pe.data.fields.values()] as number[]);
     } else if (pe.kind === 'gps') {
       const f = pe.data.fields as Map<string, number>;
-      gpsTime.push(pe.data.time ?? 0);
+      gpsAnchor.push(rows.length - 1);
       gpsSat.push(f.get('GPS_numSat') ?? 0);
       gpsSpeed.push(f.get('GPS_speed') ?? 0);
+      const hdop = f.get('GPS_hdop'); // INAV seulement, en centièmes
+      if (hdop !== undefined) gpsHasHdop = true;
+      gpsHdop.push(hdop ?? 0);
     } else if (pe.kind === 'slow') {
       const f = pe.data.fields as Map<string, unknown>;
       const phase = String(f.get('failsafePhase') ?? '?');
@@ -313,21 +391,25 @@ async function parseSession(
   }
   const t0 = times[0];
 
-  const motorOutput = (rawHeaders['motorOutput'] ?? '48,2047').split(',').map(Number);
+  // INAV écrit motorOutput:1100,2000 ; s'il manquait, la plage DSHOT Betaflight
+  // 48-2047 fausserait les % moteur d'un log INAV (sorties en µs 1000-2000).
+  const motorOutputDefault = isInav ? '1000,2000' : '48,2047';
+  const motorOutput = (rawHeaders['motorOutput'] ?? motorOutputDefault).split(',').map(Number);
 
   const meta: SessionMeta = {
     index,
     fileName,
     craftName: h.craftName ?? undefined,
     boardInfo: h.boardInfo ?? undefined,
-    firmware: originalFirmware ? `Betaflight ${originalFirmware}` : h.firmwareRevision,
+    firmware: originalFirmware ?? h.firmwareRevision,
+    firmwareFamily: isInav ? 'inav' : 'betaflight',
     debugMode: h.debugMode,
     fieldNames,
     sampleRateHz,
     durationS: time[time.length - 1],
     frameCount: rows.length,
-    motorOutputLow: motorOutput[0] ?? 48,
-    motorOutputHigh: motorOutput[1] ?? 2047,
+    motorOutputLow: motorOutput[0] ?? (isInav ? 1000 : 48),
+    motorOutputHigh: motorOutput[1] ?? (isInav ? 2000 : 2047),
     headers: rawHeaders,
     timeAnomalies,
   };
@@ -348,7 +430,7 @@ async function parseSession(
   };
 
   const gyro = triple('gyroADC');
-  const setpoint = triple('setpoint');
+  const setpoint = triple(N.setpoint);
   const motor = quad('motor');
   if (!gyro || !setpoint || !motor || !has('rcCommand[3]')) {
     throw new Error(dict.system.essentialFieldsMissing);
@@ -358,14 +440,14 @@ async function parseSession(
     meta,
     time,
     gyro,
-    gyroUnfilt: triple('gyroUnfilt'),
+    gyroUnfilt: triple(N.gyroUnfilt),
     setpoint,
     throttle: toF32(rows, col['rcCommand[3]']),
     motor,
     erpm: quad('eRPM'),
-    vbat: scaled('vbatLatest', 0.01),
-    amperage: scaled('amperageLatest', 0.01),
-    baroAlt: scaled('baroAlt', 0.01),
+    vbat: scaled(N.vbat, 0.01),
+    amperage: scaled(N.amperage, 0.01),
+    baroAlt: scaled(N.baroAlt, 0.01),
     axisP: triple('axisP'),
     axisI: triple('axisI'),
     axisD: has('axisD[0]')
@@ -377,11 +459,12 @@ async function parseSession(
       : null,
     axisF: triple('axisF'),
     gps:
-      gpsTime.length > 0
+      gpsAnchor.length > 0
         ? {
-            time: Float64Array.from(gpsTime, (v) => v - t0),
+            time: Float64Array.from(gpsAnchor, (a) => (a >= 0 ? time[a] : 0)),
             numSat: Float32Array.from(gpsSat),
             speedMps: Float32Array.from(gpsSpeed, (v) => v / 100), // brut en cm/s
+            hdop: gpsHasHdop ? Float32Array.from(gpsHdop, (v) => v / 100) : null,
           }
         : null,
     failsafePhaseCounts: failsafeCounts,

@@ -1,8 +1,9 @@
 # My Drone Can Fly Better
 
-**Your flight, decoded.** Drop a Betaflight blackbox log in the browser and get
-back numbered verdicts and ready-to-paste CLI commands: vibrations, filters,
-PID, motors, battery, GPS, safety.
+**Your flight, decoded.** Drop a Betaflight or INAV blackbox log in the browser
+and get back numbered verdicts and ready-to-paste CLI commands: vibrations,
+filters, PID, motors, battery, GPS, safety. (INAV logs get the flight metrics;
+the config lint and CLI lines are Betaflight only.)
 
 Nothing is uploaded. The `.bbl` is decoded, analysed and judged inside the tab,
 by DSP (FFT, Welch, Wiener deconvolution) and a deterministic rule engine. No
@@ -322,3 +323,7 @@ MIT, see [LICENSE](LICENSE). The vendored decoder
   place.
 
 If the tool saves you a pack or two: <https://ko-fi.com/rvia>.
+
+<!-- checked-by-anatoly -->
+[![Checked by Anatoly](https://img.shields.io/badge/checked%20by-Anatoly-blue)](https://github.com/r-via/anatoly)
+<!-- /checked-by-anatoly -->

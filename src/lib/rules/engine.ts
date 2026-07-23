@@ -25,13 +25,13 @@ const f2 = (x: number): string => x.toFixed(2);
 
 const SEVERITY_RANK: Record<Severity, number> = { crit: 0, warn: 1, info: 2, ok: 3 };
 
-interface WorstAxis {
+export interface WorstAxis {
   axis: Axis;
   value: number;
 }
 
-/** Pire axe (valeur max), en ignorant les null. */
-function worstAxis(values: ReadonlyArray<number | null>): WorstAxis | null {
+/** Pire axe (valeur max), en ignorant les null. Partagé avec compare.ts. */
+export function worstAxis(values: ReadonlyArray<number | null>): WorstAxis | null {
   let best: WorstAxis | null = null;
   for (let i = 0; i < values.length; i++) {
     const v = values[i];
@@ -505,12 +505,17 @@ export function evaluateSession(
           f2(p.vbatMax),
           f2(p.vbatMin),
         ),
-        // Noms de paramètres CLI, identiques dans toutes les langues.
-        fix: {
-          text: r.batteryReadingsImplausible.fix(
-            ampBad ? 'vbat_scale / ibata_scale' : 'vbat_scale',
-          ),
-        },
+        // Noms de paramètres CLI, identiques dans toutes les langues. Sur un
+        // log INAV le conseil citerait des paramètres Betaflight (ibata_scale
+        // n'existe pas côté INAV) : le verdict reste, le fix saute.
+        fix:
+          analysis.meta.firmwareFamily === 'inav'
+            ? undefined
+            : {
+                text: r.batteryReadingsImplausible.fix(
+                  ampBad ? 'vbat_scale / ibata_scale' : 'vbat_scale',
+                ),
+              },
       });
     }
     const sagPerCell = p.sagV / p.cells;
@@ -581,6 +586,40 @@ export function evaluateSession(
         fix: { text: r.batteryNotLogged.fix, cli: ['set blackbox_disable_bat = OFF'] },
       });
     }
+  }
+
+  // --- rpm-not-logged : eRPM absent → fondamentale moteur non mesurable --------
+  // Sans eRPM, la ligne « moteurs ~X Hz » du spectre, l'attribution du pic
+  // dominant à un moteur et la détection de desync sont impossibles : on
+  // l'annonce plutôt que de laisser croire à une analyse complète. On ne décode
+  // PAS le bit RPM du fields_disabled_mask : sa position dépend du firmware
+  // (ATTITUDE inséré en 2025.12 décale RPM de 12 à 13), l'absence des colonnes
+  // eRPM dans les trames suffit. dshot_bidir départage les deux causes.
+  // scoreExempt : l'axe moteurs reste mesuré par ailleurs (sorties moteur,
+  // saturation) - un champ de log décoché n'est pas un défaut du vol.
+  if (!analysis.motors.erpmAvailable) {
+    const bidir = cfgNum('dshot_bidir');
+    const cause =
+      bidir === null
+        ? r.rpmNotLogged.causeUnknown
+        : bidir === 0
+          ? r.rpmNotLogged.causeNoBidir
+          : r.rpmNotLogged.causeFieldDisabled;
+    findings.push({
+      id: 'rpm-not-logged',
+      severity: 'info',
+      category: 'moteurs',
+      scoreExempt: true,
+      title: r.rpmNotLogged.title,
+      detail: r.rpmNotLogged.detail(cause),
+      evidence: r.rpmNotLogged.evidence(bidir === null ? 'n/a' : String(bidir)),
+      fix:
+        bidir === null
+          ? { text: r.rpmNotLogged.fixUnknown }
+          : bidir === 0
+            ? { text: r.rpmNotLogged.fixNoBidir, cli: ['set dshot_bidir = ON'] }
+            : { text: r.rpmNotLogged.fixFieldDisabled, cli: ['set blackbox_disable_rpm = OFF'] },
+    });
   }
 
   // --- yoyo-detected -------------------------------------------------------------
@@ -674,20 +713,104 @@ export function evaluateSession(
     }
   }
 
-  // --- gps-low-sats -----------------------------------------------------------------
-  if (analysis.gps.available && analysis.gps.numSatMin !== null && analysis.gps.numSatMin < 6) {
-    findings.push({
-      id: 'gps-low-sats',
-      severity: 'warn',
-      category: 'gps',
-      title: r.gpsLowSats.title,
-      detail: r.gpsLowSats.detail,
-      evidence: r.gpsLowSats.evidence(
-        f0(analysis.gps.numSatMin),
-        analysis.gps.numSatMax !== null ? f0(analysis.gps.numSatMax) : null,
-      ),
-      fix: { text: r.gpsLowSats.fix },
-    });
+  // --- règles GPS (accroche, chutes, interférences) --------------------------
+  if (analysis.gps.available) {
+    const g = analysis.gps;
+
+    // gps-low-sats : plancher de couverture sous le seuil de fiabilité rescue.
+    if (g.numSatMin !== null && g.numSatMin < 6) {
+      findings.push({
+        id: 'gps-low-sats',
+        severity: 'warn',
+        category: 'gps',
+        title: r.gpsLowSats.title,
+        detail: r.gpsLowSats.detail,
+        evidence: r.gpsLowSats.evidence(
+          f0(g.numSatMin),
+          g.numSatMax !== null ? f0(g.numSatMax) : null,
+        ),
+        fix: { text: r.gpsLowSats.fix },
+      });
+    }
+
+    // gps-acquisition-slow : accroche saine (8+ sats) jamais atteinte ou tardive.
+    if (g.numSatMedian !== null) {
+      const neverHealthy = g.timeToHealthySatsS === null && analysis.meta.durationS >= 60;
+      const lateHealthy = g.timeToHealthySatsS !== null && g.timeToHealthySatsS > 30;
+      if (neverHealthy || lateHealthy) {
+        findings.push({
+          id: 'gps-acquisition-slow',
+          severity: neverHealthy ? 'warn' : 'info',
+          category: 'gps',
+          title: r.gpsAcquisitionSlow.title,
+          detail: r.gpsAcquisitionSlow.detail,
+          evidence: r.gpsAcquisitionSlow.evidence(
+            f0(g.numSatMedian),
+            g.timeToHealthySatsS !== null ? f0(g.timeToHealthySatsS) : null,
+          ),
+          fix: { text: r.gpsAcquisitionSlow.fix },
+        });
+      }
+    }
+
+    // gps-sat-drops : chutes transitoires de sats en vol (masquage, antenne, EMI).
+    // Seules les chutes sous 8 sats comptent : perdre 13 → 10 est du churn de
+    // constellation normal et ne menace pas un rescue.
+    const harmfulDrops = g.satDrops.filter((d) => d.toSats < 8);
+    if (harmfulDrops.length > 0) {
+      const worst = harmfulDrops.reduce((a, b) => (b.toSats < a.toSats ? b : a));
+      findings.push({
+        id: 'gps-sat-drops',
+        // Sous 5 sats le fix 3D lui-même est perdu : un rescue à cet instant partirait en vrille.
+        severity: worst.toSats < 5 ? 'crit' : 'warn',
+        category: 'gps',
+        title: r.gpsSatDrops.title,
+        detail: r.gpsSatDrops.detail,
+        evidence: r.gpsSatDrops.evidence(
+          f0(harmfulDrops.length),
+          f0(worst.fromSats),
+          f0(worst.toSats),
+          f0(worst.timeS),
+        ),
+        fix: { text: r.gpsSatDrops.fix },
+      });
+    }
+
+    // gps-emi-throttle : les sats tombent quand la puissance monte - signature
+    // d'interférence électrique (VTX/ESC/câblage) sur le récepteur GPS.
+    if (g.satsVsThrottle !== null && g.satsVsThrottle.delta <= -2) {
+      findings.push({
+        id: 'gps-emi-throttle',
+        severity: g.satsVsThrottle.delta <= -4 ? 'crit' : 'warn',
+        category: 'gps',
+        title: r.gpsEmiThrottle.title,
+        detail: r.gpsEmiThrottle.detail,
+        evidence: r.gpsEmiThrottle.evidence(
+          f0(g.satsVsThrottle.lowMedian),
+          f0(g.satsVsThrottle.highMedian),
+        ),
+        fix: { text: r.gpsEmiThrottle.fix },
+      });
+    }
+
+    // gps-hdop-high (INAV) : géométrie/qualité de signal médiocre malgré les sats.
+    if (g.hdopMedian !== null) {
+      const sev = sevAbove(g.hdopMedian, 2.5, 5);
+      if (sev) {
+        findings.push({
+          id: 'gps-hdop-high',
+          severity: sev,
+          category: 'gps',
+          title: r.gpsHdopHigh.title,
+          detail: r.gpsHdopHigh.detail,
+          evidence: r.gpsHdopHigh.evidence(
+            f1(g.hdopMedian),
+            g.hdopWorst !== null ? f1(g.hdopWorst) : null,
+          ),
+          fix: { text: r.gpsHdopHigh.fix },
+        });
+      }
+    }
   }
 
   // --- failsafe-triggered --------------------------------------------------------------

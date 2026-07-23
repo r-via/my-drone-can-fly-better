@@ -1,7 +1,8 @@
 # Documentation
 
 Reference documentation for **My Drone Can Fly Better**, the browser-only
-Betaflight blackbox analyser (`debrief/`, repo `r-via/my-drone-can-fly-better`).
+Betaflight and INAV blackbox analyser (`debrief/`, repo
+`r-via/my-drone-can-fly-better`).
 
 The [top level README](../README.md) is the tour. These pages are the detail:
 what every module computes, with which constant, and why that constant has the

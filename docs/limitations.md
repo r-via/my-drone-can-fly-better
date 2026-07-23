@@ -5,14 +5,31 @@ deliberate and documented in the source at the point it bites.
 
 ## Parser
 
-**The npm wrapper is stuck at firmware 4.4.**
+**The npm wrapper is stuck at firmware 4.4 (Betaflight) / 6.1 (INAV).**
 `blackbox-log` 0.2.2 (MIT, unmaintained) refuses any Betaflight version newer
-than 4.4, so `parse.ts` rewrites the version string in the headers to `4.4.2`,
-padded to constant length. This is safe because the frame format is self
-describing, and the result was cross checked against orangebox on real logs from
-three drones. The real firmware is preserved in `meta.firmware` and displayed.
-The proper fix is upstream, either a maintained wrapper or a direct binding to
-the Rust crate.
+than 4.4 and any INAV outside 5.0 to 6.1, so `parse.ts` rewrites the version
+string in the headers (`4.4.2` / `6.0.0`), padded to constant length. This is
+safe because the frame format is self describing, and the result was cross
+checked against orangebox on real logs from three drones plus an INAV 9 log.
+The real firmware is preserved in `meta.firmware` and displayed. The proper fix
+is upstream, either a maintained wrapper or a direct binding to the Rust crate.
+
+**INAV logs get a metric-only analysis.**
+The decoder and every flight metric work on INAV logs (field names and scales
+are mapped in `parse.ts`), but the config lint and the CLI suggestion lines are
+Betaflight vocabulary, so they are disabled for `firmwareFamily: 'inav'` and an
+info finding says so. INAV has no per motor eRPM in main frames either: desync
+detection and motor fundamental tracking stay off. Old INAV (before 5.0) is
+rejected as too old, like Betaflight before 4.2.
+
+**INAV throttle is floored at minthrottle.**
+INAV logs `rcCommand[3]` clamped to `minthrottle` (1100 by default), and the
+analysis thresholds are absolute microseconds (`FLIGHT_THROTTLE_US = 1100`).
+With the default the ground idle sits exactly on the threshold and is counted
+as ground, but a raised `minthrottle` (a common anti-desync tweak on big props)
+makes armed idle on the ground look like flight to the timeline, yoyo and
+oscillation windows. Long armed ground waits on such a craft can therefore leak
+into the flight-time tile and dilute those metrics.
 
 **A large log detaches the WASM ArrayBuffer.**
 Reusing one `Parser` across sessions crashes on the second one, so a fresh

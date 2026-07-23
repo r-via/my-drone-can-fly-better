@@ -256,6 +256,23 @@ describe('composants React (rendu sans DOM : appel direct, structure élément)'
     expect(SpectrumChart({ axes, motorFundamentalHz: null }).type).toBe('svg');
   });
 
+  it("SpectrumChart signale l'eRPM absent quand la fondamentale moteur est inconnue", () => {
+    const axes: [AxisSpectrum, AxisSpectrum, AxisSpectrum] = [
+      makeSpectrum(150),
+      makeSpectrum(250),
+      makeSpectrum(400),
+    ];
+    const missing = renderToStaticMarkup(
+      createElement(SpectrumChart, { axes, motorFundamentalHz: null }),
+    );
+    expect(missing).toContain('eRPM absent');
+    const present = renderToStaticMarkup(
+      createElement(SpectrumChart, { axes, motorFundamentalHz: 210 }),
+    );
+    expect(present).not.toContain('eRPM absent');
+    expect(present).toContain('moteurs ~210 Hz');
+  });
+
   it('SpectrumChart hachure la zone au-delà de Nyquist quand le log est lent', () => {
     const axes: [AxisSpectrum, AxisSpectrum, AxisSpectrum] = [
       makeSpectrum(150, 2000, 250),

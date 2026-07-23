@@ -41,8 +41,11 @@ export default function Page() {
   // fragment ne recharge pas le document. Sans cet écouteur, coller un lien de
   // partage dans un onglet déjà ouvert sur le site ne produisait rien.
   useEffect(() => {
-    let cancelled = false;
+    // Un contrôleur par lecture : deux hashchange rapprochés sinon, c'est la
+    // réponse la plus lente qui gagne, même si c'est celle de l'ancien lien.
+    let controller: AbortController | null = null;
     const read = () => {
+      controller?.abort();
       const inline = /^#r=(.+)$/.exec(window.location.hash);
       if (inline) {
         setSharedEncoded(inline[1]);
@@ -50,25 +53,27 @@ export default function Page() {
       }
       const short = /^#s=([A-Za-z0-9_-]+)$/.exec(window.location.hash);
       if (short) {
+        const ctrl = new AbortController();
+        controller = ctrl;
         setFetchingShared(true);
-        void fetch(`/api/share/${short[1]}`)
+        void fetch(`/api/share/${short[1]}`, { signal: ctrl.signal })
           .then(async (res) => {
             if (!res.ok) throw new Error(String(res.status));
             const encoded = await res.text();
-            if (!cancelled) setSharedEncoded(encoded);
+            if (!ctrl.signal.aborted) setSharedEncoded(encoded);
           })
           .catch(() => {
-            if (!cancelled) setShareError(dictRef.current.ui.shareLink.fetchError);
+            if (!ctrl.signal.aborted) setShareError(dictRef.current.ui.shareLink.fetchError);
           })
           .finally(() => {
-            if (!cancelled) setFetchingShared(false);
+            if (!ctrl.signal.aborted) setFetchingShared(false);
           });
       }
     };
     read();
     window.addEventListener('hashchange', read);
     return () => {
-      cancelled = true;
+      controller?.abort();
       window.removeEventListener('hashchange', read);
     };
   }, []);

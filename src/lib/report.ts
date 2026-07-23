@@ -59,6 +59,23 @@ export function analyzeFlightData(fd: FlightData, motorPoles: number): SessionAn
 }
 
 /**
+ * Constat affiché sur toute session INAV : les métriques de vol sont analysées
+ * normalement, mais le lint de config et les lignes CLI parlent Betaflight.
+ * scoreExempt : c'est une limite de l'outil, pas un défaut du vol.
+ */
+function inavLimitedFinding(analysis: SessionAnalysis, dict: Dict): Finding {
+  return {
+    id: 'inav-limited',
+    severity: 'info',
+    category: 'log',
+    title: dict.rules.inavLimited.title,
+    detail: dict.rules.inavLimited.detail,
+    evidence: dict.rules.inavLimited.evidence(analysis.meta.firmware),
+    scoreExempt: true,
+  };
+}
+
+/**
  * Verdicts d'une session à partir de ses seules métriques. Isolé de
  * buildSessionReport pour que le décodage d'un lien partagé (share/codec.ts)
  * rejoue exactement le même pipeline, sans avoir besoin du FlightData.
@@ -69,9 +86,13 @@ export function composeFindings(
   config: CliConfig,
   dict: Dict = fr,
 ): Finding[] {
+  // Session INAV : le snapshot config et les conseils CLI sont du vocabulaire
+  // Betaflight. Plutôt que de publier des commandes fausses, on coupe le lint
+  // et les lignes CLI (config null) et on l'annonce par un constat dédié.
+  const inav = analysis.meta.firmwareFamily === 'inav';
   const findings = sortFindings([
-    ...evaluateSession(analysis, profile, dict, config),
-    ...lintConfig(config, profile, analysis, dict),
+    ...evaluateSession(analysis, profile, dict, inav ? null : config),
+    ...(inav ? [inavLimitedFinding(analysis, dict)] : lintConfig(config, profile, analysis, dict)),
   ]);
   // « Tout est propre » (émis par le moteur, qui ne voit pas le lint config)
   // n'a plus sa place si le lint a trouvé des warn/crit dans le même rapport.

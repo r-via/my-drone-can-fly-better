@@ -19,15 +19,17 @@ export const system = {
     `${cells}S ${max}→${min} V (sag ${sag} V)`,
   cliCurrentMax: (amps: string) => `courant max ${amps} A`,
   cliCurrentUnreliable: 'courant : capteur non fiable, valeur écartée',
+  cliGpsSummary: (median: string, min: string, hdop: string | null) =>
+    `GPS ${median} sats (min ${min}${hdop !== null ? `, HDOP ${hdop}` : ''})`,
   headersUnreadable: 'Headers illisibles (session corrompue ?)',
   dataVersionUnsupported: 'Version de données inconnue du décodeur (fragment de log corrompu ?)',
   decoderRejected: (raw: string) => `Décodage impossible : ${raw}`,
   noFramesDecoded: 'Aucune frame décodée (données corrompues ?)',
   essentialFieldsMissing: 'Champs essentiels absents (gyroADC/setpoint/motor/rcCommand)',
-  firmwareTooOld: (version: string, minimum: string) =>
-    `Firmware trop ancien (Betaflight ${version}) - le décodeur demande ${minimum} au minimum`,
+  firmwareTooOld: (firmware: string, minimum: string) =>
+    `Firmware trop ancien (${firmware}) - le décodeur demande ${minimum} au minimum`,
   firmwareNotSupported: (flavour: string) =>
-    `Firmware non supporté : ${flavour} - seul Betaflight est décodé de façon fiable`,
+    `Firmware non supporté : ${flavour} - seuls Betaflight et INAV sont décodés de façon fiable`,
 
   // src/worker/analyze.worker.ts - progression + erreur de chargement WASM.
   wasmLoadFailed: (httpStatus: string) =>

@@ -7,9 +7,9 @@ import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 import './globals.css';
 
-const TITLE = 'My Drone Can Fly Better - Betaflight blackbox analysis';
+const TITLE = 'My Drone Can Fly Better - Betaflight & INAV blackbox analysis';
 const DESCRIPTION =
-  'Fully local Betaflight blackbox analysis: DSP and deterministic rules, quantified verdicts, ready-to-paste CLI commands. Your logs never leave your browser.';
+  'Fully local Betaflight and INAV blackbox analysis: DSP and deterministic rules, quantified verdicts, ready-to-paste CLI commands. Your logs never leave your browser.';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://mydronecanflybetter.wooplib.com'),
