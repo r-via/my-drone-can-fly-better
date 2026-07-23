@@ -687,6 +687,7 @@ export const zh: Dict = {
       bannerCta: '分析我的日志',
       decodeErrorMalformed: '这个分享链接不完整或已损坏。',
       decodeErrorVersion: '这个链接来自更新版本的网站。请刷新页面后重新索取。',
+      fetchError: '找不到报告：这个短链接不存在或已不可用。',
     },
 
     chartHelp: {

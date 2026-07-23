@@ -680,6 +680,7 @@ export const es: Dict = {
       bannerCta: 'Analizar mi log',
       decodeErrorMalformed: 'Este enlace para compartir está incompleto o dañado.',
       decodeErrorVersion: 'Este enlace viene de una versión más reciente del sitio. Recarga la página y vuelve a pedirlo.',
+      fetchError: 'Informe no encontrado: este enlace corto no existe o ya no está disponible.',
     },
 
     chartHelp: {

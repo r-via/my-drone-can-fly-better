@@ -1,21 +1,23 @@
 'use client';
 
 // Bouton « partager ce rapport » (en-tête du rapport) : encode la session
-// courante dans un fragment d'URL. Le fragment n'est jamais transmis au
-// serveur, ce qui garde la promesse affichée en page d'accueil - rien de ce
-// vol ne quitte le navigateur.
+// courante avec le codec de partage, puis dépose ce rapport encodé sur le
+// serveur (/api/share, Netlify Blobs) pour obtenir un lien court /s/<id>.
+// La version stockée est toujours complète : courbes incluses, jamais tronquée.
+// Seul le rapport calculé part au serveur - jamais le .bbl brut, la promesse
+// de la page d'accueil (les logs ne quittent pas le navigateur) tient.
 //
-// Le lien passe par /s (fonction Netlify share-preview) avec le titre et la
-// description en query string : c'est ce que lit le crawler Discord/Slack pour
-// afficher la carte d'aperçu (craft, score, verdicts par axe). Le rapport
-// lui-même reste dans le fragment, que le crawler ne voit jamais.
+// Si le dépôt échoue (hors ligne, fonction absente en next dev) : repli sur le
+// lien fragment historique /s?t=…&d=…#r=…, que le serveur ne voit jamais.
+// Dans les deux cas le crawler Discord/Slack lit le titre et la description
+// (query ou métadonnées du blob) et la carte PNG /api/og.
 
 import { useEffect, useRef, useState } from 'react';
 
 import { CheckIcon, ShareIcon } from '@/components/icons';
 import { useLocale } from '@/lib/i18n/locale';
 import { computeFlightScore } from '@/lib/score';
-import { DEFAULT_MAX_CHARS, encodeSessionAdaptive } from '@/lib/share/codec';
+import { DEFAULT_MAX_CHARS, encodeSession, encodeSessionAdaptive } from '@/lib/share/codec';
 
 import type { SessionReport, Severity } from '@/lib/types';
 
@@ -59,10 +61,8 @@ export default function ShareLink({ sessionReport, fileName }: ShareLinkProps) {
   const build = async (): Promise<string | null> => {
     setStatus('building');
     try {
-      const res = await encodeSessionAdaptive(sessionReport, fileName, dict);
-
-      // Aperçu OG : composé ici, dans la langue courante - la fonction /s ne
-      // fait que l'échapper et le servir au crawler.
+      // Aperçu OG : composé ici, dans la langue courante - le serveur ne fait
+      // que l'échapper et le servir au crawler.
       const { score, axes } = computeFlightScore(sessionReport);
       let worst: Severity = 'ok';
       for (const f of sessionReport.findings) {
@@ -82,6 +82,26 @@ export default function ShareLink({ sessionReport, fileName }: ShareLinkProps) {
         d: `${dict.ui.verdict[worst]} · ${axisSummary}`,
       });
 
+      // Lien court d'abord : la version complète (courbes incluses) part dans
+      // le store et l'id suffit dans le chat.
+      try {
+        const full = await encodeSession(sessionReport, fileName, dict);
+        const res = await fetch(`/api/share?${og.toString()}`, { method: 'POST', body: full });
+        if (res.ok) {
+          const { id } = (await res.json()) as { id?: string };
+          if (id) {
+            const url = `${window.location.origin}/s/${id}`;
+            setLink(url);
+            setOverBudget(false);
+            setStatus('ready');
+            return url;
+          }
+        }
+      } catch {
+        // Hors ligne ou fonction absente : le repli fragment prend la suite.
+      }
+
+      const res = await encodeSessionAdaptive(sessionReport, fileName, dict);
       // res.trimmed n'est pas montré ici : le destinataire voit déjà la note
       // « les courbes ne tenaient pas dans le lien » sur le rapport reçu, et
       // côté envoi ce détail technique n'aide pas au geste de partage.

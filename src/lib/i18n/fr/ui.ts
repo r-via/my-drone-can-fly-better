@@ -250,6 +250,7 @@ export const ui = {
     bannerCta: 'Analyser mon log',
     decodeErrorMalformed: 'Ce lien de partage est incomplet ou abîmé.',
     decodeErrorVersion: "Ce lien vient d'une version plus récente du site. Recharge la page, puis redemande-le.",
+    fetchError: "Rapport introuvable : ce lien court n'existe pas ou n'est plus disponible.",
   },
 
   // ChartHelp - bouton « Comment lire » + panneau latéral pédagogique par graphe.

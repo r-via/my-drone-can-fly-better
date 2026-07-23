@@ -680,6 +680,7 @@ export const de: Dict = {
       decodeErrorMalformed: 'Dieser Teilen-Link ist unvollständig oder beschädigt.',
       decodeErrorVersion:
         'Dieser Link stammt aus einer neueren Version der Seite. Lade die Seite neu und frag ihn noch einmal an.',
+      fetchError: 'Bericht nicht gefunden: dieser Kurzlink existiert nicht oder ist nicht mehr verfügbar.',
     },
 
     chartHelp: {

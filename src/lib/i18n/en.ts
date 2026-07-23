@@ -691,6 +691,7 @@ export const en: Dict = {
       bannerCta: 'Analyse my log',
       decodeErrorMalformed: 'This share link is incomplete or damaged.',
       decodeErrorVersion: 'This link comes from a newer version of the site. Reload the page, then ask for it again.',
+      fetchError: 'Report not found: this short link does not exist or is no longer available.',
     },
 
     chartHelp: {

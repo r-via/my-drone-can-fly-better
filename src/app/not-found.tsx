@@ -2,9 +2,10 @@
 
 // Page 404 - et filet de sécurité des liens de partage /s.
 //
-// En prod Netlify, /s est réécrit vers la fonction share-preview (aperçu OG).
-// Partout ailleurs (next dev sans Netlify, autre hébergeur, redirect cassé),
-// /s tombe ici : on renvoie alors vers l'app en préservant le fragment #r=…,
+// En prod Netlify, /s est réécrit vers la fonction share-preview et /s/<id>
+// vers l'edge function share-report (aperçu OG). Partout ailleurs (next dev
+// sans Netlify, autre hébergeur, redirect cassé), ces chemins tombent ici : on
+// renvoie alors vers l'app en préservant le rapport (#r=…) ou l'id (#s=<id>),
 // pour qu'un lien de partage reste fonctionnel même sans l'aperçu.
 
 import { useEffect, useState } from 'react';
@@ -16,8 +17,14 @@ export default function NotFound() {
   const [redirecting, setRedirecting] = useState(true);
 
   useEffect(() => {
-    if (window.location.pathname.replace(/\/$/, '') === '/s' && /^#r=.+/.test(window.location.hash)) {
+    const path = window.location.pathname.replace(/\/$/, '');
+    if (path === '/s' && /^#r=.+/.test(window.location.hash)) {
       window.location.replace('/' + window.location.hash);
+      return;
+    }
+    const short = /^\/s\/([A-Za-z0-9_-]+)$/.exec(path);
+    if (short) {
+      window.location.replace('/#s=' + short[1]);
       return;
     }
     setRedirecting(false);

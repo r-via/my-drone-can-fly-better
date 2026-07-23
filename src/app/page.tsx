@@ -25,21 +25,52 @@ export default function Page() {
   const [sharedEncoded, setSharedEncoded] = useState<string | null>(null);
   const [sharedReport, setSharedReport] = useState<Report | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  /** Lien court en cours de résolution (/api/share/<id>) : montre le spinner. */
+  const [fetchingShared, setFetchingShared] = useState(false);
 
-  // Le fragment n'est jamais transmis au serveur : le rapport partagé n'apparaît
-  // donc dans aucun log d'accès, ce qui vaut aussi pour un site statique.
+  // L'écouteur de fragment est monté une seule fois ; le ref lui donne accès au
+  // dictionnaire courant sans le réabonner à chaque changement de langue.
+  const dictRef = useRef(dict);
+  dictRef.current = dict;
+
+  // Deux formats de lien : #r=<rapport encodé> (fragment autonome, jamais
+  // transmis au serveur) et #s=<id> (lien court : le rapport encodé est relu
+  // depuis /api/share/<id>, où /s/<id> l'a déposé au partage).
   //
   // `hashchange` en plus du montage : une navigation qui ne change que le
   // fragment ne recharge pas le document. Sans cet écouteur, coller un lien de
   // partage dans un onglet déjà ouvert sur le site ne produisait rien.
   useEffect(() => {
+    let cancelled = false;
     const read = () => {
-      const match = /^#r=(.+)$/.exec(window.location.hash);
-      if (match) setSharedEncoded(match[1]);
+      const inline = /^#r=(.+)$/.exec(window.location.hash);
+      if (inline) {
+        setSharedEncoded(inline[1]);
+        return;
+      }
+      const short = /^#s=([A-Za-z0-9_-]+)$/.exec(window.location.hash);
+      if (short) {
+        setFetchingShared(true);
+        void fetch(`/api/share/${short[1]}`)
+          .then(async (res) => {
+            if (!res.ok) throw new Error(String(res.status));
+            const encoded = await res.text();
+            if (!cancelled) setSharedEncoded(encoded);
+          })
+          .catch(() => {
+            if (!cancelled) setShareError(dictRef.current.ui.shareLink.fetchError);
+          })
+          .finally(() => {
+            if (!cancelled) setFetchingShared(false);
+          });
+      }
     };
     read();
     window.addEventListener('hashchange', read);
-    return () => window.removeEventListener('hashchange', read);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('hashchange', read);
+    };
   }, []);
 
   useEffect(() => {
@@ -138,7 +169,7 @@ export default function Page() {
     return <ReportView report={sharedReport} files={[]} onReset={dismissShared} />;
   }
 
-  if (analyzer.status === 'working' || reading || (sharedEncoded && !shareError)) {
+  if (analyzer.status === 'working' || reading || fetchingShared || (sharedEncoded && !shareError)) {
     return (
       <div
         role="status"
