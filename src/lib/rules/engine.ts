@@ -431,8 +431,66 @@ export function evaluateSession(
     }
   }
 
+  // --- motors-floor-clip : saturation par le bas ------------------------------
+  // Symétrique de motors-saturation, mais mesuré uniquement en vol stabilisé :
+  // toucher le plancher pendant un flip commandé est normal (airmode), y camper
+  // en stationnaire signifie que le mixer n'a plus de réserve vers le bas.
+  {
+    const sev = sevAbove(analysis.motors.floorClipPct, t.floorClipWarn, t.floorClipCrit);
+    if (sev) {
+      findings.push({
+        id: 'motors-floor-clip',
+        severity: sev,
+        category: 'moteurs',
+        title: r.motorsFloorClip.title,
+        detail: r.motorsFloorClip.detail,
+        evidence: r.motorsFloorClip.evidence(
+          f2(analysis.motors.floorClipPct),
+          t.floorClipWarn,
+          t.floorClipCrit,
+        ),
+        fix: { text: r.motorsFloorClip.fix },
+      });
+    }
+  }
+
+  // --- motors-balance-shift : l'équilibre casse EN vol -------------------------
+  // Prime sur motors-imbalance : quand la rupture est datée, la moyenne de
+  // session est le SYMPTÔME de la rupture, et le conseil « recentre le pack »
+  // serait à côté de la cause. Une seule des deux règles parle.
+  const shift = analysis.motors.balanceShift;
+  const shiftQualifies = shift !== null && shift.deltaPctPts >= t.imbalanceShiftWarn;
+  if (shift !== null && shiftQualifies) {
+    const motorLabel = `M${shift.motor}`;
+    const counterNote =
+      shift.counterMotor !== null && shift.counterDeltaPctPts !== null
+        ? r.motorsBalanceShift.counterNote(`M${shift.counterMotor}`, f1(shift.counterDeltaPctPts))
+        : '';
+    findings.push({
+      id: 'motors-balance-shift',
+      severity: shift.deltaPctPts >= t.imbalanceShiftCrit ? 'crit' : 'warn',
+      category: 'moteurs',
+      title: r.motorsBalanceShift.title(motorLabel),
+      detail: r.motorsBalanceShift.detail(motorLabel),
+      evidence: r.motorsBalanceShift.evidence(
+        motorLabel,
+        f1(shift.beforeDevPts),
+        f1(shift.afterDevPts),
+        f1(shift.deltaPctPts),
+        f1(shift.tChangeS),
+        counterNote,
+      ),
+      fix: {
+        text:
+          analysis.meta.firmwareFamily === 'inav'
+            ? r.motorsBalanceShift.fixInav(motorLabel)
+            : r.motorsBalanceShift.fixBetaflight(motorLabel),
+      },
+    });
+  }
+
   // --- motors-imbalance -------------------------------------------------------
-  if (analysis.motors.imbalancePctPts >= t.imbalanceWarn) {
+  if (!shiftQualifies && analysis.motors.imbalancePctPts >= t.imbalanceWarn) {
     const per = analysis.motors.perMotorAvgPct;
     let hi = 0;
     let lo = 0;
@@ -446,13 +504,24 @@ export function evaluateSession(
       category: 'moteurs',
       title: r.motorsImbalance.title,
       detail: r.motorsImbalance.detail(`M${hi + 1}`, `M${lo + 1}`),
-      // evidenceN et pas evidence : l'ancienne signature 4-aire reste dans les
-      // dictionnaires uniquement pour rejouer les liens partagés déjà émis.
-      evidence: r.motorsImbalance.evidenceN(
-        per.map((v, i) => `M${i + 1} ${f0(v)}`).join(' / '),
-        f1(analysis.motors.imbalancePctPts),
-        t.imbalanceWarn,
-      ),
+      // Quad : signature 4-aire historique, pour que les liens partagés restent
+      // rendables même par un client pas encore à jour. evidenceN (liste
+      // pré-jointe) ne sert qu'au-delà de 4 moteurs, où elle est indispensable.
+      evidence:
+        per.length === 4
+          ? r.motorsImbalance.evidence(
+              f0(per[0]),
+              f0(per[1]),
+              f0(per[2]),
+              f0(per[3]),
+              f1(analysis.motors.imbalancePctPts),
+              t.imbalanceWarn,
+            )
+          : r.motorsImbalance.evidenceN(
+              per.map((v, i) => `M${i + 1} ${f0(v)}`).join(' / '),
+              f1(analysis.motors.imbalancePctPts),
+              t.imbalanceWarn,
+            ),
       fix: { text: r.motorsImbalance.fix(`M${hi + 1}`) },
     });
   }
@@ -473,6 +542,38 @@ export function evaluateSession(
       evidence: r.motorsDesync.evidence(zeros.join(', ')),
       fix: { text: r.motorsDesync.fix(motorList) },
     });
+  }
+
+  // --- control-loss : excursion non commandée, mixer au bout de son autorité ---
+  // Seule signature de désync accessible SANS eRPM (APD, INAV…) : le drone
+  // tourne plus vite que la consigne (ou à contre-sens) pendant que le mixer
+  // demande déjà le différentiel maximal. Couvre aussi hélice perdue et impact.
+  {
+    const cl = analysis.controlLoss;
+    const w = cl !== null && cl.worst !== null ? cl.worst : null;
+    if (cl !== null && w !== null) {
+      findings.push({
+        id: 'control-loss',
+        severity: 'crit',
+        category: 'securite',
+        title: r.controlLoss.title,
+        detail: r.controlLoss.detail,
+        evidence: r.controlLoss.evidence(
+          String(cl.events.length),
+          f2(w.tStart),
+          f2(w.tEnd),
+          f0(w.peakExcessDps),
+          AXIS_NAMES[w.axis],
+          f0(w.peakSpreadPct),
+        ),
+        fix: {
+          text:
+            analysis.meta.firmwareFamily === 'inav'
+              ? r.controlLoss.fixInav
+              : r.controlLoss.fixBetaflight,
+        },
+      });
+    }
   }
 
   // --- batterie ----------------------------------------------------------------
@@ -587,16 +688,33 @@ export function evaluateSession(
     }
   }
 
-  // --- rpm-not-logged : eRPM absent → fondamentale moteur non mesurable --------
-  // Sans eRPM, la ligne « moteurs ~X Hz » du spectre, l'attribution du pic
-  // dominant à un moteur et la détection de desync sont impossibles : on
-  // l'annonce plutôt que de laisser croire à une analyse complète. On ne décode
-  // PAS le bit RPM du fields_disabled_mask : sa position dépend du firmware
-  // (ATTITUDE inséré en 2025.12 décale RPM de 12 à 13), l'absence des colonnes
-  // eRPM dans les trames suffit. dshot_bidir départage les deux causes.
+  // --- rpm-not-logged : régime moteur absent → fondamentale non mesurable ------
+  // Sans source RPM, la ligne « moteurs ~X Hz » du spectre est impossible : on
+  // l'annonce plutôt que de laisser croire à une analyse complète. Chaque
+  // famille a SA source et SON vocabulaire, jamais mélangés : eRPM par moteur
+  // via DShot bidirectionnel sur Betaflight, escRPM agrégé via télémétrie ESC
+  // sur INAV (où dshot_bidir n'existe pas).
   // scoreExempt : l'axe moteurs reste mesuré par ailleurs (sorties moteur,
   // saturation) - un champ de log décoché n'est pas un défaut du vol.
-  if (!analysis.motors.erpmAvailable) {
+  if (analysis.meta.firmwareFamily === 'inav') {
+    // escRpm présent : le régime est loggé sous sa forme INAV, rien à signaler
+    // (le per-moteur n'existe simplement pas sur ce firmware).
+    if (!analysis.motors.escRpmAvailable) {
+      findings.push({
+        id: 'rpm-not-logged',
+        severity: 'info',
+        category: 'moteurs',
+        scoreExempt: true,
+        title: r.rpmNotLogged.title,
+        detail: r.rpmNotLogged.detailInav,
+        evidence: r.rpmNotLogged.evidenceInav,
+        fix: { text: r.rpmNotLogged.fixInav },
+      });
+    }
+  } else if (!analysis.motors.erpmAvailable) {
+    // On ne décode PAS le bit RPM du fields_disabled_mask : sa position dépend
+    // du firmware (ATTITUDE inséré en 2025.12 décale RPM de 12 à 13), l'absence
+    // des colonnes eRPM dans les trames suffit. dshot_bidir départage les causes.
     const bidir = cfgNum('dshot_bidir');
     const cause =
       bidir === null

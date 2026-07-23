@@ -1,4 +1,5 @@
 // Orchestrateur : ParsedFile[] → Report complet.
+import { analyzeControlLoss } from './analysis/control';
 import { analyzeYoyo, analyzePropwash } from './analysis/flight';
 import { analyzeOscillation } from './analysis/oscillation';
 import {
@@ -51,6 +52,7 @@ export function analyzeFlightData(fd: FlightData, motorPoles: number): SessionAn
     yoyo: analyzeYoyo(fd),
     propwash: analyzePropwash(fd),
     oscillation: analyzeOscillation(fd),
+    controlLoss: analyzeControlLoss(fd),
     filters: analyzeFilters(fd),
     timeline: analyzeTimeline(fd),
     gps: analyzeGps(fd),

@@ -8,6 +8,7 @@ import type {
   AxisTracking,
   FlightData,
   GpsMetrics,
+  MotorBalanceShift,
   MotorMetrics,
   NoiseMetrics,
   PowerMetrics,
@@ -246,6 +247,161 @@ export function analyzePower(fd: FlightData): PowerMetrics | null {
 // Moteurs : moyennes, déséquilibre, saturation, desyncs (eRPM)
 // ---------------------------------------------------------------------------
 
+/**
+ * |consigne| max (deg/s, tous axes) sous laquelle la demande est « stabilisée ».
+ * Au-delà, un moteur au plancher pendant un flip commandé est du fonctionnement
+ * normal (airmode), pas une perte d'autorité.
+ */
+const STEADY_SETPOINT_DPS = 150;
+/**
+ * Marge au-dessus du plancher (en % de plage) pour compter un écrêtage bas :
+ * couvre l'idle DSHOT Betaflight (~5.5 %) comme le plancher INAV (0 %) sans
+ * dépendre d'un paramètre de config absent des headers INAV.
+ */
+const FLOOR_CLIP_PCT_MARGIN = 6;
+/**
+ * Différentiel mixer mini (pts de %) pour qu'un plancher compte : tous moteurs
+ * au ralenti (descente gaz coupés) n'est pas un écrêtage, un moteur au plancher
+ * pendant que son opposé porte 40 % de plus l'est.
+ */
+const FLOOR_CLIP_MIN_SPREAD = 30;
+/** Sous ce nombre d'échantillons stabilisés, le % d'écrêtage n'a pas de sens. */
+const MIN_STEADY_SAMPLES = 500;
+
+/** Largeur des paniers de la série d'équilibre (s) : lisse le différentiel de pilotage. */
+const SHIFT_BIN_S = 0.1;
+/** Chaque côté de la rupture doit tenir au moins ça de vol pour être une tendance. */
+const SHIFT_MIN_SEGMENT_S = 3;
+/**
+ * Écart soutenu mini (pts de %) pour retenir une rupture. C'est un plancher de
+ * DÉTECTION, volontairement sous les seuils d'alerte des profils
+ * (imbalanceShiftWarn) : la métrique existe dès que la rupture est mesurable,
+ * le verdict reste l'affaire du profil.
+ */
+const SHIFT_MIN_DELTA_PTS = 6;
+/**
+ * La médiane de chaque côté doit confirmer au moins cette part de l'écart des
+ * moyennes : élimine les « ruptures » fabriquées par quelques transitoires
+ * violents (crash, figure) qui tirent une moyenne sans déplacer le régime.
+ */
+const SHIFT_MEDIAN_CONFIRM = 0.6;
+
+/** Médiane d'un tableau non vide. */
+function medianArr(x: number[]): number {
+  const s = [...x].sort((a, b) => a - b);
+  const mid = s.length >> 1;
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/** |consigne| à partir de laquelle une réponse gyro est exigible en vol. */
+const RESPONSE_SETPOINT_DPS = 200;
+/** Sous ce nombre d'échantillons commandés, pas de verdict banc/vol possible. */
+const MIN_RESPONSE_SAMPLES = 200;
+/** Médiane de |gyro|/|consigne| sous laquelle le drone n'a pas répondu : banc. */
+const BENCH_RESPONSE_RATIO = 0.2;
+
+/**
+ * Log de banc : le pilote commande de grandes rotations et le gyro ne bouge
+ * pas (quad tenu, posé, hélices démontées). L'I-term s'enroule alors jusqu'à
+ * écarteler le mixer (mesuré 0/100 % pendant 20 s sur un log au sol du
+ * corpus), ce qui imite exactement un écrêtage bas ou une rupture d'équilibre
+ * de vol. Sur un quad EN L'AIR, même cassé, le gyro répond toujours
+ * substantiellement à une grande consigne. Sans grande consigne dans le log
+ * (pur stationnaire), on présume le vol.
+ */
+function looksLikeBenchLog(fd: FlightData): boolean {
+  const ratios: number[] = [];
+  for (let i = 0; i < fd.time.length; i++) {
+    let axis = -1;
+    let sp = 0;
+    for (let a = 0; a < 3; a++) {
+      const s = Math.abs(fd.setpoint[a][i]);
+      if (s > sp) {
+        sp = s;
+        axis = a;
+      }
+    }
+    if (axis < 0 || sp < RESPONSE_SETPOINT_DPS) continue;
+    const g = Math.abs(fd.gyro[axis][i]);
+    if (g >= GYRO_ABERRATION_LIMIT) continue;
+    ratios.push(g / sp);
+  }
+  if (ratios.length < MIN_RESPONSE_SAMPLES) return false;
+  return medianArr(ratios) < BENCH_RESPONSE_RATIO;
+}
+
+/**
+ * Rupture d'équilibre : détection de saut unique (CUSUM) sur l'écart de chaque
+ * moteur à la moyenne collective, série mise en paniers de SHIFT_BIN_S en vol.
+ * Le moteur retenu est le plus SURcommandé après la rupture : c'est le côté
+ * qui a perdu de la poussée (ou vers lequel la masse s'est déplacée).
+ */
+function detectBalanceShift(
+  dev: number[][],
+  binT: number[],
+): MotorBalanceShift | null {
+  const nBins = binT.length;
+  const minSeg = Math.max(2, Math.round(SHIFT_MIN_SEGMENT_S / SHIFT_BIN_S));
+  if (nBins < 2 * minSeg) return null;
+
+  const nMotors = dev.length;
+  // Meilleure coupure PARTAGÉE : la rupture est un événement du vol, pas un
+  // caprice par moteur. On maximise la somme des |S_k| (CUSUM) sur tous les
+  // moteurs, ce qui date l'instant où l'équilibre global bascule.
+  let bestK = -1;
+  let bestScore = 0;
+  const cum: number[][] = dev.map((x) => {
+    const mean = x.reduce((s, v) => s + v, 0) / x.length;
+    let acc = 0;
+    return x.map((v) => (acc += v - mean));
+  });
+  for (let k = minSeg - 1; k < nBins - minSeg; k++) {
+    let score = 0;
+    for (let m = 0; m < nMotors; m++) score += Math.abs(cum[m][k]);
+    if (score > bestScore) {
+      bestScore = score;
+      bestK = k;
+    }
+  }
+  if (bestK < 0) return null;
+
+  let best: MotorBalanceShift | null = null;
+  let counterMotor: number | null = null;
+  let counterDelta = 0;
+  for (let m = 0; m < nMotors; m++) {
+    const before = dev[m].slice(0, bestK + 1);
+    const after = dev[m].slice(bestK + 1);
+    const meanB = before.reduce((s, v) => s + v, 0) / before.length;
+    const meanA = after.reduce((s, v) => s + v, 0) / after.length;
+    const delta = meanA - meanB;
+    const medDelta = medianArr(after) - medianArr(before);
+    // Confirmation par la médiane, dans le même sens et une part suffisante de
+    // l'écart : un delta porté par quelques transitoires ne compte pas.
+    if (Math.sign(medDelta) !== Math.sign(delta)) continue;
+    if (Math.abs(medDelta) < Math.abs(delta) * SHIFT_MEDIAN_CONFIRM) continue;
+    if (delta >= SHIFT_MIN_DELTA_PTS && (best === null || delta > best.deltaPctPts)) {
+      best = {
+        motor: m + 1,
+        tChangeS: binT[bestK + 1],
+        deltaPctPts: delta,
+        beforeDevPts: meanB,
+        afterDevPts: meanA,
+        counterMotor: null,
+        counterDeltaPctPts: null,
+      };
+    }
+    if (delta <= -SHIFT_MIN_DELTA_PTS && delta < counterDelta) {
+      counterDelta = delta;
+      counterMotor = m + 1;
+    }
+  }
+  if (best !== null && counterMotor !== null) {
+    best.counterMotor = counterMotor;
+    best.counterDeltaPctPts = counterDelta;
+  }
+  return best;
+}
+
 export function analyzeMotors(fd: FlightData): MotorMetrics {
   const pct = motorPctFn(fd);
   const satThreshold = fd.meta.motorOutputHigh - SATURATION_MARGIN;
@@ -286,6 +442,78 @@ export function analyzeMotors(fd: FlightData): MotorMetrics {
     }
   }
 
+  // Présence != câblage : un log INAV sans télémétrie ESC garde le champ
+  // escRPM dans ses frames S, mais à zéro. « Disponible » = au moins une
+  // valeur non nulle.
+  let escRpmAvailable = false;
+  if (fd.escRpm) {
+    for (const v of fd.escRpm.rpm) {
+      if (v > 0) {
+        escRpmAvailable = true;
+        break;
+      }
+    }
+  }
+
+  // Écrêtage bas en vol stabilisé + série d'équilibre pour la détection de
+  // rupture : une seule passe sur les frames, filtrée « en vol, frame saine ».
+  let steadyCount = 0;
+  let floorClipCount = 0;
+  const devBins: number[][] = Array.from({ length: nMotors }, () => []);
+  const binT: number[] = [];
+  // Accumulateurs du panier courant (SHIFT_BIN_S) : sommes par moteur + collective.
+  let binStart = -Infinity;
+  let binN = 0;
+  const binSum = new Float64Array(nMotors);
+  const flushBin = (): void => {
+    if (binN === 0) return;
+    let coll = 0;
+    for (let m = 0; m < nMotors; m++) coll += binSum[m];
+    coll /= nMotors * binN;
+    for (let m = 0; m < nMotors; m++) devBins[m].push(pct(binSum[m] / binN) - pct(coll));
+    binT.push(binStart);
+    binN = 0;
+    binSum.fill(0);
+  };
+  for (let i = 0; i < fd.time.length; i++) {
+    if (fd.throttle[i] <= FLIGHT_THROTTLE_US) continue;
+    let minV = Infinity;
+    let maxV = -Infinity;
+    let frameOk = true;
+    for (let m = 0; m < nMotors; m++) {
+      const v = fd.motor[m][i];
+      if (!isMotorSampleValid(v, hi)) {
+        frameOk = false;
+        break;
+      }
+      if (v < minV) minV = v;
+      if (v > maxV) maxV = v;
+    }
+    if (!frameOk) continue;
+
+    if (fd.time[i] - binStart >= SHIFT_BIN_S) {
+      flushBin();
+      binStart = fd.time[i];
+    }
+    binN++;
+    for (let m = 0; m < nMotors; m++) binSum[m] += fd.motor[m][i];
+
+    const steady =
+      Math.abs(fd.setpoint[0][i]) <= STEADY_SETPOINT_DPS &&
+      Math.abs(fd.setpoint[1][i]) <= STEADY_SETPOINT_DPS &&
+      Math.abs(fd.setpoint[2][i]) <= STEADY_SETPOINT_DPS;
+    if (!steady) continue;
+    steadyCount++;
+    if (pct(minV) <= FLOOR_CLIP_PCT_MARGIN && pct(maxV) - pct(minV) >= FLOOR_CLIP_MIN_SPREAD) {
+      floorClipCount++;
+    }
+  }
+  flushBin();
+
+  // Un log de banc imite l'écrêtage bas et la rupture d'équilibre (I-term
+  // enroulé au sol) : ces deux métriques n'ont de sens que si le drone a volé.
+  const bench = looksLikeBenchLog(fd);
+
   return {
     avgPct: countAll > 0 ? pct(sumAll / countAll) : 0,
     perMotorAvgPct,
@@ -293,6 +521,10 @@ export function analyzeMotors(fd: FlightData): MotorMetrics {
     saturationPct: countAll > 0 ? (100 * satCount) / countAll : 0,
     desyncZeros,
     erpmAvailable,
+    escRpmAvailable,
+    floorClipPct:
+      !bench && steadyCount >= MIN_STEADY_SAMPLES ? (100 * floorClipCount) / steadyCount : 0,
+    balanceShift: bench ? null : detectBalanceShift(devBins, binT),
   };
 }
 

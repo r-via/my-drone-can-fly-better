@@ -134,9 +134,10 @@ export const rules = {
     title: 'Déséquilibre entre moteurs',
     detail: (motorHigh: string, motorLow: string) =>
       `${motorHigh} travaille nettement plus que ${motorLow} pour tenir le quad à plat : centre de gravité décalé (pack, caméra), hélice voilée ou moteur fatigué de ce côté.`,
-    /** Legacy 4 moteurs : ne sert plus qu'à rejouer les liens partagés émis avant le passage à N moteurs (arguments positionnels capturés). Les nouveaux rapports passent par evidenceN. */
+    /** Signature 4-aire : sert aux quads (et au rejeu des liens partagés antérieurs, arguments positionnels capturés). Ne pas changer son arité sans bump de SHARE_VERSION. */
     evidence: (m1: string, m2: string, m3: string, m4: string, spread: string, warn: number) =>
       `Moyennes moteur : M1 ${m1} / M2 ${m2} / M3 ${m3} / M4 ${m4} % - écart ${spread} pts (seuil ${warn})`,
+    /** Au-delà de 4 moteurs (X8…) : liste "M1 25 / … / M8 45" pré-jointe par le moteur de règles. */
     evidenceN: (motors: string, spread: string, warn: number) =>
       `Moyennes moteur : ${motors} % - écart ${spread} pts (seuil ${warn})`,
     fix: (motorHigh: string) =>
@@ -150,6 +151,54 @@ export const rules = {
     evidence: (zeros: string) => `eRPM zéros en vol par moteur : [${zeros}]`,
     fix: (motors: string) =>
       `Contrôle les soudures et le connecteur du moteur ${motors}, fais-le tourner à la main (point dur = roulement), et vérifie le firmware/timing ESC. Ne revole pas avant.`,
+  },
+
+  motorsBalanceShift: {
+    title: (motor: string) => `Rupture d'équilibre en vol sur ${motor}`,
+    detail: (motor: string) =>
+      `L'équilibre moteur bascule brutalement en plein vol et ne revient pas : ${motor} est nettement surcommandé après la rupture. Ce moteur (ou son ESC) a perdu de la poussée en vol - désync, bobinage cuit, roulement fatigué - ou une masse s'est déplacée (pack mal sanglé).`,
+    evidence: (
+      motor: string,
+      before: string,
+      after: string,
+      delta: string,
+      tChange: string,
+      counterNote: string,
+    ) =>
+      `${motor} : écart à la moyenne des moteurs ${before} → ${after} pts autour de t=${tChange} s (Δ +${delta} pts)${counterNote}`,
+    counterNote: (motor: string, delta: string) => ` ; en face ${motor} est délesté (Δ ${delta} pts)`,
+    fixBetaflight: (motor: string) =>
+      `Compare la température des moteurs juste après un vol court, contrôle ${motor} (roulement à la main, résistance des phases) et son ESC, et vérifie que le pack n'a pas glissé. L'eRPM du DSHOT bidirectionnel confirmerait le désync au prochain vol.`,
+    fixInav: (motor: string) =>
+      `Compare la température des moteurs juste après un vol court, contrôle ${motor} (roulement à la main, résistance des phases) et son ESC, et vérifie que le pack n'a pas glissé. Branche la télémétrie ESC pour logger le régime moteur et confirmer le désync au prochain vol.`,
+  },
+
+  motorsFloorClip: {
+    title: 'Moteur au plancher en vol stabilisé',
+    detail:
+      "Hors manoeuvre commandée, un moteur tombe au ralenti pendant que le mixer demande un grand différentiel : plus de réserve d'autorité vers le bas, la mise à plat ne tient que par les moteurs restants. Conséquence typique d'un fort déséquilibre (moteur faible, CG très décalé).",
+    evidence: (pct: string, warn: number, crit: number) =>
+      `Écrêtage bas ${pct} % du vol stabilisé (warn ${warn} %, crit ${crit} %)`,
+    fix: "Traite d'abord le déséquilibre signalé par ailleurs (moteur fatigué, rupture en vol, CG) ; si l'équilibre est bon, baisse l'idle moteur ou allège le quad.",
+  },
+
+  controlLoss: {
+    title: 'Perte de contrôle en vol',
+    detail:
+      "Le drone tourne nettement plus vite que la consigne (ou à contre-sens) pendant que le mixer est déjà au différentiel maximal, butée touchée : la boucle commande le maximum physique et l'attitude diverge quand même. Signature d'un moteur qui décroche (désync, perte de poussée), d'une hélice endommagée ou d'un impact.",
+    evidence: (
+      count: string,
+      tStart: string,
+      tEnd: string,
+      excess: string,
+      axis: string,
+      spread: string,
+    ) =>
+      `${count} événement(s) - le pire à t=${tStart}-${tEnd} s : excès ${excess} deg/s sur ${axis}, différentiel moteur ${spread} % de la plage`,
+    fixBetaflight:
+      "Ne revole pas avant d'avoir trouvé la cause : inspecte moteurs (roulement, bobinage) et ESC, soudures et connecteurs. Active le DSHOT bidirectionnel (set dshot_bidir = ON) pour logger l'eRPM et confirmer le désync.",
+    fixInav:
+      "Ne revole pas avant d'avoir trouvé la cause : inspecte moteurs (roulement, bobinage) et ESC, soudures et connecteurs. Branche la télémétrie ESC pour logger le régime moteur et confirmer le désync.",
   },
 
   batterySag: {
@@ -206,6 +255,13 @@ export const rules = {
       "Active le DSHOT bidirectionnel si tes ESC le supportent (BLHeli_32, Bluejay, AM32) : il alimente le filtre RPM en vol et l'eRPM dans les logs.",
     fixUnknown:
       "Vérifie que le DSHOT bidirectionnel est actif et que le champ RPM est coché dans les réglages blackbox.",
+    // Variante INAV : la source RPM est l'escRPM agrégé de la télémétrie ESC
+    // (frames lentes), pas l'eRPM DShot bidirectionnel qui n'existe pas ici.
+    detailInav:
+      "Le log ne contient pas de régime moteur : le champ escRPM des frames lentes est resté à zéro, la télémétrie ESC n'alimente pas la carte. Sur le spectre, la ligne « moteurs ~X Hz » ne peut pas être tracée.",
+    evidenceInav: 'escRPM = 0 sur toutes les frames lentes du log',
+    fixInav:
+      "Si tes ESC fournissent la télémétrie (BLHeli_32, AM32...), branche leur fil telemetry sur le RX d'un UART libre et assigne la fonction ESC à ce port dans INAV : le régime moyen des moteurs sera loggé.",
   },
 
   yoyoDetected: {

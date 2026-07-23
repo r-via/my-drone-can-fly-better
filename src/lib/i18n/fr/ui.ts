@@ -328,6 +328,10 @@ export const ui = {
       xAxis: 'Fréquence (Hz)',
       motorLine: (hz: string): string => `moteurs ~${hz} Hz`,
       motorLineMissing: 'ligne moteurs indisponible - eRPM absent du log',
+      // Variantes INAV : la fondamentale vient de la télémétrie ESC agrégée
+      // (escRPM des frames lentes), pas de l'eRPM par moteur qui n'existe pas.
+      motorLineInav: (hz: string): string => `moteurs ~${hz} Hz (télémétrie ESC)`,
+      motorLineMissingInav: 'ligne moteurs indisponible - pas de télémétrie ESC dans le log',
       beyondNyquist: (hz: string): string => `non mesurable - log enregistré à ${hz} Hz`,
     },
     step: {
@@ -340,6 +344,8 @@ export const ui = {
       axisUnreliable: (axis: string): string => `${axis}*`,
       unreliableNote: '* courbe estompée : excitation stick insuffisante, axe non jugé',
       noData: "Pas assez d'excitation stick pour estimer la réponse.",
+      noDataWhy: 'En stationnaire la consigne reste plate : la boucle PID ne reçoit aucun ordre à mesurer.',
+      noDataHint: 'Refais une passe avec des coups de stick francs (roll puis pitch, une dizaine par axe) : la courbe se remplira.',
     },
     timeline: {
       ariaLabel: (duration: string, segmentCount: string): string =>

@@ -120,7 +120,8 @@ function axisSpectrum(sig: Float32Array, fsHz: number): AxisSpectrum | null {
 
 /**
  * Spectre vibrations par axe (source gyro brut si dispo, sinon filtré) +
- * fondamentale moteur depuis l'eRPM + attribution du pic global dominant.
+ * fondamentale moteur (eRPM par moteur sur Betaflight, escRpm agrégé sur INAV)
+ * + attribution du pic global dominant (Betaflight seulement).
  * Retourne null si la session est trop courte pour une FFT propre.
  */
 export function analyzeSpectrum(fd: FlightData, motorPoles: number): SpectrumMetrics | null {
@@ -138,13 +139,16 @@ export function analyzeSpectrum(fd: FlightData, motorPoles: number): SpectrumMet
   const axes: [AxisSpectrum, AxisSpectrum, AxisSpectrum] = [roll, pitch, yaw];
 
   // Régime moteur depuis l'eRPM (échantillons non nuls uniquement : au sol
-  // l'ESC rapporte 0, ça fausserait la médiane).
+  // l'ESC rapporte 0, ça fausserait la médiane). Betaflight seulement.
   let perMotorHz: Array<{ median: number; p90: number }> | null = null;
   let motorFundamentalHz: number | null = null;
   if (fd.erpm) {
     perMotorHz = [];
     const all: number[] = [];
-    for (let m = 0; m < fd.erpm.length; m++) {
+    // Clamp défensif : jamais plus de canaux eRPM que de moteurs, sinon
+    // nearestMotor pourrait désigner un moteur qui n'existe pas.
+    const nErpm = Math.min(fd.erpm.length, fd.motor.length);
+    for (let m = 0; m < nErpm; m++) {
       const arr = fd.erpm[m];
       const vals: number[] = [];
       for (let i = 0; i < arr.length; i++) {
@@ -160,6 +164,14 @@ export function analyzeSpectrum(fd: FlightData, motorPoles: number): SpectrumMet
       );
     }
     if (all.length > 0) motorFundamentalHz = erpmToHz(median(all), motorPoles);
+  } else if (fd.escRpm) {
+    // INAV : moyenne flotte en tr/min mécaniques, déjà convertie par le
+    // firmware (motor_poles côté INAV) - motorPoles ne sert pas ici. Une seule
+    // valeur agrégée à ~1 Hz : la fondamentale existe, mais perMotorHz et
+    // l'attribution du pic dominant restent réservés au per-moteur Betaflight.
+    const vals: number[] = [];
+    for (const v of fd.escRpm.rpm) if (v > 0) vals.push(v);
+    if (vals.length > 0) motorFundamentalHz = median(vals) / 60;
   }
 
   // Pic global dominant (tous axes, fMin 15) attribué au moteur le plus proche

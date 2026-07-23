@@ -151,6 +151,54 @@ export const zh: Dict = {
         `检查 ${motors} 的焊点和插头，用手转一转（有卡顿 = 轴承坏），并核对电调固件/timing。修好之前别再飞。`,
     },
 
+    motorsBalanceShift: {
+      title: (motor: string) => `${motor} 飞行中电机平衡突变`,
+      detail: (motor: string) =>
+        `电机平衡在飞行途中突然改变且不再恢复：突变之后 ${motor} 被明显加大输出。该电机（或其电调）在飞行中失去了推力 - 失步、绕组烧蚀、轴承老化 - 或有重物移位（电池绑带松了）。`,
+      evidence: (
+        motor: string,
+        before: string,
+        after: string,
+        delta: string,
+        tChange: string,
+        counterNote: string,
+      ) =>
+        `${motor}：相对电机平均值的偏差 ${before} → ${after} 个点，发生在 t=${tChange} s 附近（Δ +${delta} 点）${counterNote}`,
+      counterNote: (motor: string, delta: string) => `；对侧 ${motor} 被减载（Δ ${delta} 点）`,
+      fixBetaflight: (motor: string) =>
+        `短飞一趟后立刻对比各电机温度，检查 ${motor}（手转轴承、测相电阻）及其电调，并确认电池没有滑动。下次飞行开启双向 DSHOT 记录 eRPM 即可实证失步。`,
+      fixInav: (motor: string) =>
+        `短飞一趟后立刻对比各电机温度，检查 ${motor}（手转轴承、测相电阻）及其电调，并确认电池没有滑动。接上电调回传以记录电机转速，下次飞行即可实证失步。`,
+    },
+
+    motorsFloorClip: {
+      title: '平稳飞行中电机贴怠速下限',
+      detail:
+        '在没有操纵动作时，一台电机掉到怠速，而混控却在要求很大的差动：向下已没有任何控制余量，保持水平只能靠其余电机。这通常是严重失衡（电机变弱、重心严重偏移）的后果。',
+      evidence: (pct: string, warn: number, crit: number) =>
+        `平稳飞行中下限削波占 ${pct}%（warn ${warn}%，crit ${crit}%）`,
+      fix: '先处理其他判定指出的失衡（电机老化、飞行中突变、重心）；若平衡正常，则调低电机怠速或给机架减重。',
+    },
+
+    controlLoss: {
+      title: '飞行中失控',
+      detail:
+        '机体转动明显快于指令（或与指令反向），而混控已处于最大差动并触到电机上下限：控制环已命令物理极限，姿态仍在发散。这是电机脱出（失步、推力丢失）、桨叶损坏或撞击的特征。',
+      evidence: (
+        count: string,
+        tStart: string,
+        tEnd: string,
+        excess: string,
+        axis: string,
+        spread: string,
+      ) =>
+        `${count} 次事件 - 最严重的在 t=${tStart}-${tEnd} s：${axis} 轴超转 ${excess} deg/s，电机差动达量程的 ${spread}%`,
+      fixBetaflight:
+        '找到原因之前不要再飞：检查电机（轴承、绕组）和电调、焊点与插头。开启双向 DSHOT（set dshot_bidir = ON）记录 eRPM 以实证失步。',
+      fixInav:
+        '找到原因之前不要再飞：检查电机（轴承、绕组）和电调、焊点与插头。接上电调回传以记录电机转速，实证失步。',
+    },
+
     batterySag: {
       title: '电池压降严重',
       detail:
@@ -200,6 +248,11 @@ export const zh: Dict = {
       fixNoBidir:
         '如果你的电调支持（BLHeli_32、Bluejay、AM32），开启双向 DSHOT：它在飞行中驱动 RPM 滤波器，也向日志提供 eRPM。',
       fixUnknown: '检查双向 DSHOT 是否开启，以及 blackbox 设置中是否勾选了 RPM 字段。',
+      detailInav:
+        '日志中没有电机转速：慢速帧的 escRPM 字段一直为零，ESC 遥测没有送达飞控。频谱上无法绘制"电机 ~X Hz"参考线。',
+      evidenceInav: '日志所有慢速帧中 escRPM = 0',
+      fixInav:
+        '如果你的电调提供遥测（BLHeli_32、AM32 等），把它们的遥测焊盘接到空闲 UART 的 RX，并在 INAV 中给该端口分配 ESC 功能：日志将记录电机平均转速。',
     },
 
     yoyoDetected: {
@@ -832,6 +885,8 @@ export const zh: Dict = {
         xAxis: '频率（Hz）',
         motorLine: (hz: string): string => `电机 ~${hz} Hz`,
         motorLineMissing: '无电机参考线 - 日志中没有 eRPM',
+        motorLineInav: (hz: string): string => `电机 ~${hz} Hz（ESC 遥测）`,
+        motorLineMissingInav: '无电机参考线 - 日志中没有 ESC 遥测数据',
         beyondNyquist: (hz: string): string => `无法测量 - 日志记录频率 ${hz} Hz`,
       },
       step: {
@@ -844,6 +899,8 @@ export const zh: Dict = {
         axisUnreliable: (axis: string): string => `${axis}*`,
         unreliableNote: '* 淡色曲线：摇杆激励不足，该轴未参与评判',
         noData: '摇杆激励不足，无法估计响应。',
+      noDataWhy: '悬停时指令保持平直：PID 环路没有收到任何可测量的指令。',
+      noDataHint: '飞一趟带干脆摇杆输入的航段（先 roll 后 pitch，每轴十次左右），曲线就会出现。',
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>

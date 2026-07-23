@@ -93,6 +93,7 @@ function makeFd(opts: SynthOpts = {}): FlightData {
     throttle,
     motor,
     erpm: null,
+    escRpm: null,
     vbat: null,
     amperage: null,
     baroAlt: null,

@@ -114,6 +114,7 @@ function makeFd(opts: { n: number; fsHz: number; freqHz: number; ampUnfilt: numb
     throttle: new Float32Array(n).fill(1500),
     motor: [new Float32Array(n), new Float32Array(n), new Float32Array(n), new Float32Array(n)],
     erpm: null,
+    escRpm: null,
     vbat: null,
     amperage: null,
     baroAlt: null,

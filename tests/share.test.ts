@@ -127,6 +127,9 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
       saturationPct: 0.1,
       desyncZeros: [0, 0, 0, 0],
       erpmAvailable: true,
+      escRpmAvailable: false,
+      floorClipPct: 0,
+      balanceShift: null,
     },
     noise: {
       axes: [
@@ -154,6 +157,7 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
     yoyo: { applicable: true, ratio: 0.8, verdict: 'stable', peaks: [] },
     propwash: { applicable: true, events: [], worstSeverity: 5, avgSeverity: 4 },
     oscillation: { applicable: true, baselineAmp: 20, events: [], worst: null },
+    controlLoss: { applicable: true, events: [], worst: null },
     filters: {
       available: true,
       axes: [
@@ -265,6 +269,49 @@ const CASES: Array<{ name: string; analysis: SessionAnalysis }> = [
     analysis: makeAnalysis((a) => {
       a.meta.craftName = 'LR4-O4PRO';
       a.power = { ...a.power!, cells: 4, vbatMax: 16.8, vbatMin: 15.2, perCellMax: 4.2, perCellMin: 3.8 };
+    }),
+  },
+  {
+    // counterNote : seul argument d'evidence qui est LUI-MÊME un gabarit du
+    // dictionnaire (marqueur imbriqué) - le cas que parseTemplate doit récurser.
+    name: 'désync en vol : rupture d équilibre, écrêtage bas, perte de contrôle (INAV)',
+    analysis: makeAnalysis((a) => {
+      a.meta.firmwareFamily = 'inav';
+      a.motors.floorClipPct = 22.4;
+      a.motors.balanceShift = {
+        motor: 7,
+        tChangeS: 5.8,
+        deltaPctPts: 17.4,
+        beforeDevPts: 7.4,
+        afterDevPts: 24.9,
+        counterMotor: 2,
+        counterDeltaPctPts: -18.2,
+      };
+      a.controlLoss = {
+        applicable: true,
+        events: [
+          {
+            tStart: 4.35,
+            tEnd: 4.43,
+            axis: 0,
+            peakErrDps: 584,
+            peakExcessDps: 547,
+            peakSpreadPct: 83,
+            floorTouched: true,
+            ceilTouched: false,
+          },
+        ],
+        worst: {
+          tStart: 4.35,
+          tEnd: 4.43,
+          axis: 0,
+          peakErrDps: 584,
+          peakExcessDps: 547,
+          peakSpreadPct: 83,
+          floorTouched: true,
+          ceilTouched: false,
+        },
+      };
     }),
   },
 ];

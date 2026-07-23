@@ -93,6 +93,9 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
       saturationPct: 0.1,
       desyncZeros: [0, 0, 0, 0],
       erpmAvailable: true,
+      escRpmAvailable: false,
+      floorClipPct: 0,
+      balanceShift: null,
     },
     noise: {
       axes: [
@@ -125,6 +128,7 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
     yoyo: { applicable: true, ratio: 0.8, verdict: 'stable', peaks: [] },
     propwash: { applicable: true, events: [], worstSeverity: 5, avgSeverity: 4 },
     oscillation: { applicable: true, baselineAmp: 20, events: [], worst: null },
+    controlLoss: { applicable: true, events: [], worst: null },
     filters: {
       available: true,
       axes: [
@@ -611,5 +615,134 @@ describe('evaluateSession', () => {
     for (let i = 1; i < findings.length; i++) {
       expect(rank[findings[i - 1].severity]).toBeLessThanOrEqual(rank[findings[i].severity]);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rupture d'équilibre, écrêtage bas, perte de contrôle
+// ---------------------------------------------------------------------------
+
+describe('motors-balance-shift', () => {
+  const withShift = (delta: number, family?: 'inav' | 'betaflight') =>
+    makeAnalysis((x) => {
+      if (family) x.meta.firmwareFamily = family;
+      x.motors.imbalancePctPts = 30; // la moyenne de session voit aussi l'écart
+      x.motors.balanceShift = {
+        motor: 7,
+        tChangeS: 5.8,
+        deltaPctPts: delta,
+        beforeDevPts: 7.4,
+        afterDevPts: 7.4 + delta,
+        counterMotor: 2,
+        counterDeltaPctPts: -delta,
+      };
+    });
+
+  it('warn au seuil, crit au-dessus, et prime sur motors-imbalance', () => {
+    const warn = evaluateSession(withShift(12), chimera);
+    checkShape(warn);
+    const f = warn.find((fd) => fd.id === 'motors-balance-shift');
+    expect(f?.severity).toBe('warn');
+    expect(f?.title).toContain('M7');
+    expect(f?.evidence).toContain('5.8');
+    expect(f?.evidence).toContain('M2');
+    // le déséquilibre moyen est le symptôme de la rupture : une seule règle parle
+    expect(ids(warn)).not.toContain('motors-imbalance');
+
+    const crit = evaluateSession(withShift(20), chimera);
+    expect(crit.find((fd) => fd.id === 'motors-balance-shift')?.severity).toBe('crit');
+  });
+
+  it('sous le seuil du profil : la rupture ne parle pas, motors-imbalance reprend', () => {
+    const findings = evaluateSession(withShift(7), chimera);
+    expect(ids(findings)).not.toContain('motors-balance-shift');
+    expect(ids(findings)).toContain('motors-imbalance');
+  });
+
+  it('le conseil parle le dialecte du firmware : eRPM en Betaflight, télémétrie ESC en INAV', () => {
+    const bf = evaluateSession(withShift(20, 'betaflight'), chimera);
+    expect(bf.find((fd) => fd.id === 'motors-balance-shift')?.fix?.text).toContain('DSHOT');
+    const inav = evaluateSession(withShift(20, 'inav'), chimera);
+    expect(inav.find((fd) => fd.id === 'motors-balance-shift')?.fix?.text).not.toContain('DSHOT');
+  });
+});
+
+describe('motors-floor-clip', () => {
+  it('warn puis crit selon le pourcentage de vol stabilisé écrêté', () => {
+    const warn = evaluateSession(
+      makeAnalysis((x) => {
+        x.motors.floorClipPct = 5;
+      }),
+      chimera,
+    );
+    checkShape(warn);
+    expect(warn.find((fd) => fd.id === 'motors-floor-clip')?.severity).toBe('warn');
+
+    const crit = evaluateSession(
+      makeAnalysis((x) => {
+        x.motors.floorClipPct = 22.4;
+      }),
+      chimera,
+    );
+    const f = crit.find((fd) => fd.id === 'motors-floor-clip');
+    expect(f?.severity).toBe('crit');
+    expect(f?.evidence).toContain('22.4');
+  });
+});
+
+describe('control-loss', () => {
+  const withEvent = (family?: 'inav' | 'betaflight') =>
+    makeAnalysis((x) => {
+      if (family) x.meta.firmwareFamily = family;
+      x.controlLoss = {
+        applicable: true,
+        events: [
+          {
+            tStart: 4.35,
+            tEnd: 4.43,
+            axis: 0,
+            peakErrDps: 584,
+            peakExcessDps: 547,
+            peakSpreadPct: 83,
+            floorTouched: true,
+            ceilTouched: false,
+          },
+        ],
+        worst: {
+          tStart: 4.35,
+          tEnd: 4.43,
+          axis: 0,
+          peakErrDps: 584,
+          peakExcessDps: 547,
+          peakSpreadPct: 83,
+          floorTouched: true,
+          ceilTouched: false,
+        },
+      };
+    });
+
+  it('crit en catégorie sécurité, avec les chiffres de l événement', () => {
+    const findings = evaluateSession(withEvent(), chimera);
+    checkShape(findings);
+    const f = findings.find((fd) => fd.id === 'control-loss');
+    expect(f?.severity).toBe('crit');
+    expect(f?.category).toBe('securite');
+    expect(f?.evidence).toContain('4.35');
+    expect(f?.evidence).toContain('547');
+    expect(f?.evidence).toContain('83');
+  });
+
+  it('le conseil parle le dialecte du firmware', () => {
+    expect(
+      evaluateSession(withEvent('betaflight'), chimera).find((fd) => fd.id === 'control-loss')?.fix
+        ?.text,
+    ).toContain('dshot_bidir');
+    expect(
+      evaluateSession(withEvent('inav'), chimera).find((fd) => fd.id === 'control-loss')?.fix?.text,
+    ).not.toContain('dshot_bidir');
+  });
+
+  it('aucun événement → silence', () => {
+    expect(ids(evaluateSession(makeAnalysis(), chimera))).not.toContain('control-loss');
   });
 });

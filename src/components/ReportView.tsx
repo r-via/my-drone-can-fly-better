@@ -473,7 +473,18 @@ function SessionBlock({
                 axes={analysis.spectrum.axes}
                 motorFundamentalHz={analysis.spectrum.motorFundamentalHz}
                 sampleRateHz={meta.sampleRateHz}
-                labels={dict.ui.charts.spectrum}
+                labels={
+                  /* INAV : la ligne moteurs vient de la télémétrie ESC agrégée
+                     (escRpm), pas de l'eRPM par moteur - les libellés doivent
+                     nommer la vraie source, absente comme présente. */
+                  meta.firmwareFamily === 'inav'
+                    ? {
+                        ...dict.ui.charts.spectrum,
+                        motorLine: dict.ui.charts.spectrum.motorLineInav,
+                        motorLineMissing: dict.ui.charts.spectrum.motorLineMissingInav,
+                      }
+                    : dict.ui.charts.spectrum
+                }
               />
             </div>
           </div>

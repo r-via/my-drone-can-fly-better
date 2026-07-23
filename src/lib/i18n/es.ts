@@ -149,6 +149,55 @@ export const es: Dict = {
         `Revisa las soldaduras y el conector del motor ${motors}, gíralo a mano (punto duro = rodamiento), y verifica el firmware/timing del ESC. No vuelvas a volar antes de arreglarlo.`,
     },
 
+    motorsBalanceShift: {
+      title: (motor: string) => `Ruptura del equilibrio en vuelo en ${motor}`,
+      detail: (motor: string) =>
+        `El equilibrio de motores cambia bruscamente en pleno vuelo y no vuelve: ${motor} queda claramente sobreexigido tras la ruptura. Ese motor (o su ESC) perdió empuje en vuelo - desync, bobinado quemado, rodamiento gastado - o una masa se desplazó (pack mal sujeto).`,
+      evidence: (
+        motor: string,
+        before: string,
+        after: string,
+        delta: string,
+        tChange: string,
+        counterNote: string,
+      ) =>
+        `${motor}: desviación respecto a la media de motores ${before} → ${after} pts alrededor de t=${tChange} s (Δ +${delta} pts)${counterNote}`,
+      counterNote: (motor: string, delta: string) =>
+        `; enfrente ${motor} queda descargado (Δ ${delta} pts)`,
+      fixBetaflight: (motor: string) =>
+        `Compara la temperatura de los motores justo después de un vuelo corto, revisa ${motor} (rodamiento a mano, resistencia de fases) y su ESC, y verifica que el pack no se haya movido. El eRPM del DSHOT bidireccional confirmaría el desync en el próximo vuelo.`,
+      fixInav: (motor: string) =>
+        `Compara la temperatura de los motores justo después de un vuelo corto, revisa ${motor} (rodamiento a mano, resistencia de fases) y su ESC, y verifica que el pack no se haya movido. Conecta la telemetría del ESC para registrar el régimen del motor y confirmar el desync en el próximo vuelo.`,
+    },
+
+    motorsFloorClip: {
+      title: 'Motor al mínimo en vuelo estabilizado',
+      detail:
+        'Fuera de maniobras, un motor cae al ralentí mientras el mixer pide un gran diferencial: no queda reserva de autoridad hacia abajo, mantener el nivel depende solo de los motores restantes. Consecuencia típica de un fuerte desequilibrio (motor débil, CG muy desplazado).',
+      evidence: (pct: string, warn: number, crit: number) =>
+        `Recorte inferior ${pct}% del vuelo estabilizado (warn ${warn}%, crit ${crit}%)`,
+      fix: 'Trata primero el desequilibrio señalado en otro verdicto (motor gastado, ruptura en vuelo, CG); si el equilibrio está bien, baja el idle del motor o aligera el quad.',
+    },
+
+    controlLoss: {
+      title: 'Pérdida de control en vuelo',
+      detail:
+        'El dron gira claramente más rápido que la consigna (o en sentido contrario) mientras el mixer ya está en el diferencial máximo con un tope tocado: el lazo pide el máximo físico y la actitud diverge igualmente. Firma de un motor que se desengancha (desync, pérdida de empuje), de una hélice dañada o de un impacto.',
+      evidence: (
+        count: string,
+        tStart: string,
+        tEnd: string,
+        excess: string,
+        axis: string,
+        spread: string,
+      ) =>
+        `${count} evento(s) - el peor en t=${tStart}-${tEnd} s: exceso ${excess} deg/s en ${axis}, diferencial de motores ${spread}% del rango`,
+      fixBetaflight:
+        'No vuelvas a volar antes de encontrar la causa: inspecciona motores (rodamiento, bobinado) y ESC, soldaduras y conectores. Activa el DSHOT bidireccional (set dshot_bidir = ON) para registrar el eRPM y confirmar el desync.',
+      fixInav:
+        'No vuelvas a volar antes de encontrar la causa: inspecciona motores (rodamiento, bobinado) y ESC, soldaduras y conectores. Conecta la telemetría del ESC para registrar el régimen del motor y confirmar el desync.',
+    },
+
     batterySag: {
       title: 'Sag de batería importante',
       detail:
@@ -202,6 +251,11 @@ export const es: Dict = {
         'Activa el DSHOT bidireccional si tus ESC lo soportan (BLHeli_32, Bluejay, AM32): alimenta el filtro RPM en vuelo y el eRPM en los logs.',
       fixUnknown:
         'Comprueba que el DSHOT bidireccional está activo y que el campo RPM está marcado en los ajustes de blackbox.',
+      detailInav:
+        'El log no contiene régimen de motores: el campo escRPM de las tramas lentas se quedó a cero, la telemetría ESC no llega a la placa. En el espectro, la línea "motores ~X Hz" no se puede trazar.',
+      evidenceInav: 'escRPM = 0 en todas las tramas lentas del log',
+      fixInav:
+        'Si tus ESC ofrecen telemetría (BLHeli_32, AM32...), conecta su pad de telemetría al RX de un UART libre y asigna la función ESC a ese puerto en INAV: se registrará el régimen medio de los motores.',
     },
 
     yoyoDetected: {
@@ -830,6 +884,8 @@ export const es: Dict = {
         xAxis: 'Frecuencia (Hz)',
         motorLine: (hz: string): string => `motores ~${hz} Hz`,
         motorLineMissing: 'línea de motores no disponible - sin eRPM en el log',
+        motorLineInav: (hz: string): string => `motores ~${hz} Hz (telemetría ESC)`,
+        motorLineMissingInav: 'línea de motores no disponible - sin telemetría ESC en el log',
         beyondNyquist: (hz: string): string => `no medible - log grabado a ${hz} Hz`,
       },
       step: {
@@ -842,6 +898,8 @@ export const es: Dict = {
         axisUnreliable: (axis: string): string => `${axis}*`,
         unreliableNote: '* curva atenuada: excitación de stick insuficiente, eje no evaluado',
         noData: 'No hay suficiente excitación de stick para estimar la respuesta.',
+      noDataWhy: 'En estacionario la consigna se queda plana: el bucle PID no recibe ninguna orden que medir.',
+      noDataHint: 'Haz una pasada con golpes de stick francos (roll y luego pitch, una decena por eje) y la curva se rellenará.',
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>

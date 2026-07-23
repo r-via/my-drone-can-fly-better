@@ -16,6 +16,10 @@ const GENERIC_THRESHOLDS: ProfileThresholds = {
   saturationWarn: 3, // >3 % d'échantillons moteur à fond = plus de marge d'autorité
   saturationCrit: 10, // saturation chronique : oscillations et perte de contrôle possibles
   imbalanceWarn: 12, // >12 pts d'écart entre moteurs : CG décalé ou hélice/moteur fatigué
+  imbalanceShiftWarn: 10, // rupture d'équilibre en vol >10 pts soutenus : moteur qui lâche ou masse déplacée
+  imbalanceShiftCrit: 15, // mesuré : 17.4 pts sur le désync en vol Akira, 28.4 sur le crash LR4 btfl_003 s6
+  floorClipWarn: 3, // >3 % du vol stabilisé avec un moteur au plancher : réserve basse entamée
+  floorClipCrit: 10, // chronique : la stabilité ne tient que par les moteurs restants
   sagPerCellWarn: 0.4, // sag/cellule sous charge : 0.3-0.4 V normal, au-delà pack fatigué
   sagPerCellCrit: 0.6, // chute brutale : pack en fin de vie ou connectique résistive
   perCellMinCrit: 3.3, // sous 3.3 V/cellule en vol on abîme le pack (défaut BF vbat_min)

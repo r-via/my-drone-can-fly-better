@@ -149,6 +149,55 @@ export const de: Dict = {
         `Prüfe Lötstellen und Stecker von Motor ${motors}, dreh ihn von Hand (harter Punkt = Lager) und check Firmware/Timing des ESC. Flieg vorher nicht wieder.`,
     },
 
+    motorsBalanceShift: {
+      title: (motor: string) => `Motorbalance bricht im Flug auf ${motor}`,
+      detail: (motor: string) =>
+        `Die Motorbalance kippt mitten im Flug abrupt und kommt nicht zurück: ${motor} wird nach dem Bruch deutlich stärker angesteuert. Dieser Motor (oder sein ESC) hat im Flug Schub verloren - Desync, verbrannte Wicklung, müdes Lager - oder eine Masse hat sich verschoben (Akku schlecht festgezurrt).`,
+      evidence: (
+        motor: string,
+        before: string,
+        after: string,
+        delta: string,
+        tChange: string,
+        counterNote: string,
+      ) =>
+        `${motor}: Abweichung vom Motor-Mittel ${before} → ${after} Pkt um t=${tChange} s (Δ +${delta} Pkt)${counterNote}`,
+      counterNote: (motor: string, delta: string) =>
+        `; gegenüber wird ${motor} entlastet (Δ ${delta} Pkt)`,
+      fixBetaflight: (motor: string) =>
+        `Vergleiche die Motortemperaturen direkt nach einem kurzen Flug, prüfe ${motor} (Lager von Hand, Phasenwiderstand) und seinen ESC, und stell sicher, dass der Akku nicht verrutscht ist. Die eRPM des bidirektionalen DSHOT würde den Desync beim nächsten Flug bestätigen.`,
+      fixInav: (motor: string) =>
+        `Vergleiche die Motortemperaturen direkt nach einem kurzen Flug, prüfe ${motor} (Lager von Hand, Phasenwiderstand) und seinen ESC, und stell sicher, dass der Akku nicht verrutscht ist. Schließ die ESC-Telemetrie an, um die Motordrehzahl zu loggen und den Desync beim nächsten Flug zu bestätigen.`,
+    },
+
+    motorsFloorClip: {
+      title: 'Motor am unteren Anschlag im ruhigen Flug',
+      detail:
+        'Außerhalb kommandierter Manöver fällt ein Motor auf Leerlauf, während der Mixer ein großes Differential verlangt: nach unten ist keine Autoritätsreserve mehr da, die Lage hält nur noch über die übrigen Motoren. Typische Folge einer starken Unwucht (schwacher Motor, stark versetzter Schwerpunkt).',
+      evidence: (pct: string, warn: number, crit: number) =>
+        `Unteres Clipping ${pct}% des ruhigen Flugs (warn ${warn}%, crit ${crit}%)`,
+      fix: 'Behebe zuerst die anderswo gemeldete Unwucht (müder Motor, Bruch im Flug, Schwerpunkt); stimmt die Balance, senke das Motor-Idle oder mach den Quad leichter.',
+    },
+
+    controlLoss: {
+      title: 'Kontrollverlust im Flug',
+      detail:
+        'Der Copter dreht deutlich schneller als kommandiert (oder gegen die Vorgabe), während der Mixer bereits am maximalen Differential ist und ein Anschlag berührt wird: der Regelkreis kommandiert das physikalische Maximum und die Lage divergiert trotzdem. Signatur eines abreißenden Motors (Desync, Schubverlust), eines beschädigten Propellers oder eines Einschlags.',
+      evidence: (
+        count: string,
+        tStart: string,
+        tEnd: string,
+        excess: string,
+        axis: string,
+        spread: string,
+      ) =>
+        `${count} Ereignis(se) - das schlimmste bei t=${tStart}-${tEnd} s: Überschuss ${excess} deg/s auf ${axis}, Motor-Differential ${spread}% des Bereichs`,
+      fixBetaflight:
+        'Flieg nicht wieder, bevor die Ursache gefunden ist: prüfe Motoren (Lager, Wicklung) und ESCs, Lötstellen und Stecker. Aktiviere bidirektionales DSHOT (set dshot_bidir = ON), um die eRPM zu loggen und den Desync zu bestätigen.',
+      fixInav:
+        'Flieg nicht wieder, bevor die Ursache gefunden ist: prüfe Motoren (Lager, Wicklung) und ESCs, Lötstellen und Stecker. Schließ die ESC-Telemetrie an, um die Motordrehzahl zu loggen und den Desync zu bestätigen.',
+    },
+
     batterySag: {
       title: 'Starker Batterie-Sag',
       detail:
@@ -202,6 +251,11 @@ export const de: Dict = {
         'Aktiviere bidirektionales DSHOT, falls deine ESCs es unterstützen (BLHeli_32, Bluejay, AM32): es versorgt den RPM-Filter im Flug und das eRPM in den Logs.',
       fixUnknown:
         'Prüfe, ob bidirektionales DSHOT aktiv und das RPM-Feld in den Blackbox-Einstellungen angehakt ist.',
+      detailInav:
+        'Das Log enthält keine Motordrehzahl: das escRPM-Feld der Slow-Frames blieb auf null, die ESC-Telemetrie erreicht die Karte nicht. Im Spektrum kann die Linie "Motoren ~X Hz" nicht gezeichnet werden.',
+      evidenceInav: 'escRPM = 0 in allen Slow-Frames des Logs',
+      fixInav:
+        'Falls deine ESCs Telemetrie liefern (BLHeli_32, AM32...), verbinde ihr Telemetrie-Pad mit dem RX eines freien UART und weise dem Port in INAV die ESC-Funktion zu: die mittlere Motordrehzahl wird dann geloggt.',
     },
 
     yoyoDetected: {
@@ -830,6 +884,8 @@ export const de: Dict = {
         xAxis: 'Frequenz (Hz)',
         motorLine: (hz: string): string => `Motoren ~${hz} Hz`,
         motorLineMissing: 'Motorlinie nicht verfügbar - kein eRPM im Log',
+        motorLineInav: (hz: string): string => `Motoren ~${hz} Hz (ESC-Telemetrie)`,
+        motorLineMissingInav: 'Motorlinie nicht verfügbar - keine ESC-Telemetrie im Log',
         beyondNyquist: (hz: string): string => `nicht messbar - Log mit ${hz} Hz aufgezeichnet`,
       },
       step: {
@@ -842,6 +898,8 @@ export const de: Dict = {
         axisUnreliable: (axis: string): string => `${axis}*`,
         unreliableNote: '* blasse Kurve: zu wenig Stick-Anregung, Achse nicht bewertet',
         noData: 'Nicht genug Stick-Anregung, um die Antwort zu schätzen.',
+      noDataWhy: 'Im Schwebeflug bleibt der Setpoint flach: der PID-Loop bekommt keinen Befehl zum Messen.',
+      noDataHint: 'Flieg einen Pass mit klaren Stick-Eingaben (erst Roll, dann Pitch, etwa zehn pro Achse), dann füllt sich die Kurve.',
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>

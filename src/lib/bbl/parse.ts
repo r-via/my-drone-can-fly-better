@@ -337,6 +337,11 @@ async function parseSession(
   const gpsHdop: number[] = [];
   let gpsHasHdop = false;
   const failsafeCounts: Record<string, number> = {};
+  // escRPM des frames S : INAV uniquement (Betaflight n'écrit pas ce champ, et
+  // s'il apparaissait dans un log exotique on ne veut PAS le confondre avec
+  // l'eRPM par moteur du DShot bidirectionnel). Ancré comme les frames G.
+  const escAnchor: number[] = [];
+  const escRpmVals: number[] = [];
 
   const dp = h.getDataParser();
   for (const pe of dp) {
@@ -355,6 +360,13 @@ async function parseSession(
       const f = pe.data.fields as Map<string, unknown>;
       const phase = String(f.get('failsafePhase') ?? '?');
       failsafeCounts[phase] = (failsafeCounts[phase] ?? 0) + 1;
+      if (isInav) {
+        const rpm = Number(f.get('escRPM'));
+        if (Number.isFinite(rpm)) {
+          escAnchor.push(rows.length - 1);
+          escRpmVals.push(rpm);
+        }
+      }
     }
   }
 
@@ -450,7 +462,16 @@ async function parseSession(
     setpoint,
     throttle: toF32(rows, col['rcCommand[3]']),
     motor,
-    erpm: bank('eRPM'),
+    // Chaque famille garde SA source RPM : eRPM par moteur n'existe que sur
+    // Betaflight, escRPM (moyenne flotte des frames S) que sur INAV.
+    erpm: isInav ? null : bank('eRPM'),
+    escRpm:
+      escRpmVals.length > 0
+        ? {
+            time: Float64Array.from(escAnchor, (a) => (a >= 0 ? time[a] : 0)),
+            rpm: Float32Array.from(escRpmVals),
+          }
+        : null,
     vbat: scaled(N.vbat, 0.01),
     amperage: scaled(N.amperage, 0.01),
     baroAlt: scaled(N.baroAlt, 0.01),

@@ -109,6 +109,8 @@ export interface StepChartLabels {
   axisUnreliable: (axis: string) => string;
   unreliableNote: string;
   noData: string;
+  noDataWhy: string;
+  noDataHint: string;
 }
 
 const DEFAULT_LABELS: StepChartLabels = {
@@ -121,6 +123,8 @@ const DEFAULT_LABELS: StepChartLabels = {
   axisUnreliable: (axis) => `${axis}*`,
   unreliableNote: '* courbe estompée : excitation stick insuffisante, axe non jugé',
   noData: "Pas assez d'excitation stick pour estimer la réponse.",
+  noDataWhy: 'En stationnaire la consigne reste plate : la boucle PID ne reçoit aucun ordre à mesurer.',
+  noDataHint: 'Refais une passe avec des coups de stick francs (roll puis pitch, une dizaine par axe) : la courbe se remplira.',
 };
 
 export function StepResponseChart(props: {
@@ -308,15 +312,38 @@ export function StepResponseChart(props: {
       </g>
 
       {!hasAny && (
-        <text
-          x={pad.left + plotW / 2}
-          y={pad.top + plotH / 2}
-          fontSize={11}
-          fill={INK_AXIS}
-          textAnchor="middle"
-        >
-          {L.noData}
-        </text>
+        <g>
+          {/* État vide : constat, cause, action. Un graphe muet sans explication
+              se lit comme un bug ; trois lignes transforment le vide en mode d'emploi. */}
+          <text
+            x={pad.left + plotW / 2}
+            y={pad.top + plotH / 2 - 18}
+            fontSize={11.5}
+            fontWeight={600}
+            fill={INK_DIM}
+            textAnchor="middle"
+          >
+            {L.noData}
+          </text>
+          <text
+            x={pad.left + plotW / 2}
+            y={pad.top + plotH / 2 + 2}
+            fontSize={10}
+            fill={INK_AXIS}
+            textAnchor="middle"
+          >
+            {L.noDataWhy}
+          </text>
+          <text
+            x={pad.left + plotW / 2}
+            y={pad.top + plotH / 2 + 20}
+            fontSize={10}
+            fill={INK_AXIS}
+            textAnchor="middle"
+          >
+            {L.noDataHint}
+          </text>
+        </g>
       )}
     </svg>
   );

@@ -67,6 +67,9 @@ function makeAnalysis(over: Partial<SessionAnalysis> = {}): SessionAnalysis {
       saturationPct: 0.5,
       desyncZeros: [0, 0, 0, 0],
       erpmAvailable: true,
+      escRpmAvailable: false,
+      floorClipPct: 0,
+      balanceShift: null,
     },
     noise: {
       axes: [
@@ -87,6 +90,7 @@ function makeAnalysis(over: Partial<SessionAnalysis> = {}): SessionAnalysis {
     yoyo: { applicable: false, ratio: null, verdict: null, peaks: [] },
     propwash: { applicable: true, events: [], worstSeverity: 8, avgSeverity: 4 },
     oscillation: { applicable: false, baselineAmp: 0, events: [], worst: null },
+    controlLoss: { applicable: true, events: [], worst: null },
     filters: { available: false, axes: null },
     timeline: { segments: [], flightTimeS: 110, throttleMaxUs: 1600 },
     gps: {

@@ -141,6 +141,15 @@ describe('cas limites des fichiers .txt et multi-firmwares', () => {
     expect(bfSessions.length).toBe(1);
     for (const s of inavSessions) expect(s.meta.firmware).toBe('INAV 9.0.1');
     for (const s of bfSessions) expect(s.meta.firmware).toContain('Betaflight 2025.12.2');
+    // Chaque famille garde SA source RPM, même dans un fichier mélangé
+    for (const s of inavSessions) {
+      expect(s.erpm).toBeNull();
+      expect(s.escRpm).not.toBeNull();
+    }
+    for (const s of bfSessions) {
+      expect(s.erpm).not.toBeNull();
+      expect(s.escRpm).toBeNull();
+    }
   });
 });
 
@@ -182,6 +191,19 @@ describe('log INAV réel', () => {
     expect(s.gyroUnfilt).not.toBeNull();
     expect(s.baroAlt).not.toBeNull();
     expect(s.erpm).toBeNull(); // pas d eRPM par moteur dans les frames main INAV
+    // La source RPM d INAV est escRpm (frames S) : moyenne mécanique des 8
+    // ESCs en tr/min, série dense car INAV réécrit la frame S dès qu elle
+    // change - donc quasi à chaque intervalle (~130 Hz sur ce log).
+    const esc = s.escRpm!;
+    expect(esc).not.toBeNull();
+    expect(esc.rpm.length).toBeGreaterThan(5000);
+    expect(esc.time[0]).toBeGreaterThanOrEqual(0);
+    expect(esc.time[esc.rpm.length - 1]).toBeLessThanOrEqual(s.meta.durationS);
+    // Hover 9" X8 : régime max plausible, jamais négatif
+    let escMax = 0;
+    for (const v of esc.rpm) escMax = Math.max(escMax, v);
+    expect(escMax).toBeGreaterThan(6000);
+    expect(escMax).toBeLessThan(12000);
     // X8 : les 8 canaux moteurs sont lus (validés réels contre orangebox :
     // plages 1133-1422 dans motorOutput 1100-2000, dynamique corrélée)
     expect(s.motor).toHaveLength(8);
@@ -227,6 +249,41 @@ describe('log INAV réel', () => {
     }
     expect(m.imbalancePctPts).toBeLessThan(12); // pas de faux positif imbalance sur ce vol sain
     expect(sr.findings.some((f) => f.id === 'motors-imbalance')).toBe(false);
+  });
+
+  it('tire la fondamentale moteur du spectre depuis escRpm, sans données per-moteur inventées', () => {
+    const sr = buildSessionReport(sessions[0], fr);
+    const sp = sr.analysis.spectrum!;
+    expect(sp).not.toBeNull();
+    // Médiane escRpm / 60 : validée physiquement, les pics gyro dominants de
+    // ce vol se groupent à 120-130 Hz sur les trois axes.
+    expect(sp.motorFundamentalHz).toBeCloseTo(126.25, 1);
+    // Une seule valeur agrégée : pas de per-moteur ni d attribution de pic
+    // (réservés à l eRPM par moteur Betaflight).
+    expect(sp.perMotorHz).toBeNull();
+    expect(sp.dominantPeak).toBeNull();
+  });
+
+  it('ne réclame jamais le DShot bidirectionnel sur INAV : rpm-not-logged version télémétrie ESC', () => {
+    const sr = buildSessionReport(sessions[0], fr);
+    // escRpm alimenté : le régime moteur est loggé sous sa forme INAV,
+    // aucun constat « RPM absent » ne doit sortir.
+    expect(sr.analysis.motors.escRpmAvailable).toBe(true);
+    expect(sr.findings.some((f) => f.id === 'rpm-not-logged')).toBe(false);
+
+    // Même vol, télémétrie ESC muette : la variante INAV sort, sans le
+    // vocabulaire Betaflight (dshot_bidir, blackbox_disable_rpm) ni CLI.
+    const doctored = {
+      ...sr.analysis,
+      motors: { ...sr.analysis.motors, escRpmAvailable: false },
+    };
+    const f = evaluateSession(doctored, sr.profile, fr).find((x) => x.id === 'rpm-not-logged');
+    expect(f).toBeDefined();
+    expect(f!.detail).toContain('escRPM');
+    expect(f!.detail).not.toMatch(/dshot/i);
+    expect(f!.evidence).not.toContain('dshot_bidir');
+    expect(f!.fix?.cli).toBeUndefined();
+    expect(f!.fix?.text).toContain('télémétrie');
   });
 
   it('nomme les moteurs au-delà de M4 dans le verdict de déséquilibre', () => {

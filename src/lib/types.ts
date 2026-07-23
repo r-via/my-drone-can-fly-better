@@ -39,8 +39,15 @@ export interface FlightData {
   throttle: Float32Array; // rcCommand[3], ~1000..2000
   /** Un canal par moteur, 4 à 8 selon le mixer (X8 = 8). Brut, voir meta.motorOutputLow/High. */
   motor: Float32Array[];
-  /** Mêmes indices que motor. Brut : centaines d'eRPM (hz méca = v*100/(poles/2)/60). */
+  /** Mêmes indices que motor. Brut : centaines d'eRPM (hz méca = v*100/(poles/2)/60).
+   *  Betaflight uniquement (DShot bidirectionnel) - toujours null sur INAV. */
   erpm: Float32Array[] | null;
+  /** Télémétrie ESC des frames lentes INAV (~1 Hz), time ancré sur la frame
+   *  main précédente comme gps. rpm = moyenne mécanique de TOUS les ESCs en
+   *  tr/min, déjà convertie par le firmware (motor_poles côté INAV) : aucune
+   *  conversion poles ici. INAV uniquement - toujours null sur Betaflight,
+   *  jamais fusionné avec erpm (granularités incomparables). */
+  escRpm: { time: Float64Array; rpm: Float32Array } | null;
   vbat: Float32Array | null; // volts
   amperage: Float32Array | null; // ampères
   baroAlt: Float32Array | null; // mètres
@@ -112,6 +119,26 @@ export interface PowerMetrics {
   implausibleSamples: number;
 }
 
+/**
+ * Rupture d'équilibre moteur EN VOL : les moyennes par moteur changent
+ * brutalement à un instant donné et ne reviennent pas. Signature d'un moteur
+ * qui a perdu de la poussée en vol (désync, bobinage cuit) ou d'une masse qui
+ * s'est déplacée (pack mal sanglé), là où imbalancePctPts, moyenné sur toute
+ * la session, ne distingue pas cette rupture d'un CG décalé depuis le décollage.
+ * Tous les écarts sont mesurés par rapport à la moyenne collective des moteurs
+ * (en points de % de plage), pour être insensibles au throttle.
+ */
+export interface MotorBalanceShift {
+  motor: number; // 1-based : le moteur le plus SURcommandé après la rupture
+  tChangeS: number; // instant estimé de la rupture (base temps du log)
+  deltaPctPts: number; // afterDevPts - beforeDevPts (toujours > 0 pour `motor`)
+  beforeDevPts: number; // écart à la moyenne collective avant la rupture
+  afterDevPts: number;
+  /** Moteur le plus DÉLESTÉ en face (souvent la diagonale), null si aucun ne bouge assez. */
+  counterMotor: number | null;
+  counterDeltaPctPts: number | null;
+}
+
 export interface MotorMetrics {
   avgPct: number; // moyenne de tous les moteurs en % de la plage
   /** Une entrée par moteur du log (4 à 8, même longueur que FlightData.motor). */
@@ -120,7 +147,49 @@ export interface MotorMetrics {
   imbalancePctPts: number;
   saturationPct: number; // % d'échantillons moteur >= high-8
   desyncZeros: number[]; // eRPM==0 en vol, par moteur (mêmes indices que motor)
+  /** eRPM par moteur présent (Betaflight, DShot bidirectionnel). */
   erpmAvailable: boolean;
+  /** escRpm agrégé présent avec des valeurs non nulles (INAV, télémétrie ESC). */
+  escRpmAvailable: boolean;
+  /**
+   * Écrêtage bas en vol stabilisé : % des échantillons en vol HORS manoeuvre
+   * commandée où un moteur est au plancher pendant que le mixer demande un
+   * grand différentiel. La saturation haute (saturationPct) a son symétrique
+   * ici : un moteur au plancher, c'est autant d'autorité perdue qu'un moteur
+   * au plafond, mais une descente moteurs au ralenti n'en est pas.
+   */
+  floorClipPct: number;
+  /** Rupture d'équilibre en vol la plus marquée, null si aucune ne qualifie. */
+  balanceShift: MotorBalanceShift | null;
+}
+
+/**
+ * Excursion non commandée : le drone tourne nettement plus vite que la
+ * consigne (ou à contre-sens) pendant que le mixer est au bout de son
+ * autorité. C'est la seule signature de désync accessible SANS eRPM (APD,
+ * INAV…) ; elle couvre aussi hélice larguée et impact, l'evidence donne les
+ * chiffres pour trancher.
+ */
+export interface ControlLossEvent {
+  tStart: number;
+  tEnd: number;
+  /** Axe de la pire erreur gyro-consigne pendant l'événement. */
+  axis: Axis;
+  /** Crête de |gyro - consigne| (deg/s). */
+  peakErrDps: number;
+  /** Crête de rotation excédentaire (au-delà de la consigne, deg/s). */
+  peakExcessDps: number;
+  /** Pire différentiel mixer (max - min moteurs, % de plage) pendant l'événement. */
+  peakSpreadPct: number;
+  /** Une butée moteur (plancher / plafond) a été touchée pendant l'événement. */
+  floorTouched: boolean;
+  ceilTouched: boolean;
+}
+
+export interface ControlLossMetrics {
+  applicable: boolean; // assez d'échantillons en vol
+  events: ControlLossEvent[]; // triés par excès décroissant
+  worst: ControlLossEvent | null;
 }
 
 export interface AxisNoise {
@@ -336,6 +405,7 @@ export interface SessionAnalysis {
   yoyo: YoyoMetrics | null;
   propwash: PropwashMetrics | null;
   oscillation: OscillationMetrics | null;
+  controlLoss: ControlLossMetrics | null;
   filters: FilterMetrics;
   timeline: TimelineMetrics;
   gps: GpsMetrics;
@@ -404,6 +474,12 @@ export interface ProfileThresholds {
   saturationCrit: number;
   /** Déséquilibre moteurs (points de %). */
   imbalanceWarn: number;
+  /** Rupture d'équilibre en vol (points de % d'écart à la moyenne, soutenus). */
+  imbalanceShiftWarn: number;
+  imbalanceShiftCrit: number;
+  /** Écrêtage bas en vol stabilisé (% des échantillons stabilisés). */
+  floorClipWarn: number;
+  floorClipCrit: number;
   /** Sag par cellule (V) sous charge. */
   sagPerCellWarn: number;
   sagPerCellCrit: number;

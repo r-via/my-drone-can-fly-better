@@ -765,6 +765,10 @@ function neutralAnalysis(p: SharePayload): SessionAnalysis {
       craftName: v.craftName,
       boardInfo: v.boardInfo,
       firmware: v.firmware,
+      // La famille n'est pas dans le payload : redérivée de la chaîne firmware
+      // pour que la vue partagée d'un log INAV garde ses libellés INAV
+      // (ligne moteurs = télémétrie ESC) au lieu du vocabulaire eRPM Betaflight.
+      firmwareFamily: v.firmware.startsWith('INAV') ? 'inav' : 'betaflight',
       fieldNames: [],
       sampleRateHz: v.sampleRateHz,
       durationS: v.durationS,
@@ -797,6 +801,9 @@ function neutralAnalysis(p: SharePayload): SessionAnalysis {
       saturationPct: v.saturationPct,
       desyncZeros: [0, 0, 0, 0],
       erpmAvailable: false,
+      escRpmAvailable: false,
+      floorClipPct: 0,
+      balanceShift: null,
     },
     noise: { axes: [axisNoise, axisNoise, axisNoise] },
     spectrum: unpackSpectrum(p.spectrum),
@@ -805,6 +812,7 @@ function neutralAnalysis(p: SharePayload): SessionAnalysis {
     yoyo: null,
     propwash: null,
     oscillation: null,
+    controlLoss: null,
     filters: { available: false, axes: null },
     timeline: {
       segments: p.timeline.map((s, i, all) => ({

@@ -341,6 +341,7 @@ function synth(over: Partial<FlightData> = {}, n = 8): FlightData {
     throttle,
     motor: [z(), z(), z(), z()] as F32x4,
     erpm: null,
+    escRpm: null,
     vbat: null,
     amperage: null,
     baroAlt: null,
@@ -498,5 +499,101 @@ describe('cas limites', () => {
     tl = analyzeTimeline(synth({ throttle: armed }));
     expect(tl.segments[0].state).toBe('low');
     expect(tl.flightTimeS).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Écrêtage bas et rupture d'équilibre (analyzeMotors)
+// ---------------------------------------------------------------------------
+
+describe('analyzeMotors : floorClipPct et balanceShift', () => {
+  const fill = (nn: number, v: number) => new Float32Array(nn).fill(v);
+
+  it('écrêtage bas : moteur au plancher + grand différentiel en demande stabilisée', () => {
+    const n = 2000;
+    const fd = synth(
+      {
+        throttle: fill(n, 1400),
+        motor: [fill(n, 100), fill(n, 800), fill(n, 800), fill(n, 800)] as F32x4,
+      },
+      n,
+    );
+    // pct(100) = 2.6 % <= 6, spread 35 pts >= 30 : chaque échantillon compte
+    expect(analyzeMotors(fd).floorClipPct).toBe(100);
+  });
+
+  it('pas d écrêtage si le différentiel est petit ou la demande non stabilisée', () => {
+    const n = 2000;
+    const small = synth(
+      {
+        throttle: fill(n, 1400),
+        motor: [fill(n, 100), fill(n, 500), fill(n, 500), fill(n, 500)] as F32x4,
+      },
+      n,
+    );
+    expect(analyzeMotors(small).floorClipPct).toBe(0); // spread 20 pts < 30
+
+    const commanded = synth(
+      {
+        throttle: fill(n, 1400),
+        setpoint: [fill(n, 300), fill(n, 0), fill(n, 0)] as F32x3,
+        gyro: [fill(n, 290), fill(n, 0), fill(n, 0)] as F32x3, // le gyro suit : vol réel
+        motor: [fill(n, 100), fill(n, 800), fill(n, 800), fill(n, 800)] as F32x4,
+      },
+      n,
+    );
+    expect(analyzeMotors(commanded).floorClipPct).toBe(0); // manoeuvre commandée
+  });
+
+  it('rupture d équilibre : saut soutenu détecté, moteur surcommandé et diagonale', () => {
+    const n = 10_000; // 10 s à 1 kHz
+    const m0 = new Float32Array(n);
+    const m1 = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      m0[i] = i < n / 2 ? 1000 : 1250;
+      m1[i] = i < n / 2 ? 1000 : 750;
+    }
+    const fd = synth(
+      { throttle: fill(n, 1400), motor: [m0, m1, fill(n, 1000), fill(n, 1000)] as F32x4 },
+      n,
+    );
+    const shift = analyzeMotors(fd).balanceShift;
+    expect(shift).not.toBeNull();
+    expect(shift?.motor).toBe(1);
+    expect(shift?.counterMotor).toBe(2);
+    expect(shift?.deltaPctPts).toBeGreaterThan(10);
+    expect(Math.abs((shift?.tChangeS ?? 0) - 5)).toBeLessThan(0.5);
+  });
+
+  it('log de banc (grandes consignes sans réponse gyro) : les deux métriques se taisent', () => {
+    const n = 10_000;
+    const m0 = new Float32Array(n);
+    const m1 = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      m0[i] = i < n / 2 ? 1000 : 1250;
+      m1[i] = i < n / 2 ? 100 : 750; // passe aussi sous le plancher
+    }
+    const fd = synth(
+      {
+        throttle: fill(n, 1400),
+        setpoint: [fill(n, 400), fill(n, 0), fill(n, 0)] as F32x3, // gyro reste à 0 : quad posé
+        motor: [m0, m1, fill(n, 1000), fill(n, 1000)] as F32x4,
+      },
+      n,
+    );
+    const mm = analyzeMotors(fd);
+    expect(mm.balanceShift).toBeNull();
+    expect(mm.floorClipPct).toBe(0);
+  });
+
+  it('pas de rupture sans vol assez long de chaque côté', () => {
+    const n = 2000; // 2 s < 2 x 3 s de segments minimum
+    const m0 = new Float32Array(n);
+    for (let i = 0; i < n; i++) m0[i] = i < n / 2 ? 1000 : 1400;
+    const fd = synth(
+      { throttle: fill(n, 1400), motor: [m0, fill(n, 1000), fill(n, 1000), fill(n, 1000)] as F32x4 },
+      n,
+    );
+    expect(analyzeMotors(fd).balanceShift).toBeNull();
   });
 });

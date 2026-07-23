@@ -152,6 +152,55 @@ export const en: Dict = {
         `Check the solder joints and connector on ${motors}, spin it by hand (rough spot = bearing), and verify the ESC firmware/timing. Do not fly again before that.`,
     },
 
+    motorsBalanceShift: {
+      title: (motor: string) => `Motor balance breaks mid-flight on ${motor}`,
+      detail: (motor: string) =>
+        `The motor balance shifts abruptly mid-flight and never comes back: ${motor} is commanded much harder after the break. That motor (or its ESC) lost thrust in flight - desync, cooked winding, tired bearing - or a mass moved (loose battery strap).`,
+      evidence: (
+        motor: string,
+        before: string,
+        after: string,
+        delta: string,
+        tChange: string,
+        counterNote: string,
+      ) =>
+        `${motor}: deviation from the motor average ${before} → ${after} pts around t=${tChange} s (Δ +${delta} pts)${counterNote}`,
+      counterNote: (motor: string, delta: string) =>
+        `; opposite side ${motor} is unloaded (Δ ${delta} pts)`,
+      fixBetaflight: (motor: string) =>
+        `Compare motor temperatures right after a short flight, check ${motor} (spin the bearing by hand, measure phase resistance) and its ESC, and make sure the pack did not slide. Bidirectional DSHOT eRPM would confirm the desync on the next flight.`,
+      fixInav: (motor: string) =>
+        `Compare motor temperatures right after a short flight, check ${motor} (spin the bearing by hand, measure phase resistance) and its ESC, and make sure the pack did not slide. Wire up ESC telemetry to log motor RPM and confirm the desync on the next flight.`,
+    },
+
+    motorsFloorClip: {
+      title: 'Motor pinned at idle in steady flight',
+      detail:
+        'Outside commanded moves, one motor drops to idle while the mixer asks for a large differential: no authority reserve left on the low side, staying level relies on the remaining motors only. Typical consequence of a strong imbalance (weak motor, badly offset CG).',
+      evidence: (pct: string, warn: number, crit: number) =>
+        `Low-side clipping ${pct}% of steady flight (warn ${warn}%, crit ${crit}%)`,
+      fix: 'Fix the imbalance reported elsewhere first (tired motor, mid-flight break, CG); if the balance is fine, lower the motor idle or lighten the quad.',
+    },
+
+    controlLoss: {
+      title: 'Loss of control in flight',
+      detail:
+        'The craft rotates clearly faster than commanded (or against the command) while the mixer is already at maximum differential with a motor stop touched: the loop commands the physical maximum and the attitude still diverges. Signature of a motor dropping out (desync, thrust loss), a damaged prop, or an impact.',
+      evidence: (
+        count: string,
+        tStart: string,
+        tEnd: string,
+        excess: string,
+        axis: string,
+        spread: string,
+      ) =>
+        `${count} event(s) - worst at t=${tStart}-${tEnd} s: excess ${excess} deg/s on ${axis}, motor differential ${spread}% of range`,
+      fixBetaflight:
+        'Do not fly again before finding the cause: inspect motors (bearing, winding) and ESCs, solder joints and connectors. Enable bidirectional DSHOT (set dshot_bidir = ON) to log eRPM and confirm the desync.',
+      fixInav:
+        'Do not fly again before finding the cause: inspect motors (bearing, winding) and ESCs, solder joints and connectors. Wire up ESC telemetry to log motor RPM and confirm the desync.',
+    },
+
     batterySag: {
       title: 'Heavy battery sag',
       detail:
@@ -205,6 +254,11 @@ export const en: Dict = {
         'Enable bidirectional DSHOT if your ESCs support it (BLHeli_32, Bluejay, AM32): it feeds the RPM filter in flight and the eRPM in the logs.',
       fixUnknown:
         'Check that bidirectional DSHOT is active and the RPM field is ticked in the blackbox settings.',
+      detailInav:
+        'The log carries no motor RPM: the escRPM field of the slow frames stayed at zero, so ESC telemetry is not reaching the board. On the spectrum, the "motors ~X Hz" line cannot be drawn.',
+      evidenceInav: 'escRPM = 0 on every slow frame of the log',
+      fixInav:
+        'If your ESCs provide telemetry (BLHeli_32, AM32...), wire their telemetry pad to the RX of a free UART and assign the ESC function to that port in INAV: the average motor RPM will be logged.',
     },
 
     yoyoDetected: {
@@ -841,7 +895,9 @@ export const en: Dict = {
         bandMotors: 'motors',
         xAxis: 'Frequency (Hz)',
         motorLine: (hz: string): string => `motors ~${hz} Hz`,
-      motorLineMissing: 'motor line unavailable - no eRPM in this log',
+        motorLineMissing: 'motor line unavailable - no eRPM in this log',
+        motorLineInav: (hz: string): string => `motors ~${hz} Hz (ESC telemetry)`,
+        motorLineMissingInav: 'motor line unavailable - no ESC telemetry in this log',
         beyondNyquist: (hz: string): string => `not measurable - log recorded at ${hz} Hz`,
       },
       step: {
@@ -854,6 +910,8 @@ export const en: Dict = {
         axisUnreliable: (axis: string): string => `${axis}*`,
         unreliableNote: '* dimmed curve: not enough stick input, axis not judged',
         noData: 'Not enough stick input to estimate the response.',
+      noDataWhy: 'In a hover the setpoint stays flat: the PID loop gets no command to measure.',
+      noDataHint: 'Fly a pass with sharp stick inputs (roll then pitch, about ten per axis) and the curve will fill in.',
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>
