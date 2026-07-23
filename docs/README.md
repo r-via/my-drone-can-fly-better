@@ -34,7 +34,7 @@ If you are new to the code, read in this order:
 | [i18n.md](i18n.md) | Dictionary shape, five locales, detection, adding a language |
 | [ui.md](ui.md) | Components, flight score, charts, design tokens, accessibility |
 | [cli.md](cli.md) | `npm run analyze`, `scripts/smoke.mjs` |
-| [testing.md](testing.md) | The 125 vitest cases, goldens, tolerances |
+| [testing.md](testing.md) | The 257 vitest cases, goldens, tolerances |
 | [deployment.md](deployment.md) | Static export, Netlify, the sharing function |
 | [limitations.md](limitations.md) | What the tool cannot do, and why |
 

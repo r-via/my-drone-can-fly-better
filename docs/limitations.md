@@ -55,7 +55,9 @@ At least 20 seconds of log, and enough stick movement. A pure cruise flight
 retries at half the excitation threshold and reports lower confidence through
 `quality`. Axes under quality 0.3 are ignored by the rules entirely, because a
 measured log at 0.07 produced a phantom 163 % overshoot out of deconvolution
-noise.
+noise. The chart applies the same threshold: those axes are drawn dimmed and
+dashed so a deconvolution artifact cannot be read as a real overshoot, and the
+quality travels inside share links so a shared report renders them the same way.
 
 **Welch amplitudes are not a physical unit.**
 `residualHfWarn` and the band RMS values are expressed in the amplitude scale of

@@ -24,7 +24,7 @@ per-category status chips.](docs/screenshots/report-warn.png)
 npm install
 npm run dev        # http://localhost:3000
 npm run build      # static export to out/
-npm test           # 125 tests, including goldens vs the reference Python scripts
+npm test           # 257 tests, including goldens vs the reference Python scripts
 ```
 
 Node 20 or newer (Next 15 and the WASM parser both need it).
@@ -102,7 +102,9 @@ the outputs stay comparable to the Python reference scripts.
   ([Plasmatree PID-Analyzer](https://github.com/Plasmatree/PID-Analyzer)
   method), 2 s Hann windows with 50 % overlap. No normalisation, so a settle
   value near 1 genuinely means the PID reaches its setpoint. A `quality` score
-  reports how much of the log had enough stick excitation to be usable.
+  reports how much of the log had enough stick excitation to be usable; axes
+  below the reliability gate are skipped by the rules and drawn dimmed and
+  dashed on the chart.
 - **Filter attenuation**: unfiltered against filtered, per band, in dB. Weak
   attenuation in the motor range and leftover high-frequency content each get
   their own rule.
@@ -211,7 +213,7 @@ Brand assets and their usage rules are documented in
 
 ## Tests
 
-`npm test` runs 125 vitest cases in Node. Several of them compare the
+`npm test` runs 257 vitest cases in Node. Several of them compare the
 TypeScript pipeline against `tests/golden/*.txt`, captured outputs of the older
 Python scripts (`analyze_pico.py`, `analyze_lr4.py`, `analyze_shimera.py`, on
 top of the orangebox parser), with tolerances around 2 % on RMS and averages.
@@ -289,7 +291,8 @@ tab left open re-checks for updates when it regains focus, at most once an hour.
   sessions in the file are still analysed.
 - **Step response** needs at least 20 s of log and enough stick movement. A
   pure cruise flight retries at half the excitation threshold and reports the
-  lower confidence through `quality`.
+  lower confidence through `quality`; unreliable axes are dimmed on the chart
+  and never judged.
 
 ---
 

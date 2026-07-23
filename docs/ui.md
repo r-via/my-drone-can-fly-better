@@ -85,7 +85,7 @@ directly:
 | Component | Helper | Notes |
 | --- | --- | --- |
 | `SpectrumChart` | `buildSpectrumPaths(axes, w, h)` | 0 to 1 kHz, square root Y scale, shaded resonance and motor bands, optional motor fundamental line |
-| `StepResponseChart` | `buildStepPaths(axes, w, h)` | 0 to 500 ms, Y from 0 to `max(1.5, observed peak)`, dashed target at 1.0, tinted overshoot zone |
+| `StepResponseChart` | `buildStepPaths(axes, w, h)` | 0 to 500 ms, Y from 0 to `max(1.5, peak of reliable axes)`, dashed target at 1.0, tinted overshoot zone; axes under `MIN_STEP_QUALITY` are drawn dimmed and dashed, starred in the legend, and never drive the Y scale |
 | `TimelineStrip` | `buildTimelineRects(segments, w)` | state bands (idle, low, flight) with the vbat curve on top |
 
 The square root Y scale on the spectrum is a deliberate compromise: linear

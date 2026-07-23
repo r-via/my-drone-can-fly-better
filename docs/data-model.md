@@ -138,7 +138,7 @@ Field by field semantics are in [analysis.md](analysis.md). The shapes:
 | `AxisSpectrum` | `bands[]`, `dominantBand`, `peaks[]` (top 5), `freqs`/`mags` for the chart |
 | `TrackingMetrics` | `axes[3]` of `{ meanAbsErr, maxErr, setpointMax }` |
 | `StepResponseMetrics` | `axes[3]` of `AxisStepResponse \| null` |
-| `AxisStepResponse` | `t`, `y`, `riseTimeMs`, `peakValue`, `overshootPct`, `settleValue`, `quality` |
+| `AxisStepResponse` | `t`, `y`, `riseTimeMs`, `peakValue`, `overshootPct`, `settleValue`, `quality`, `ms`, `msFreqHz`, `mtDb`, `mtFreqHz`, `msBandTopHz` |
 | `YoyoMetrics` | `applicable`, `ratio`, `verdict`, `peaks[]` |
 | `PropwashMetrics` | `applicable`, `events[]`, `worstSeverity`, `avgSeverity` |
 | `FilterMetrics` | `available`, `axes[3]` of `{ attenuationDb[], residualHfRms }` |

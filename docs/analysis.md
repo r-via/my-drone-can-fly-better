@@ -206,7 +206,9 @@ Three subtleties worth knowing:
 `quality` is `kept windows / total windows`. The rule engine ignores any axis
 under 0.3 and adds a confidence note between 0.3 and 0.5. That gate exists
 because a measured log (lr4 session 6, quality 0.07) produced a phantom 163 %
-overshoot out of pure noise.
+overshoot out of pure noise. The chart and the share codec honour the same
+threshold (`MIN_STEP_QUALITY`, exported by `step.ts`): gated axes render dimmed
+and dashed instead of posing as a real response.
 
 Metrics derived from the averaged curve:
 

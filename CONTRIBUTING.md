@@ -27,7 +27,7 @@ the same terms.
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm test           # 125 vitest cases
+npm test           # 257 vitest cases
 npx tsc --noEmit   # type check, also enforces translation completeness
 ```
 

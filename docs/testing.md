@@ -1,7 +1,7 @@
 # Testing
 
 ```bash
-npm test           # 125 vitest cases, node environment
+npm test           # 257 vitest cases, node environment
 npx tsc --noEmit   # type check, also enforces translation completeness
 ```
 
@@ -9,22 +9,28 @@ Vitest runs in a Node environment with a 60 second per test timeout, since the
 golden suites decode real multi megabyte logs. Configuration is
 [`vitest.config.ts`](../vitest.config.ts).
 
-## The ten suites
+## The sixteen suites
 
 | Suite | Cases | Needs a log file | Covers |
 | --- | --- | --- | --- |
 | `dsp.test.ts` | 19 | no | FFT, ifft round trip, Welch, band RMS, peak exclusion, numpy percentile convention |
-| `charts.test.ts` | 21 | no | the three geometry helpers plus server side rendering of the chart components |
-| `rules.test.ts` | 14 | no | every rule against synthetic `SessionAnalysis` fixtures |
+| `charts.test.ts` | 35 | no | the three geometry helpers plus server side rendering of the chart components |
+| `rules.test.ts` | 18 | no | every rule against synthetic `SessionAnalysis` fixtures |
+| `score.test.ts` | 10 | no | the flight score aggregation |
+| `share.test.ts` | 25 | no | share codec round trip: findings, curves, step quality, degraded mode |
 | `ui-shell.test.ts` | 4 | no | `useAnalyzer` exports and `collectCliLines` |
 | `basic.test.ts` | 26 | yes | power, motors, noise, tracking, timeline, GPS, failsafe against the goldens |
 | `spectrum.test.ts` | 12 | yes | bands, peaks, motor attribution, filter attenuation |
 | `flight.test.ts` | 11 | yes | yoyo and prop wash |
-| `step.test.ts` | 5 | yes | step response, quality gating |
-| `cli.test.ts` | 11 | yes | header reconstruction, lint-key coverage guard, the nine lint rules |
-| `parse.test.ts` | 1 | yes | the decoder agreeing with orangebox on a real chimera log |
+| `step.test.ts` | 9 | yes | step response, quality gating, Ms/Mt |
+| `compare.test.ts` | 29 | yes | flight to flight comparison: tune deltas, metrics, caveats |
+| `oscillation.test.ts` | 13 | yes | oscillation event detection, severity, no false positives on the fleet |
+| `validity.test.ts` | 19 | yes | vbat/current channel validity, config lint from the `.bbl` headers |
+| `i18n-leaks.test.ts` | 10 | yes | no raw decoder or reference language string leaks in any locale |
+| `cli.test.ts` | 12 | yes | header reconstruction, lint-key coverage guard, the lint rules |
+| `parse.test.ts` | 5 | yes | the decoder agreeing with orangebox on a real chimera log |
 
-The four synthetic suites run anywhere and are where new logic gets covered.
+The six synthetic suites run anywhere and are where new logic gets covered.
 
 ## Golden tests
 
@@ -102,11 +108,11 @@ const LR4     = '/home/rviau/projects/drones/explorer lr4/btfl_003.bbl';
 const PICO    = '/home/rviau/projects/drones/pavo pico/btfl_002.bbl';
 ```
 
-Clone the repository elsewhere and those six suites fail on a missing file. That
-is expected and documented in CONTRIBUTING. The logs are not vendored: they are
-tens of megabytes each and carry GPS traces.
+Clone the repository elsewhere and the ten log-based suites fail on a missing
+file. That is expected and documented in CONTRIBUTING. The logs are not
+vendored: they are tens of megabytes each and carry GPS traces.
 
-The four synthetic suites are the contribution surface. New logic belongs there.
+The six synthetic suites are the contribution surface. New logic belongs there.
 
 ## Rule tests
 
