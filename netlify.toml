@@ -6,6 +6,14 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# netlify dev : lance next dev sur un port fixe et proxifie tout sur :8888
+# (app + functions + edge functions). Sans targetPort explicite, un next dev
+# deja lance sur 3000 fait sauter le port et casse le proxy.
+[dev]
+  command = "npm run dev -- --port 3210"
+  targetPort = 3210
+  port = 8888
+
 # Liens de partage : /s sert l'aperçu OG (Discord, Slack) puis redirige vers
 # l'app en préservant le fragment #r=… (voir netlify/functions/share-preview.ts).
 [[redirects]]

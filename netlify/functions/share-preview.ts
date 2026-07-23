@@ -23,8 +23,14 @@ function esc(s: string): string {
 
 export default (req: Request): Response => {
   const url = new URL(req.url);
-  const title = esc((url.searchParams.get('t') ?? 'Flight report').slice(0, MAX_TITLE));
-  const desc = esc((url.searchParams.get('d') ?? '').slice(0, MAX_DESC));
+  const rawTitle = (url.searchParams.get('t') ?? 'Flight report').slice(0, MAX_TITLE);
+  const rawDesc = (url.searchParams.get('d') ?? '').slice(0, MAX_DESC);
+  const title = esc(rawTitle);
+  const desc = esc(rawDesc);
+  // Carte de score en PNG, générée par l'edge function og-image.
+  const image = esc(
+    `${url.origin}/api/og?t=${encodeURIComponent(rawTitle)}&d=${encodeURIComponent(rawDesc)}`,
+  );
 
   const html = `<!doctype html>
 <html>
@@ -35,20 +41,25 @@ export default (req: Request): Response => {
 <meta property="og:site_name" content="My Drone Can Fly Better">
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="${desc}">
+<meta property="og:image" content="${image}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="description" content="${desc}">
-<meta name="twitter:card" content="summary">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${title}">
 <meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="${image}">
 <meta name="theme-color" content="#c6ff5e">
 <meta name="robots" content="noindex">
 <script>
   // Humains : direction l'app, fragment (#r=…) préservé - il ne quitte jamais
   // le navigateur. Les crawlers n'exécutent pas ce script et lisent l'OG.
+  // Pas de meta refresh en secours : les crawlers (Discord inclus) suivent
+  // les meta refresh et scraperaient l'OG générique de la home à la place.
   location.replace('/' + location.hash);
 </script>
-<noscript><meta http-equiv="refresh" content="0;url=/"></noscript>
 </head>
-<body></body>
+<body><noscript><a href="/">My Drone Can Fly Better</a></noscript></body>
 </html>`;
 
   return new Response(html, {
