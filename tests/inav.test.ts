@@ -188,9 +188,9 @@ describe('log INAV réel', () => {
     expect(peak).toBeGreaterThan(100);
   });
 
-  it('produit un rapport chimera7 avec le constat INAV et sans lignes CLI Betaflight', () => {
+  it('produit un rapport au profil akira avec le constat INAV et sans lignes CLI Betaflight', () => {
     const sr = buildSessionReport(sessions[0], fr);
-    expect(sr.profile.id).toBe('chimera7'); // craft AKIRA = build INAV du châssis Chimera 7"
+    expect(sr.profile.id).toBe('akira'); // craft AKIRA = RRFPV RR Akira 9" X8 6S
     expect(sr.analysis.power?.cells).toBe(6);
 
     const notice = sr.findings.find((f) => f.id === 'inav-limited');
