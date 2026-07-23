@@ -135,6 +135,14 @@ export default function ShareLink({ sessionReport, fileName }: ShareLinkProps) {
         {copied ? t.copiedSr : ''}
       </span>
 
+      {/* Confirmation visible : le bouton n'a pas de texte, la coche seule ne
+          dit pas ce qui vient de se passer. */}
+      {copied ? (
+        <p className="absolute right-0 top-full z-10 mt-2 whitespace-nowrap rounded-full border border-line-strong bg-surface-2 px-3 py-1.5 text-xs font-semibold text-ok shadow-[0_12px_30px_-14px_rgba(0,0,0,0.6)]">
+          {t.copied}
+        </p>
+      ) : null}
+
       {/* Réserves (courbes retirées, lien trop long), copie refusée et erreurs :
           panneau flottant sous le bouton, pour ne pas pousser la mise en page. */}
       {showPanel ? (

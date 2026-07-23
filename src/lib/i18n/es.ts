@@ -660,7 +660,7 @@ export const es: Dict = {
       description:
         'El informe entero cabe en el propio enlace: no se guarda nada en ningún servidor y tu .bbl no sale de tu máquina. Quien lo abra verá este informe en su propio idioma.',
       button: 'Copiar enlace',
-      copied: 'Enlace copiado',
+      copied: 'Copiado al portapapeles',
       copiedSr: 'Enlace de compartir copiado al portapapeles',
       building: 'Preparando…',
       error: 'No se pudo preparar el enlace.',

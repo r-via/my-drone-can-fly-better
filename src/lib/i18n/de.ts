@@ -659,7 +659,7 @@ export const de: Dict = {
       description:
         'Der ganze Bericht steckt im Link selbst: nichts wird auf einem Server abgelegt, und dein .bbl verlässt deinen Rechner nicht. Wer ihn öffnet, sieht diesen Bericht in seiner eigenen Sprache.',
       button: 'Link kopieren',
-      copied: 'Link kopiert',
+      copied: 'In die Zwischenablage kopiert',
       copiedSr: 'Teilen-Link in die Zwischenablage kopiert',
       building: 'Wird vorbereitet…',
       error: 'Link konnte nicht erstellt werden.',

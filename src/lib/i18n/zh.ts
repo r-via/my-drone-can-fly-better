@@ -669,7 +669,7 @@ export const zh: Dict = {
       description:
         '整份报告都装在链接本身里：不会存到任何服务器，你的 .bbl 也不会离开你的电脑。打开链接的人会看到这份报告的本地语言版本。',
       button: '复制链接',
-      copied: '链接已复制',
+      copied: '已复制到剪贴板',
       copiedSr: '分享链接已复制到剪贴板',
       building: '准备中…',
       error: '无法生成链接。',

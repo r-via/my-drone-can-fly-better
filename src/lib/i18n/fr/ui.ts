@@ -229,7 +229,7 @@ export const ui = {
     description:
       "Le rapport entier tient dans le lien lui-même : rien n'est déposé sur un serveur, et ton .bbl ne quitte pas ta machine. Qui l'ouvre voit ce rapport dans sa propre langue.",
     button: 'Copier le lien',
-    copied: 'Lien copié',
+    copied: 'Copié dans le presse-papiers',
     copiedSr: 'Lien de partage copié dans le presse-papiers',
     building: 'Préparation…',
     error: "Impossible de préparer le lien.",

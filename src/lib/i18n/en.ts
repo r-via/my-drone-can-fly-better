@@ -671,7 +671,7 @@ export const en: Dict = {
       description:
         'The whole report fits inside the link itself: nothing is stored on a server, and your .bbl never leaves your machine. Whoever opens it sees this report in their own language.',
       button: 'Copy link',
-      copied: 'Link copied',
+      copied: 'Copied to clipboard',
       copiedSr: 'Share link copied to clipboard',
       building: 'Preparing…',
       error: 'Could not build the link.',
