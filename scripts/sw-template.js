@@ -36,12 +36,42 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
+  const url = new URL(req.url);
   // Ko-fi, Discord, GitHub : liens externes, jamais interceptés.
-  if (new URL(req.url).origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) return;
 
-  // Une seule route : toute navigation retombe sur la coquille en cache.
+  // /api/* : rapports partagés et carte OG, servis par les fonctions Netlify.
+  // Jamais en cache : ignoreSearch fusionnerait les query strings de /api/og.
+  if (url.pathname.startsWith('/api/')) return;
+
   if (req.mode === 'navigate') {
-    event.respondWith(caches.match(APP_SHELL).then((hit) => hit ?? fetch(req)));
+    // /s et /s/<id> doivent atteindre l'edge function (aperçu OG + redirection
+    // vers /#s=<id>) : servir la coquille ici ferait atterrir le lien sur la
+    // page d'accueil, sans rapport. Hors ligne on redirige nous-mêmes - le
+    // fragment #r= de l'ancien format survit à la redirection.
+    if (url.pathname === '/s' || url.pathname.startsWith('/s/')) {
+      event.respondWith(
+        fetch(req).catch(() =>
+          Response.redirect(url.pathname === '/s' ? '/' : `/#s=${url.pathname.slice(3)}`, 302),
+        ),
+      );
+      return;
+    }
+    // Une seule route : toute navigation retombe sur la coquille en cache.
+    // Cache raté (stockage évincé ou vidé par l'utilisateur) : on la reprend
+    // au réseau et on la remet en cache, le hors-ligne se répare tout seul.
+    event.respondWith(
+      (async () => {
+        const hit = await caches.match(APP_SHELL);
+        if (hit) return hit;
+        const res = await fetch(APP_SHELL);
+        if (res.ok) {
+          const cache = await caches.open(CACHE);
+          await cache.put(APP_SHELL, res.clone());
+        }
+        return res;
+      })(),
+    );
     return;
   }
 
