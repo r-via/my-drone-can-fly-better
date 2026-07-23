@@ -9,3 +9,7 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+
+# Anatoly (outil local)
+.anatoly/
+.anatoly.yml
