@@ -365,6 +365,17 @@ describe('codec de partage', () => {
     // ne rapporterait que le fond, des centaines de fois plus bas.
     expect(best).toBeGreaterThan(Math.max(...source.mags) * 0.9);
 
+    // Le plancher de bruit aussi : le graphe affiche √(mag), une quantification
+    // linéaire écrasait tout le fond sur les niveaux 0-2 et une page partagée
+    // montrait un plancher plat à zéro. La quantification en domaine racine
+    // doit garder chaque point du dernier quart au bon ordre de grandeur.
+    const quarter = Math.floor(ax.mags.length * 0.75);
+    for (let i = quarter; i < ax.mags.length; i++) {
+      const srcAtF = 100 / (1 + Math.round((ax.freqs[i] / 1000) * 512));
+      expect(ax.mags[i]).toBeGreaterThan(srcAtF / 4);
+      expect(ax.mags[i]).toBeLessThan(srcAtF * 4);
+    }
+
     const step = got.step!.axes[0]!;
     expect(step.t.length).toBeGreaterThan(0);
     expect(step.t[step.t.length - 1]).toBeCloseTo(0.4975, 2);

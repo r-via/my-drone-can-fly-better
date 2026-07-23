@@ -53,9 +53,11 @@ export const SHARE_VERSION = 1;
 export const DEFAULT_MAX_CHARS = 1700;
 
 // Points conservés pour le spectre (max-pooling) et la réponse indicielle.
-// 128 points sur ~500 Hz suffisent à un tracé SVG de quelques centaines de
-// pixels, et le max-pooling garde les résonances étroites.
-const SPECTRUM_POINTS = 128;
+// 256 points sur 0-1 kHz : un lien complet pèse ~1.5 ko pour un budget de
+// plusieurs milliers de caractères, autant lisser le tracé et diviser par deux
+// l'imprécision de position des pics (une largeur de seau). Le max-pooling
+// garde les résonances étroites.
+const SPECTRUM_POINTS = 256;
 const STEP_POINTS = 48;
 
 // ---------------------------------------------------------------------------
@@ -80,6 +82,16 @@ interface PackedCurve {
    * contredisait le chiffre imprimé à côté.
    */
   q: number[];
+  /**
+   * Présent (true) = niveaux quantifiés dans le domaine racine :
+   * v = (level/255)² · scale. Indispensable au spectre : son échelle est
+   * dominée par le pic quasi-DC et le graphe affiche √(mag) - en linéaire,
+   * tout le plancher de bruit tombait sur les niveaux 0-2 et une page
+   * partagée montrait un plancher plat à zéro là où la page directe montre
+   * du fuzz. Absent = linéaire (réponse indicielle, et tous les liens émis
+   * avant l'ajout de ce champ).
+   */
+  sqrtScale?: true;
 }
 
 /** Entier signé → non signé, pour que les petits écarts restent de petits nombres. */
@@ -102,6 +114,7 @@ function packCurve(
   x1: number,
   points: number,
   pool: 'max' | 'sample',
+  domain: 'linear' | 'sqrt' = 'linear',
 ): PackedCurve | null {
   const len = values.length;
   if (len === 0) return null;
@@ -120,11 +133,13 @@ function packCurve(
     if (pool === 'max') {
       for (let j = lo + 1; j < hi && j < len; j++) if (values[j] > v) v = values[j];
     }
-    const level = Math.max(0, Math.min(255, Math.round((v / scale) * 255)));
+    const ratio = Math.max(0, v / scale);
+    const norm = domain === 'sqrt' ? Math.sqrt(ratio) : ratio;
+    const level = Math.max(0, Math.min(255, Math.round(norm * 255)));
     q.push(zigzag(level - prev));
     prev = level;
   }
-  return { x0, x1, scale, q };
+  return domain === 'sqrt' ? { x0, x1, scale, q, sqrtScale: true } : { x0, x1, scale, q };
 }
 
 function unpackCurve(c: PackedCurve | null): { x: Float32Array; y: Float32Array } {
@@ -137,7 +152,8 @@ function unpackCurve(c: PackedCurve | null): { x: Float32Array; y: Float32Array 
   for (let i = 0; i < n; i++) {
     level += unzigzag(c.q[i]);
     x[i] = c.x0 + i * span;
-    y[i] = (level / 255) * c.scale;
+    const norm = level / 255;
+    y[i] = (c.sqrtScale ? norm * norm : norm) * c.scale;
   }
   return { x, y };
 }
@@ -384,7 +400,7 @@ const SCHEMA_KEYS = [
   'curve', 'x0', 'x1', 'scale', 'q', 'motorFundamentalHz', 'axes',
   'riseTimeMs', 'overshootPct', 'segments',
   // Ajouts ultérieurs : toujours en fin de liste, jamais au milieu.
-  'trimmed', 'scoreExempt', 'quality',
+  'trimmed', 'scoreExempt', 'quality', 'sqrtScale',
 ] as const;
 
 const TO_SHORT = new Map<string, string>(SCHEMA_KEYS.map((k, i) => [k, i.toString(36)]));
@@ -580,7 +596,7 @@ export async function encodeSession(
         ? {
             motorFundamentalHz: spectrum.motorFundamentalHz,
             axes: spectrum.axes.map((ax) =>
-              packCurve(ax.mags, ax.freqs[0] ?? 0, ax.freqs[ax.freqs.length - 1] ?? 0, SPECTRUM_POINTS, 'max'),
+              packCurve(ax.mags, ax.freqs[0] ?? 0, ax.freqs[ax.freqs.length - 1] ?? 0, SPECTRUM_POINTS, 'max', 'sqrt'),
             ),
           }
         : null,
