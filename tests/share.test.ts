@@ -369,6 +369,9 @@ describe('codec de partage', () => {
     expect(step.t.length).toBeGreaterThan(0);
     expect(step.t[step.t.length - 1]).toBeCloseTo(0.4975, 2);
     expect(Math.max(...step.y)).toBeGreaterThan(1.1); // l'overshoot n'est pas écrasé
+    // La quality voyage avec la courbe : sans elle, une page partagée rendrait
+    // plein trait un axe que le graphe local estompe comme non fiable.
+    expect(step.quality).toBeCloseTo(0.8, 5);
   });
 
   it('signale le mode dégradé et retire alors tous les graphes', async () => {

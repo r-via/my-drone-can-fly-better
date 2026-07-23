@@ -384,7 +384,7 @@ const SCHEMA_KEYS = [
   'curve', 'x0', 'x1', 'scale', 'q', 'motorFundamentalHz', 'axes',
   'riseTimeMs', 'overshootPct', 'segments',
   // Ajouts ultérieurs : toujours en fin de liste, jamais au milieu.
-  'trimmed', 'scoreExempt',
+  'trimmed', 'scoreExempt', 'quality',
 ] as const;
 
 const TO_SHORT = new Map<string, string>(SCHEMA_KEYS.map((k, i) => [k, i.toString(36)]));
@@ -483,7 +483,13 @@ interface SharePayload {
   };
   findings: PackedFinding[];
   spectrum: { motorFundamentalHz: number | null; axes: Array<PackedCurve | null> } | null;
-  step: Array<{ curve: PackedCurve | null; riseTimeMs: number | null; overshootPct: number | null } | null> | null;
+  step: Array<{
+    curve: PackedCurve | null;
+    riseTimeMs: number | null;
+    overshootPct: number | null;
+    /** Absent des liens émis avant son ajout : le décodage retombe sur 1. */
+    quality?: number;
+  } | null> | null;
   /** [tStart, code état, vbat] - tEnd déduit du segment suivant. */
   timeline: Array<[number, number, number | null]>;
 }
@@ -586,6 +592,7 @@ export async function encodeSession(
                   curve: packCurve(ax.y, ax.t[0] ?? 0, ax.t[ax.t.length - 1] ?? 0, STEP_POINTS, 'sample'),
                   riseTimeMs: ax.riseTimeMs,
                   overshootPct: ax.overshootPct,
+                  quality: round(ax.quality, 2),
                 }
               : null,
           )
@@ -822,7 +829,9 @@ function unpackStep(packed: SharePayload['step']): StepResponseMetrics | null {
       peakValue: null,
       overshootPct: ax.overshootPct,
       settleValue: null,
-      quality: 1,
+      // Liens antérieurs à l'ajout de `quality` : 1 = rendu plein trait,
+      // identique à ce que ces liens ont toujours affiché.
+      quality: ax.quality ?? 1,
       // Ms/Mt ne voyagent pas dans le lien : ils n'alimentent aucun graphe, et
       // le finding qui les cite est déjà encodé avec son evidence chiffrée.
       ms: null,
