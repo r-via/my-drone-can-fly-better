@@ -160,6 +160,7 @@ headers (`src/lib/rules/profiles.ts`):
 | `pico` | `pavo pico` | ducted 2S whoop: high raw noise and prop wash tolerated, yoyo caught early |
 | `lr4` | `lr4` | long range 4S: strict tracking and sag, rear-heavy CG tolerated |
 | `chimera7` | `chimera` / `shimera` | 7 inch 6S: strict on raw vibration (jello), slower rise time accepted |
+| `akira` | `akira` | 9 inch coax X8 6S on INAV: starting thresholds, jello watched early, slow rise tolerated |
 | `generic` | anything else | median values for a healthy 5 inch freestyle |
 
 Adding a drone is one `DroneProfile` entry (craft-name regex, motor poles, cell
