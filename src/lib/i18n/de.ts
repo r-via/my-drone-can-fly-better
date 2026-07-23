@@ -168,6 +168,8 @@ export const de: Dict = {
         `Vergleiche die Motortemperaturen direkt nach einem kurzen Flug, prüfe ${motor} (Lager von Hand, Phasenwiderstand) und seinen ESC, und stell sicher, dass der Akku nicht verrutscht ist. Die eRPM des bidirektionalen DSHOT würde den Desync beim nächsten Flug bestätigen.`,
       fixInav: (motor: string) =>
         `Vergleiche die Motortemperaturen direkt nach einem kurzen Flug, prüfe ${motor} (Lager von Hand, Phasenwiderstand) und seinen ESC, und stell sicher, dass der Akku nicht verrutscht ist. Schließ die ESC-Telemetrie an, um die Motordrehzahl zu loggen und den Desync beim nächsten Flug zu bestätigen.`,
+      fixRpmLogged: (motor: string) =>
+        `Vergleiche die Motortemperaturen direkt nach einem kurzen Flug, prüfe ${motor} (Lager von Hand, Phasenwiderstand) und seinen ESC, und stell sicher, dass der Akku nicht verrutscht ist. Gleiche mit der geloggten Motordrehzahl um den Bruch herum ab, um den Desync zu bestätigen.`,
     },
 
     motorsFloorClip: {
@@ -193,9 +195,11 @@ export const de: Dict = {
       ) =>
         `${count} Ereignis(se) - das schlimmste bei t=${tStart}-${tEnd} s: Überschuss ${excess} deg/s auf ${axis}, Motor-Differential ${spread}% des Bereichs`,
       fixBetaflight:
-        'Flieg nicht wieder, bevor die Ursache gefunden ist: prüfe Motoren (Lager, Wicklung) und ESCs, Lötstellen und Stecker. Aktiviere bidirektionales DSHOT (set dshot_bidir = ON), um die eRPM zu loggen und den Desync zu bestätigen.',
+        'Flieg nicht wieder, bevor die Ursache gefunden ist: prüfe Motoren (Lager, Wicklung) und ESCs, Lötstellen und Stecker. Aktiviere bidirektionales DSHOT, um die eRPM zu loggen und den Desync zu bestätigen.',
       fixInav:
         'Flieg nicht wieder, bevor die Ursache gefunden ist: prüfe Motoren (Lager, Wicklung) und ESCs, Lötstellen und Stecker. Schließ die ESC-Telemetrie an, um die Motordrehzahl zu loggen und den Desync zu bestätigen.',
+      fixRpmLogged:
+        'Flieg nicht wieder, bevor die Ursache gefunden ist: prüfe Motoren (Lager, Wicklung) und ESCs, Lötstellen und Stecker. Gleiche mit der geloggten Motordrehzahl in diesem Moment ab, um den abreißenden Motor zu identifizieren.',
     },
 
     batterySag: {

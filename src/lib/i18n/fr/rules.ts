@@ -171,6 +171,9 @@ export const rules = {
       `Compare la température des moteurs juste après un vol court, contrôle ${motor} (roulement à la main, résistance des phases) et son ESC, et vérifie que le pack n'a pas glissé. L'eRPM du DSHOT bidirectionnel confirmerait le désync au prochain vol.`,
     fixInav: (motor: string) =>
       `Compare la température des moteurs juste après un vol court, contrôle ${motor} (roulement à la main, résistance des phases) et son ESC, et vérifie que le pack n'a pas glissé. Branche la télémétrie ESC pour logger le régime moteur et confirmer le désync au prochain vol.`,
+    /** Le régime moteur est déjà dans le log (eRPM Betaflight ou télémétrie ESC INAV) : ne pas conseiller de le brancher. */
+    fixRpmLogged: (motor: string) =>
+      `Compare la température des moteurs juste après un vol court, contrôle ${motor} (roulement à la main, résistance des phases) et son ESC, et vérifie que le pack n'a pas glissé. Croise avec le régime moteur loggé autour de la rupture pour confirmer le désync.`,
   },
 
   motorsFloorClip: {
@@ -196,9 +199,12 @@ export const rules = {
     ) =>
       `${count} événement(s) - le pire à t=${tStart}-${tEnd} s : excès ${excess} deg/s sur ${axis}, différentiel moteur ${spread} % de la plage`,
     fixBetaflight:
-      "Ne revole pas avant d'avoir trouvé la cause : inspecte moteurs (roulement, bobinage) et ESC, soudures et connecteurs. Active le DSHOT bidirectionnel (set dshot_bidir = ON) pour logger l'eRPM et confirmer le désync.",
+      "Ne revole pas avant d'avoir trouvé la cause : inspecte moteurs (roulement, bobinage) et ESC, soudures et connecteurs. Active le DSHOT bidirectionnel pour logger l'eRPM et confirmer le désync.",
     fixInav:
       "Ne revole pas avant d'avoir trouvé la cause : inspecte moteurs (roulement, bobinage) et ESC, soudures et connecteurs. Branche la télémétrie ESC pour logger le régime moteur et confirmer le désync.",
+    /** Le régime moteur est déjà dans le log : croiser plutôt que brancher. */
+    fixRpmLogged:
+      "Ne revole pas avant d'avoir trouvé la cause : inspecte moteurs (roulement, bobinage) et ESC, soudures et connecteurs. Croise avec le régime moteur loggé au même instant pour identifier le moteur qui décroche.",
   },
 
   batterySag: {

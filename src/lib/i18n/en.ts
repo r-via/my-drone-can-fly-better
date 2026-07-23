@@ -171,6 +171,8 @@ export const en: Dict = {
         `Compare motor temperatures right after a short flight, check ${motor} (spin the bearing by hand, measure phase resistance) and its ESC, and make sure the pack did not slide. Bidirectional DSHOT eRPM would confirm the desync on the next flight.`,
       fixInav: (motor: string) =>
         `Compare motor temperatures right after a short flight, check ${motor} (spin the bearing by hand, measure phase resistance) and its ESC, and make sure the pack did not slide. Wire up ESC telemetry to log motor RPM and confirm the desync on the next flight.`,
+      fixRpmLogged: (motor: string) =>
+        `Compare motor temperatures right after a short flight, check ${motor} (spin the bearing by hand, measure phase resistance) and its ESC, and make sure the pack did not slide. Cross-check with the logged motor RPM around the break to confirm the desync.`,
     },
 
     motorsFloorClip: {
@@ -196,9 +198,11 @@ export const en: Dict = {
       ) =>
         `${count} event(s) - worst at t=${tStart}-${tEnd} s: excess ${excess} deg/s on ${axis}, motor differential ${spread}% of range`,
       fixBetaflight:
-        'Do not fly again before finding the cause: inspect motors (bearing, winding) and ESCs, solder joints and connectors. Enable bidirectional DSHOT (set dshot_bidir = ON) to log eRPM and confirm the desync.',
+        'Do not fly again before finding the cause: inspect motors (bearing, winding) and ESCs, solder joints and connectors. Enable bidirectional DSHOT to log eRPM and confirm the desync.',
       fixInav:
         'Do not fly again before finding the cause: inspect motors (bearing, winding) and ESCs, solder joints and connectors. Wire up ESC telemetry to log motor RPM and confirm the desync.',
+      fixRpmLogged:
+        'Do not fly again before finding the cause: inspect motors (bearing, winding) and ESCs, solder joints and connectors. Cross-check with the logged motor RPM at that instant to identify the dropping motor.',
     },
 
     batterySag: {

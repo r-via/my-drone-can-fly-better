@@ -659,11 +659,32 @@ describe('motors-balance-shift', () => {
     expect(ids(findings)).toContain('motors-imbalance');
   });
 
-  it('le conseil parle le dialecte du firmware : eRPM en Betaflight, télémétrie ESC en INAV', () => {
-    const bf = evaluateSession(withShift(20, 'betaflight'), chimera);
-    expect(bf.find((fd) => fd.id === 'motors-balance-shift')?.fix?.text).toContain('DSHOT');
-    const inav = evaluateSession(withShift(20, 'inav'), chimera);
-    expect(inav.find((fd) => fd.id === 'motors-balance-shift')?.fix?.text).not.toContain('DSHOT');
+  it('le conseil parle le dialecte du firmware et respecte ce que le log porte déjà', () => {
+    // Betaflight sans eRPM : conseiller le DSHOT bidirectionnel, ligne CLI copiable.
+    const bfNoErpm = evaluateSession(
+      makeAnalysis((x) => {
+        x.motors.erpmAvailable = false;
+        x.motors.balanceShift = withShift(20).motors.balanceShift;
+      }),
+      chimera,
+    ).find((fd) => fd.id === 'motors-balance-shift');
+    expect(bfNoErpm?.fix?.text).toContain('DSHOT');
+    expect(bfNoErpm?.fix?.cli).toEqual(['set dshot_bidir = ON']);
+
+    // INAV sans télémétrie ESC : vocabulaire INAV, pas de CLI Betaflight.
+    const inav = evaluateSession(withShift(20, 'inav'), chimera).find(
+      (fd) => fd.id === 'motors-balance-shift',
+    );
+    expect(inav?.fix?.text).toContain('télémétrie');
+    expect(inav?.fix?.text).not.toContain('DSHOT');
+    expect(inav?.fix?.cli).toBeUndefined();
+
+    // Régime déjà loggé (eRPM présent, cas par défaut de la fixture) : croiser, pas brancher.
+    const logged = evaluateSession(withShift(20, 'betaflight'), chimera).find(
+      (fd) => fd.id === 'motors-balance-shift',
+    );
+    expect(logged?.fix?.text).toContain('régime moteur loggé');
+    expect(logged?.fix?.cli).toBeUndefined();
   });
 });
 
@@ -732,14 +753,25 @@ describe('control-loss', () => {
     expect(f?.evidence).toContain('83');
   });
 
-  it('le conseil parle le dialecte du firmware', () => {
-    expect(
-      evaluateSession(withEvent('betaflight'), chimera).find((fd) => fd.id === 'control-loss')?.fix
-        ?.text,
-    ).toContain('dshot_bidir');
-    expect(
-      evaluateSession(withEvent('inav'), chimera).find((fd) => fd.id === 'control-loss')?.fix?.text,
-    ).not.toContain('dshot_bidir');
+  it('le conseil parle le dialecte du firmware et respecte ce que le log porte déjà', () => {
+    // eRPM déjà loggé (défaut de la fixture) : croiser avec le régime, pas de CLI.
+    const logged = evaluateSession(withEvent('betaflight'), chimera).find(
+      (fd) => fd.id === 'control-loss',
+    );
+    expect(logged?.fix?.text).toContain('régime moteur loggé');
+    expect(logged?.fix?.cli).toBeUndefined();
+
+    // Betaflight sans eRPM : DSHOT bidirectionnel + ligne CLI.
+    const a = withEvent('betaflight');
+    a.motors.erpmAvailable = false;
+    const bf = evaluateSession(a, chimera).find((fd) => fd.id === 'control-loss');
+    expect(bf?.fix?.text).toContain('DSHOT');
+    expect(bf?.fix?.cli).toEqual(['set dshot_bidir = ON']);
+
+    // INAV sans télémétrie ESC : vocabulaire INAV.
+    const inav = evaluateSession(withEvent('inav'), chimera).find((fd) => fd.id === 'control-loss');
+    expect(inav?.fix?.text).toContain('télémétrie');
+    expect(inav?.fix?.text).not.toContain('DSHOT');
   });
 
   it('aucun événement → silence', () => {

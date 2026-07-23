@@ -168,6 +168,8 @@ export const es: Dict = {
         `Compara la temperatura de los motores justo después de un vuelo corto, revisa ${motor} (rodamiento a mano, resistencia de fases) y su ESC, y verifica que el pack no se haya movido. El eRPM del DSHOT bidireccional confirmaría el desync en el próximo vuelo.`,
       fixInav: (motor: string) =>
         `Compara la temperatura de los motores justo después de un vuelo corto, revisa ${motor} (rodamiento a mano, resistencia de fases) y su ESC, y verifica que el pack no se haya movido. Conecta la telemetría del ESC para registrar el régimen del motor y confirmar el desync en el próximo vuelo.`,
+      fixRpmLogged: (motor: string) =>
+        `Compara la temperatura de los motores justo después de un vuelo corto, revisa ${motor} (rodamiento a mano, resistencia de fases) y su ESC, y verifica que el pack no se haya movido. Cruza con el régimen del motor registrado alrededor de la ruptura para confirmar el desync.`,
     },
 
     motorsFloorClip: {
@@ -193,9 +195,11 @@ export const es: Dict = {
       ) =>
         `${count} evento(s) - el peor en t=${tStart}-${tEnd} s: exceso ${excess} deg/s en ${axis}, diferencial de motores ${spread}% del rango`,
       fixBetaflight:
-        'No vuelvas a volar antes de encontrar la causa: inspecciona motores (rodamiento, bobinado) y ESC, soldaduras y conectores. Activa el DSHOT bidireccional (set dshot_bidir = ON) para registrar el eRPM y confirmar el desync.',
+        'No vuelvas a volar antes de encontrar la causa: inspecciona motores (rodamiento, bobinado) y ESC, soldaduras y conectores. Activa el DSHOT bidireccional para registrar el eRPM y confirmar el desync.',
       fixInav:
         'No vuelvas a volar antes de encontrar la causa: inspecciona motores (rodamiento, bobinado) y ESC, soldaduras y conectores. Conecta la telemetría del ESC para registrar el régimen del motor y confirmar el desync.',
+      fixRpmLogged:
+        'No vuelvas a volar antes de encontrar la causa: inspecciona motores (rodamiento, bobinado) y ESC, soldaduras y conectores. Cruza con el régimen del motor registrado en ese instante para identificar el motor que se desengancha.',
     },
 
     batterySag: {

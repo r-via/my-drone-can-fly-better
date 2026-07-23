@@ -458,6 +458,13 @@ export function evaluateSession(
   // Prime sur motors-imbalance : quand la rupture est datée, la moyenne de
   // session est le SYMPTÔME de la rupture, et le conseil « recentre le pack »
   // serait à côté de la cause. Une seule des deux règles parle.
+  // Le conseil parle le dialecte du firmware ET tient compte de ce que le log
+  // porte déjà : conseiller « active le DSHOT bidirectionnel » quand l'eRPM
+  // est dans les trames (ou « branche la télémétrie ESC » quand escRpm y est)
+  // serait à côté de la plaque.
+  const isInav = analysis.meta.firmwareFamily === 'inav';
+  const rpmLogged = isInav ? analysis.motors.escRpmAvailable : analysis.motors.erpmAvailable;
+
   const shift = analysis.motors.balanceShift;
   const shiftQualifies = shift !== null && shift.deltaPctPts >= t.imbalanceShiftWarn;
   if (shift !== null && shiftQualifies) {
@@ -480,12 +487,11 @@ export function evaluateSession(
         f1(shift.tChangeS),
         counterNote,
       ),
-      fix: {
-        text:
-          analysis.meta.firmwareFamily === 'inav'
-            ? r.motorsBalanceShift.fixInav(motorLabel)
-            : r.motorsBalanceShift.fixBetaflight(motorLabel),
-      },
+      fix: rpmLogged
+        ? { text: r.motorsBalanceShift.fixRpmLogged(motorLabel) }
+        : isInav
+          ? { text: r.motorsBalanceShift.fixInav(motorLabel) }
+          : { text: r.motorsBalanceShift.fixBetaflight(motorLabel), cli: ['set dshot_bidir = ON'] },
     });
   }
 
@@ -566,12 +572,11 @@ export function evaluateSession(
           AXIS_NAMES[w.axis],
           f0(w.peakSpreadPct),
         ),
-        fix: {
-          text:
-            analysis.meta.firmwareFamily === 'inav'
-              ? r.controlLoss.fixInav
-              : r.controlLoss.fixBetaflight,
-        },
+        fix: rpmLogged
+          ? { text: r.controlLoss.fixRpmLogged }
+          : isInav
+            ? { text: r.controlLoss.fixInav }
+            : { text: r.controlLoss.fixBetaflight, cli: ['set dshot_bidir = ON'] },
       });
     }
   }
