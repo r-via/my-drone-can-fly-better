@@ -103,10 +103,15 @@ with a comment:
 They read real `.bbl` files by absolute path from the maintainer machine:
 
 ```ts
-const CHIMERA = '/home/rviau/projects/drones/chimera/blackbox/btfl_016.bbl';
-const LR4     = '/home/rviau/projects/drones/explorer lr4/btfl_003.bbl';
-const PICO    = '/home/rviau/projects/drones/pavo pico/btfl_002.bbl';
+const CHIMERA  = '/home/rviau/projects/drones/chimera/blackbox/btfl_016.bbl';
+const LR4      = '/home/rviau/projects/drones/explorer lr4/btfl_003.bbl';
+const PICO     = '/home/rviau/projects/drones/pavo pico/btfl_002.bbl';
+const INAV_LOG = '/home/rviau/projects/drones/chimera/blackbox/01 - Hover and wobble.TXT';
 ```
+
+The INAV log (`tests/inav.test.ts`) is an RRFPV RR Akira 9 inch coax X8 flying
+INAV 9.0.1 as craft "AKIRA"; its reference numbers were cross checked against
+orangebox 0.5.0 (values identical within 1 LSB).
 
 Clone the repository elsewhere and the ten log-based suites fail on a missing
 file. That is expected and documented in CONTRIBUTING. The logs are not

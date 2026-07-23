@@ -700,22 +700,28 @@ export async function decodeSession(encoded: string, dict: Dict): Promise<Report
 
   const profile = PROFILES.find((p) => p.id === payload.profileId) ?? pickProfile(payload.view.craftName);
 
-  return {
-    files: [
-      {
-        fileName: payload.fileName,
-        sessionReports: [
-          {
-            analysis: neutralAnalysis(payload),
-            profile,
-            findings: payload.findings.map((f) => unpackFinding(f, dict, payload.profileId)),
-          },
-        ],
-        skipped: [],
-      },
-    ],
-    shared: { trimmed: payload.trimmed === true },
-  };
+  // Un payload parsable mais de forme inattendue (champ au mauvais type) doit
+  // ressortir en ShareDecodeError, pas en TypeError brut : c'est le contrat.
+  try {
+    return {
+      files: [
+        {
+          fileName: payload.fileName,
+          sessionReports: [
+            {
+              analysis: neutralAnalysis(payload),
+              profile,
+              findings: payload.findings.map((f) => unpackFinding(f, dict, payload.profileId)),
+            },
+          ],
+          skipped: [],
+        },
+      ],
+      shared: { trimmed: payload.trimmed === true },
+    };
+  } catch {
+    throw new ShareDecodeError('malformed');
+  }
 }
 
 function unpackFinding(f: PackedFinding, dict: Dict, profileId: DroneProfileId): Finding {
@@ -812,7 +818,19 @@ function neutralAnalysis(p: SharePayload): SessionAnalysis {
       flightTimeS: v.flightTimeS,
       throttleMaxUs: 0,
     },
-    gps: { available: v.gpsAvailable, numSatMax: null, numSatMin: null, speedMaxMps: null },
+    gps: {
+      available: v.gpsAvailable,
+      numSatMax: null,
+      numSatMin: null,
+      numSatMedian: null,
+      speedMaxMps: null,
+      corruptFrameRatio: null,
+      timeToHealthySatsS: null,
+      satDrops: [],
+      satsVsThrottle: null,
+      hdopMedian: null,
+      hdopWorst: null,
+    },
     failsafe: { phases: {}, triggered: false },
   };
 }

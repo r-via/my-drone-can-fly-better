@@ -23,27 +23,57 @@ disk.
 ## Stage 1: firmware spoof
 
 The npm `blackbox-log` wrapper is version 0.2.2, MIT, and unmaintained. It
-refuses any firmware string it does not recognise, which means anything newer
-than 4.4. A 2025 log would simply fail to open.
+refuses any firmware string it does not recognise: anything newer than
+Betaflight 4.4, and any INAV outside 5.0.0 to 6.1.x (both windows measured
+against the WASM, not assumed). A 2025 log would simply fail to open.
 
 `spoofFirmware` scans for every occurrence of `Firmware revision:Betaflight `
-and rewrites the version that follows to `4.4.2`, padded with spaces to the
-exact original length so no byte offset in the file moves:
+and `Firmware revision:INAV ` and rewrites the version that follows to the
+newest one the wrapper accepts (`4.4.2` for Betaflight, `6.0.0` for INAV),
+padded with spaces to the exact original length so no byte offset in the file
+moves:
 
 ```
 H Firmware revision:Betaflight 2025.12.2 (79065c96b) STM32F7X2
                                ^^^^^^^^^ -> "4.4.2    "
+H Firmware revision:INAV 9.0.1 (d44f2cf6) TMOTORF7V2
+                         ^^^^^ -> "6.0.0"
 ```
 
-Versions already in `4.0.x` to `4.4.x` are left alone. The original string is
-returned and stored in `meta.firmware`, so the report shows the real firmware
-even though the decoder was handed a fake one.
+Versions inside the native window are left alone, and versions below it are
+also left alone on purpose: `unsupportedFirmware` must still see them to reject
+the session as "too old" instead of letting the decoder misread a genuinely
+different header format. The original string is returned and stored in
+`meta.firmware`, so the report shows the real firmware even though the decoder
+was handed a fake one.
 
 This is safe because the blackbox frame format is self describing: field names,
 widths, predictors and encodings are all declared in the headers of each
 session. The decoder does not need the version to read the frames. The output
 was cross checked against the orangebox parser on real logs from three
-different drones (see [testing.md](testing.md), `tests/parse.test.ts`).
+different drones, plus an INAV 9.0.1 log where the values matched within 1 LSB
+(see [testing.md](testing.md), `tests/parse.test.ts`, `tests/inav.test.ts`).
+
+## Stage 1b: the INAV dialect
+
+INAV shares the blackbox container but names and scales some fields
+differently. `parseSession` maps them onto the same `FlightData` contract when
+`firmwareKind` says INAV: `axisRate[]` is the rate setpoint in deg/s (the
+equivalent of `setpoint[]`), `gyroRaw[]` is the unfiltered gyro
+(`gyroUnfilt[]`), and `vbat`, `amperage`, `BaroAlt` replace `vbatLatest`,
+`amperageLatest`, `baroAlt` with identical centivolt / centiamp / cm scales.
+Motors come out in the 1000 to 2000 range and INAV writes a
+`motorOutput:1100,2000` header, read by the existing code; if the header were
+missing, the fallback is 1000,2000 rather than the DSHOT 48,2047. There is no
+per motor eRPM in INAV main frames, so desync detection and motor fundamental
+tracking switch themselves off through the usual null path.
+
+The session is tagged `meta.firmwareFamily: 'inav'`, which `composeFindings`
+uses to disable the Betaflight config lint and every CLI suggestion line (the
+headers hold INAV parameter names and enums, linting them against Betaflight
+rules would produce wrong verdicts), and to add an info finding telling the
+pilot the analysis is metric only. Flight metrics themselves (noise, filters,
+tracking, step response, motors, battery, GPS, failsafe) run unchanged.
 
 ## Stage 2: session splitting
 

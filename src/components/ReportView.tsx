@@ -24,6 +24,7 @@ import {
   CheckIcon,
   ClockIcon,
   GaugeIcon,
+  SatelliteIcon,
   TimerIcon,
   WaveIcon,
 } from '@/components/icons';
@@ -186,6 +187,18 @@ function SessionBlock({
   const satTone: MetricTone =
     satPct >= th.saturationCrit ? 'crit' : satPct >= th.saturationWarn ? 'warn' : 'ok';
 
+  // Tuile GPS : uniquement quand des chiffres existent (les liens partagés ne
+  // transportent que gps.available, la tuile y disparaît, les verdicts restent).
+  const gps = analysis.gps;
+  const showGpsTile =
+    gps.available && gps.numSatMedian !== null && gps.numSatMin !== null && gps.numSatMax !== null;
+  const gpsTone: MetricTone =
+    gps.numSatMin !== null && gps.numSatMin < 5
+      ? 'crit'
+      : gps.numSatMin !== null && gps.numSatMin < 6
+        ? 'warn'
+        : 'ok';
+
   const groups = groupFindings(findings);
   const flightScore = computeFlightScore(sessionReport);
   const { score, axes } = flightScore;
@@ -283,7 +296,13 @@ function SessionBlock({
       </div>
 
       {/* Tuiles chiffrées */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div
+        className={
+          showGpsTile
+            ? 'grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7'
+            : 'grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6'
+        }
+      >
         <MetricTile label={t.tileDuration} value={fmt.duration(meta.durationS)} icon={ClockIcon} />
         <MetricTile label={t.tileSampleRate} value={fmt.hz(meta.sampleRateHz)} icon={WaveIcon} />
         <MetricTile
@@ -326,6 +345,20 @@ function SessionBlock({
           hint={t.flightTimeHint}
           icon={TimerIcon}
         />
+        {showGpsTile ? (
+          <MetricTile
+            label={t.tileGps}
+            value={fmt.fixed(gps.numSatMedian as number, 0)}
+            unit="sats"
+            hint={t.gpsTileHint(
+              fmt.fixed(gps.numSatMin as number, 0),
+              fmt.fixed(gps.numSatMax as number, 0),
+              gps.hdopMedian !== null ? fmt.fixed(gps.hdopMedian, 1) : null,
+            )}
+            tone={gpsTone}
+            icon={SatelliteIcon}
+          />
+        ) : null}
       </div>
 
       {/* Aperçu rapide par catégorie */}

@@ -1,8 +1,9 @@
 # My Drone Can Fly Better
 
-**Your flight, decoded.** Drop a Betaflight blackbox log in the browser and get
-back numbered verdicts and ready-to-paste CLI commands: vibrations, filters,
-PID, motors, battery, GPS, safety.
+**Your flight, decoded.** Drop a Betaflight or INAV blackbox log in the browser
+and get back numbered verdicts and ready-to-paste CLI commands: vibrations,
+filters, PID, motors, battery, GPS, safety. (INAV logs get the flight metrics;
+the config lint and CLI lines are Betaflight only.)
 
 Nothing is uploaded. The `.bbl` is decoded, analysed and judged inside the tab,
 by DSP (FFT, Welch, Wiener deconvolution) and a deterministic rule engine. No
@@ -159,6 +160,7 @@ headers (`src/lib/rules/profiles.ts`):
 | `pico` | `pavo pico` | ducted 2S whoop: high raw noise and prop wash tolerated, yoyo caught early |
 | `lr4` | `lr4` | long range 4S: strict tracking and sag, rear-heavy CG tolerated |
 | `chimera7` | `chimera` / `shimera` | 7 inch 6S: strict on raw vibration (jello), slower rise time accepted |
+| `akira` | `akira` | 9 inch coax X8 6S on INAV: starting thresholds, jello watched early, slow rise tolerated |
 | `generic` | anything else | median values for a healthy 5 inch freestyle |
 
 Adding a drone is one `DroneProfile` entry (craft-name regex, motor poles, cell
@@ -322,3 +324,7 @@ MIT, see [LICENSE](LICENSE). The vendored decoder
   place.
 
 If the tool saves you a pack or two: <https://ko-fi.com/rvia>.
+
+<!-- checked-by-anatoly -->
+[![Checked by Anatoly](https://img.shields.io/badge/checked%20by-Anatoly-blue)](https://github.com/r-via/anatoly)
+<!-- /checked-by-anatoly -->

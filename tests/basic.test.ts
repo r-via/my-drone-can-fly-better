@@ -293,7 +293,19 @@ describe('pico btfl_002 session 1', () => {
 
   it('gps absent + failsafe jamais déclenché', () => {
     const g = analyzeGps(pico);
-    expect(g).toEqual({ available: false, numSatMax: null, numSatMin: null, speedMaxMps: null });
+    expect(g).toEqual({
+      available: false,
+      numSatMax: null,
+      numSatMin: null,
+      numSatMedian: null,
+      speedMaxMps: null,
+      corruptFrameRatio: null,
+      timeToHealthySatsS: null,
+      satDrops: [],
+      satsVsThrottle: null,
+      hdopMedian: null,
+      hdopWorst: null,
+    });
     expect(analyzeFailsafe(pico).triggered).toBe(false);
   });
 });
@@ -389,6 +401,82 @@ describe('cas limites', () => {
     // 3 échantillons saturés (2040, 2047, 2050) sur 31 valides (le 4294967040 est exclu)
     expect(m.saturationPct).toBeCloseTo((100 * 3) / 31, 6);
     expect(m.perMotorAvgPct[0]).toBeLessThan(100); // moyenne non polluée par la frame corrompue
+  });
+
+  it('analyzeGps : frames G corrompues écartées, stats robustes', () => {
+    const gn = 40;
+    const sat = new Float32Array(gn).fill(8);
+    sat[5] = 0; // zéro isolé au milieu de 8 : glitch décodeur, pas une perte réelle
+    sat[20] = 1042; // compte impossible (observé sur logs réels)
+    const gt = new Float64Array(gn);
+    for (let i = 0; i < gn; i++) gt[i] = i * 0.2;
+    const g = analyzeGps(
+      synth({ gps: { time: gt, numSat: sat, speedMps: new Float32Array(gn), hdop: null } }),
+    );
+    expect(g.available).toBe(true);
+    expect(g.numSatMin).toBe(8);
+    expect(g.numSatMax).toBe(8);
+    expect(g.numSatMedian).toBe(8);
+    expect(g.corruptFrameRatio).toBeCloseTo(2 / 40, 6);
+    expect(g.satDrops).toEqual([]);
+    expect(g.timeToHealthySatsS).toBe(0);
+  });
+
+  it('analyzeGps : chute soutenue détectée (pas lissée comme un glitch)', () => {
+    const gn = 40;
+    const sat = new Float32Array(gn).fill(10);
+    for (let i = 20; i < 26; i++) sat[i] = 5; // 6 frames sous le seuil : perte réelle
+    const gt = new Float64Array(gn);
+    for (let i = 0; i < gn; i++) gt[i] = i * 0.2;
+    const g = analyzeGps(
+      synth({ gps: { time: gt, numSat: sat, speedMps: new Float32Array(gn), hdop: null } }),
+    );
+    expect(g.numSatMin).toBe(5);
+    expect(g.satDrops.length).toBe(1);
+    expect(g.satDrops[0].toSats).toBe(5);
+    expect(g.satDrops[0].fromSats).toBe(10);
+    expect(g.satDrops[0].timeS).toBeCloseTo(4, 1);
+  });
+
+  it('analyzeGps : sats en baisse à haut throttle → satsVsThrottle (signature EMI)', () => {
+    const n = 400;
+    const time = new Float64Array(n);
+    const throttle = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      time[i] = i / 100; // 4 s à 100 Hz
+      throttle[i] = i < n / 2 ? 1200 : 1800;
+    }
+    const gn = 60;
+    const gt = new Float64Array(gn);
+    const sat = new Float32Array(gn);
+    for (let i = 0; i < gn; i++) {
+      gt[i] = (i * 4) / gn;
+      sat[i] = gt[i] < 2 ? 10 : 6; // le GPS perd 4 sats quand le throttle monte
+    }
+    const g = analyzeGps(
+      synth({
+        time,
+        throttle,
+        gps: { time: gt, numSat: sat, speedMps: new Float32Array(gn), hdop: null },
+      }),
+    );
+    expect(g.satsVsThrottle).not.toBeNull();
+    expect(g.satsVsThrottle?.lowMedian).toBe(10);
+    expect(g.satsVsThrottle?.highMedian).toBe(6);
+    expect(g.satsVsThrottle?.delta).toBe(-4);
+  });
+
+  it('analyzeGps : hdop médian/pire depuis les frames retenues (INAV)', () => {
+    const gn = 30;
+    const gt = new Float64Array(gn);
+    for (let i = 0; i < gn; i++) gt[i] = i * 0.2;
+    const hdop = new Float32Array(gn).fill(3.2);
+    hdop[3] = 0; // frame partielle : ignorée
+    const g = analyzeGps(
+      synth({ gps: { time: gt, numSat: new Float32Array(gn).fill(12), speedMps: new Float32Array(gn), hdop } }),
+    );
+    expect(g.hdopMedian).toBeCloseTo(3.2, 5);
+    expect(g.hdopWorst).toBeCloseTo(3.2, 5);
   });
 
   it('analyzeFailsafe : déclenché si une phase non bénigne apparaît', () => {

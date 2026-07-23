@@ -134,7 +134,19 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
       ],
     },
     timeline: { segments: [], flightTimeS: 110, throttleMaxUs: 1600 },
-    gps: { available: true, numSatMax: 14, numSatMin: 9, speedMaxMps: 20 },
+    gps: {
+      available: true,
+      numSatMax: 14,
+      numSatMin: 9,
+      numSatMedian: 12,
+      speedMaxMps: 20,
+      corruptFrameRatio: 0,
+      timeToHealthySatsS: 3,
+      satDrops: [],
+      satsVsThrottle: null,
+      hdopMedian: null,
+      hdopWorst: null,
+    },
     failsafe: { phases: { '0': 240_000 }, triggered: false },
   };
   mutate?.(a);
@@ -435,7 +447,19 @@ describe('evaluateSession', () => {
 
   it('GPS faible → gps-low-sats warn', () => {
     const a = makeAnalysis((x) => {
-      x.gps = { available: true, numSatMax: 11, numSatMin: 4, speedMaxMps: 25 };
+      x.gps = {
+        available: true,
+        numSatMax: 11,
+        numSatMin: 4,
+        numSatMedian: 9,
+        speedMaxMps: 25,
+        corruptFrameRatio: 0,
+        timeToHealthySatsS: 3,
+        satDrops: [],
+        satsVsThrottle: null,
+        hdopMedian: null,
+        hdopWorst: null,
+      };
     });
     const findings = evaluateSession(a, pickProfile('LR4-O4PRO'));
     checkShape(findings);
@@ -443,6 +467,137 @@ describe('evaluateSession', () => {
     expect(gps).toBeDefined();
     expect(gps?.severity).toBe('warn');
     expect(gps?.evidence).toContain('4');
+  });
+
+  it('8 sats jamais atteints sur 120 s → gps-acquisition-slow warn ; tardif → info', () => {
+    const never = makeAnalysis((x) => {
+      x.gps.numSatMedian = 6;
+      x.gps.timeToHealthySatsS = null;
+    });
+    const fNever = evaluateSession(never, pickProfile('LR4-O4PRO'));
+    checkShape(fNever);
+    expect(fNever.find((fd) => fd.id === 'gps-acquisition-slow')?.severity).toBe('warn');
+
+    const late = makeAnalysis((x) => {
+      x.gps.timeToHealthySatsS = 45;
+    });
+    const fLate = evaluateSession(late, pickProfile('LR4-O4PRO'));
+    expect(fLate.find((fd) => fd.id === 'gps-acquisition-slow')?.severity).toBe('info');
+
+    // Accroche rapide : pas de verdict (fixture de base, timeToHealthySatsS = 3).
+    const fOk = evaluateSession(makeAnalysis(), pickProfile('LR4-O4PRO'));
+    expect(fOk.find((fd) => fd.id === 'gps-acquisition-slow')).toBeUndefined();
+  });
+
+  it('chutes de sats → gps-sat-drops, crit sous 5 sats (fix 3D perdu)', () => {
+    const warn = makeAnalysis((x) => {
+      x.gps.satDrops = [{ timeS: 62, fromSats: 12, toSats: 7, durationS: 1.5 }];
+    });
+    const fWarn = evaluateSession(warn, pickProfile('LR4-O4PRO'));
+    checkShape(fWarn);
+    const dWarn = fWarn.find((fd) => fd.id === 'gps-sat-drops');
+    expect(dWarn?.severity).toBe('warn');
+    expect(dWarn?.evidence).toContain('62');
+
+    const crit = makeAnalysis((x) => {
+      x.gps.satDrops = [
+        { timeS: 30, fromSats: 12, toSats: 8, durationS: 1 },
+        { timeS: 70, fromSats: 12, toSats: 3, durationS: 2 },
+      ];
+    });
+    const fCrit = evaluateSession(crit, pickProfile('LR4-O4PRO'));
+    expect(fCrit.find((fd) => fd.id === 'gps-sat-drops')?.severity).toBe('crit');
+  });
+
+  it('sats en baisse à haut throttle → gps-emi-throttle warn puis crit', () => {
+    const warn = makeAnalysis((x) => {
+      x.gps.satsVsThrottle = { lowMedian: 10, highMedian: 8, delta: -2 };
+    });
+    const fWarn = evaluateSession(warn, pickProfile('LR4-O4PRO'));
+    checkShape(fWarn);
+    expect(fWarn.find((fd) => fd.id === 'gps-emi-throttle')?.severity).toBe('warn');
+
+    const crit = makeAnalysis((x) => {
+      x.gps.satsVsThrottle = { lowMedian: 11, highMedian: 6, delta: -5 };
+    });
+    const fCrit = evaluateSession(crit, pickProfile('LR4-O4PRO'));
+    expect(fCrit.find((fd) => fd.id === 'gps-emi-throttle')?.severity).toBe('crit');
+
+    // Delta faible (bruit statistique) : pas de verdict.
+    const ok = makeAnalysis((x) => {
+      x.gps.satsVsThrottle = { lowMedian: 10, highMedian: 9, delta: -1 };
+    });
+    expect(
+      evaluateSession(ok, pickProfile('LR4-O4PRO')).find((fd) => fd.id === 'gps-emi-throttle'),
+    ).toBeUndefined();
+  });
+
+  it('HDOP élevé (INAV) → gps-hdop-high warn puis crit', () => {
+    const warn = makeAnalysis((x) => {
+      x.gps.hdopMedian = 3.1;
+      x.gps.hdopWorst = 4.4;
+    });
+    const fWarn = evaluateSession(warn, pickProfile('LR4-O4PRO'));
+    checkShape(fWarn);
+    const d = fWarn.find((fd) => fd.id === 'gps-hdop-high');
+    expect(d?.severity).toBe('warn');
+    expect(d?.evidence).toContain('3.1');
+
+    const crit = makeAnalysis((x) => {
+      x.gps.hdopMedian = 5.5;
+    });
+    expect(
+      evaluateSession(crit, pickProfile('LR4-O4PRO')).find((fd) => fd.id === 'gps-hdop-high')
+        ?.severity,
+    ).toBe('crit');
+
+    // HDOP sain : pas de verdict.
+    const ok = makeAnalysis((x) => {
+      x.gps.hdopMedian = 1.4;
+    });
+    expect(
+      evaluateSession(ok, pickProfile('LR4-O4PRO')).find((fd) => fd.id === 'gps-hdop-high'),
+    ).toBeUndefined();
+  });
+
+  it("eRPM absent + dshot_bidir = 1 → rpm-not-logged pointe le champ blackbox décoché", () => {
+    const a = makeAnalysis((x) => {
+      x.motors.erpmAvailable = false;
+    });
+    const findings = evaluateSession(a, chimera, undefined, { values: { dshot_bidir: '1' } });
+    checkShape(findings);
+    const fd = findings.find((y) => y.id === 'rpm-not-logged');
+    expect(fd).toBeDefined();
+    expect(fd?.severity).toBe('info');
+    expect(fd?.scoreExempt).toBe(true);
+    expect(fd?.evidence).toContain('dshot_bidir = 1');
+    expect(fd?.fix?.cli).toEqual(['set blackbox_disable_rpm = OFF']);
+  });
+
+  it('eRPM absent + dshot_bidir = 0 → rpm-not-logged pointe la télémétrie coupée', () => {
+    const a = makeAnalysis((x) => {
+      x.motors.erpmAvailable = false;
+    });
+    const findings = evaluateSession(a, chimera, undefined, { values: { dshot_bidir: '0' } });
+    const fd = findings.find((y) => y.id === 'rpm-not-logged');
+    expect(fd?.detail).toContain('dshot_bidir = 0');
+    expect(fd?.fix?.cli).toEqual(['set dshot_bidir = ON']);
+  });
+
+  it('eRPM absent sans config (INAV) → rpm-not-logged générique, sans ligne CLI', () => {
+    const a = makeAnalysis((x) => {
+      x.motors.erpmAvailable = false;
+    });
+    const findings = evaluateSession(a, chimera);
+    const fd = findings.find((y) => y.id === 'rpm-not-logged');
+    expect(fd).toBeDefined();
+    expect(fd?.evidence).toContain('dshot_bidir = n/a');
+    expect(fd?.fix?.cli).toBeUndefined();
+  });
+
+  it('eRPM présent → pas de rpm-not-logged', () => {
+    const findings = evaluateSession(makeAnalysis(), chimera);
+    expect(ids(findings)).not.toContain('rpm-not-logged');
   });
 
   it('les findings sont triés crit > warn > info > ok', () => {

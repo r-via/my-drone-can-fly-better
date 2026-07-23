@@ -15,6 +15,7 @@
 
 import { MIN_STEP_QUALITY } from './analysis/step';
 import { configFromHeaders, parseNum } from './cli/config';
+import { worstAxis } from './rules/engine';
 
 import type { Axis, SessionAnalysis, SessionReport, StepResponseMetrics } from './types';
 
@@ -108,16 +109,6 @@ export interface MetricDelta {
   delta: number | null;
   digits: number;
   better: Direction;
-}
-
-/** Pire valeur (max) parmi les axes, en ignorant les null. */
-function worst(values: ReadonlyArray<number | null>): { value: number; axis: Axis } | null {
-  let best: { value: number; axis: Axis } | null = null;
-  for (let i = 0; i < values.length; i++) {
-    const v = values[i];
-    if (v !== null && (best === null || v > best.value)) best = { value: v, axis: i as Axis };
-  }
-  return best;
 }
 
 /**
@@ -233,8 +224,8 @@ const METRICS: Array<{
 export function compareMetrics(before: SessionAnalysis, after: SessionAnalysis): MetricDelta[] {
   const out: MetricDelta[] = [];
   for (const m of METRICS) {
-    const wb = m.perAxis ? worst(m.read(before)) : null;
-    const wa = m.perAxis ? worst(m.read(after)) : null;
+    const wb = m.perAxis ? worstAxis(m.read(before)) : null;
+    const wa = m.perAxis ? worstAxis(m.read(after)) : null;
     const bv = m.perAxis ? (wb?.value ?? null) : m.read(before)[0];
     const av = m.perAxis ? (wa?.value ?? null) : m.read(after)[0];
 

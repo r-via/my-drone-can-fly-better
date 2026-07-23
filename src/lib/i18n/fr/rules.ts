@@ -185,6 +185,26 @@ export const rules = {
     fix: "Réactive l'enregistrement batterie pour retrouver les verdicts sag et tension sur les prochains logs.",
   },
 
+  rpmNotLogged: {
+    title: 'Régime moteurs absent du log',
+    detail: (cause: string) =>
+      `Le log ne contient pas la télémétrie eRPM : la fréquence de rotation des moteurs est inconnue. Sur le spectre, la ligne « moteurs ~X Hz » ne peut pas être tracée, le pic dominant ne peut pas être attribué à un moteur précis, et une desync passerait inaperçue. ${cause}`,
+    causeFieldDisabled:
+      "dshot_bidir = 1 : la télémétrie fonctionne en vol (le filtre RPM tourne), c'est le champ RPM qui est décoché dans les réglages blackbox.",
+    causeNoBidir:
+      'dshot_bidir = 0 : la carte ne reçoit aucun retour de régime des ESC, en vol comme au log.',
+    causeUnknown:
+      "La config du log ne permet pas de dire si c'est la télémétrie DSHOT ou son enregistrement qui manque.",
+    evidence: (bidir: string) =>
+      `aucun champ eRPM[0..3] dans les trames - dshot_bidir = ${bidir}`,
+    fixFieldDisabled:
+      "Réactive l'enregistrement de l'eRPM pour retrouver la ligne moteurs et l'attribution des pics sur les prochains logs.",
+    fixNoBidir:
+      "Active le DSHOT bidirectionnel si tes ESC le supportent (BLHeli_32, Bluejay, AM32) : il alimente le filtre RPM en vol et l'eRPM dans les logs.",
+    fixUnknown:
+      "Vérifie que le DSHOT bidirectionnel est actif et que le champ RPM est coché dans les réglages blackbox.",
+  },
+
   yoyoDetected: {
     titleWarn: 'Yoyo détecté (oscillation de poussée)',
     titleInfo: 'Indice de yoyo (à confirmer)',
@@ -261,6 +281,44 @@ export const rules = {
     fix: "Attends 8+ sats avant de décoller ; éloigne l'antenne GPS de la VTX et de la caméra (interférences).",
   },
 
+  gpsAcquisitionSlow: {
+    title: 'Accroche GPS incomplète ou tardive',
+    detail:
+      "Le récepteur n'a pas atteint une couverture saine (8 satellites ou plus) au décollage, ou seulement tard dans la session. Un GPS rescue déclenché avant l'accroche complète est risqué. Causes classiques : décollage trop tôt après la mise sous tension, antenne masquée, ou bruit électrique qui ralentit l'acquisition.",
+    evidence: (median: string, timeS: string | null) =>
+      timeS !== null
+        ? `8 sats atteints seulement après ${timeS} s de log (médiane session : ${median} sats)`
+        : `8 sats jamais atteints sur la session (médiane : ${median} sats)`,
+    fix: "Laisse le GPS accrocher avant de décoller (8+ sats à l'OSD). Si l'acquisition reste lente même posé, éloigne l'antenne GPS de la VTX et des câbles de puissance : le bruit RF rallonge la synchronisation.",
+  },
+
+  gpsSatDrops: {
+    title: 'Chutes de satellites en vol',
+    detail:
+      "Le nombre de satellites chute brutalement par moments puis remonte : antenne masquée par le frame en manoeuvre, connexion intermittente, ou interférence ponctuelle. Chaque chute dégrade la position ; sous 5 sats le fix 3D est perdu et un rescue partirait au hasard.",
+    evidence: (count: string, from: string, to: string, atS: string) =>
+      `${count} chute(s) détectée(s), la pire de ${from} à ${to} sats à t=${atS} s`,
+    fix: "Vérifie la fixation et le câble de l'antenne GPS, dégage sa vue du ciel (au-dessus du frame, loin de la caméra HD), puis refais un vol calme pour comparer.",
+  },
+
+  gpsEmiThrottle: {
+    title: 'Satellites en baisse quand la puissance monte',
+    detail:
+      "Le compte de satellites baisse nettement quand le throttle monte : signature d'un bruit électrique (VTX, ESC, câbles de puissance) qui aveugle le récepteur GPS. C'est ce bruit qui empêche le GPS de bien se synchroniser alors qu'il accroche très bien posé au sol.",
+    evidence: (low: string, high: string) =>
+      `Médiane : ${low} sats à bas throttle contre ${high} sats à haut throttle`,
+    fix: "Éloigne l'antenne GPS de la VTX et des fils batterie/ESC (mât ou platine arrière), torsade les câbles de puissance, et teste armé sans hélices : monter le throttle ne doit pas faire bouger les sats.",
+  },
+
+  gpsHdopHigh: {
+    title: 'Précision GPS médiocre (HDOP élevé)',
+    detail:
+      "Le HDOP reste élevé : la position est imprécise même avec des satellites accrochés. Géométrie défavorable (ciel masqué) ou signal dégradé par du bruit RF près de l'antenne.",
+    evidence: (median: string, worst: string | null) =>
+      `HDOP médian ${median}${worst !== null ? ` / pire ${worst}` : ''} (sain : < 2.5)`,
+    fix: "Dégage la vue du ciel de l'antenne et éloigne-la des sources de bruit (VTX, caméra HD, câbles de puissance). Sous 1.5 de HDOP la position redevient fiable.",
+  },
+
   failsafeTriggered: {
     title: 'Failsafe déclenché en vol',
     detail:
@@ -280,6 +338,13 @@ export const rules = {
       `Durée ${durationS} s, échantillonnage ${rateHz} Hz`,
     fixLowRate: 'Passe le blackbox en pleine résolution pour les prochains logs de tuning.',
     fixShortLog: 'Vole au moins 30 s avec des mouvements variés pour un diagnostic fiable.',
+  },
+
+  inavLimited: {
+    title: 'Log INAV : analyse partielle',
+    detail:
+      "Ce log vient d'INAV : les métriques de vol (bruit, filtres, suivi, step response, moteurs, batterie) sont analysées normalement, mais le lint de configuration et les commandes CLI sont propres à Betaflight et restent désactivés. Applique les corrections via INAV Configurator.",
+    evidence: (firmware: string) => `Firmware : ${firmware}`,
   },
 
   allGood: {
@@ -315,6 +380,13 @@ export const rules = {
       notes: [
         'Grand châssis 7" : surveille la bande 40-120 Hz (résonance bras/caméra, source de jello).',
         "Équilibrage hélices critique : un pic à la fondamentale moteur se voit direct à l'image.",
+      ],
+    },
+    akira: {
+      label: 'RRFPV RR Akira 9" X8 (6S)',
+      notes: [
+        'X8 coaxial : 8 moteurs, seuls M1-M4 entrent dans les analyses moteurs pour le moment.',
+        'Seuils de départ non calibrés terrain : bruit brut surveillé tôt (bras longs de 9") et montée tolérée plus lente.',
       ],
     },
     generic: {

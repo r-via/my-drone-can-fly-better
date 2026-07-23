@@ -125,6 +125,7 @@ export interface SpectrumChartLabels {
   bandMotors: string;
   xAxis: string;
   motorLine: (hz: string) => string;
+  motorLineMissing: string;
   beyondNyquist: (hz: string) => string;
 }
 
@@ -136,6 +137,7 @@ const DEFAULT_LABELS: SpectrumChartLabels = {
   bandMotors: 'moteurs',
   xAxis: 'Fréquence (Hz)',
   motorLine: (hz) => `moteurs ~${hz} Hz`,
+  motorLineMissing: 'ligne moteurs indisponible - eRPM absent du log',
   beyondNyquist: (hz) => `non mesurable - log enregistré à ${hz} Hz`,
 };
 
@@ -321,6 +323,23 @@ export function SpectrumChart(props: {
           />
         ))}
       </g>
+
+      {/* Sans eRPM la fondamentale est incalculable : on le dit à l'endroit où
+          la ligne apparaîtrait, sinon son absence se lit comme « rien à voir ».
+          fMotor (pas motorX) : une fondamentale hors plage n'est pas une absence. */}
+      {fMotor == null && (
+        <text
+          x={pad.left + 6}
+          y={pad.top + 12}
+          fontSize={9}
+          fill={INK_AXIS}
+          stroke="var(--chart-surface, #1a1a19)"
+          strokeWidth={3}
+          paintOrder="stroke"
+        >
+          {L.motorLineMissing}
+        </text>
+      )}
 
       {/* Libellé de la fondamentale, au-dessus des traces avec halo surface */}
       {motorX != null && (

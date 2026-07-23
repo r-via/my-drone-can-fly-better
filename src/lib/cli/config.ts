@@ -27,7 +27,7 @@ const MOTOR_PROTOCOLS = [
 // configFromHeaders - snapshot config embarqué dans le .bbl
 // ---------------------------------------------------------------------------
 
-/** Headers en minuscules qui ne correspondent PAS à un paramètre CLI utile. */
+/** Headers qui ne correspondent PAS à un paramètre CLI/tune utile. */
 const HEADER_SKIP = new Set([
   'features', // bitmask brut, pas exploitable tel quel
   'vbatref',
@@ -35,6 +35,13 @@ const HEADER_SKIP = new Set([
   'maxthrottle',
   'looptime',
   'vbatcellvoltage', // éclaté en vbat_*_cell_voltage plus bas
+  'motorOutput', // structurel (plage de sortie), dérivé de min/maxthrottle côté INAV
+  'currentMeter', // calibration capteur INAV (scale,offset), pas un réglage de tune
+  'currentSensor', // idem côté Betaflight
+  'acc_1G', // constante physique de l'IMU
+  'rollPID', // composites éclatés en p_/i_/d_/ff_ plus bas
+  'pitchPID',
+  'yawPID',
 ]);
 
 function splitTriple(values: Record<string, string>, srcKey: string, names: [string, string, string]): void {
@@ -51,14 +58,20 @@ function splitTriple(values: Record<string, string>, srcKey: string, names: [str
 export function configFromHeaders(headers: Record<string, string>): CliConfig {
   const values: Record<string, string> = {};
 
-  // Passe 1 : les headers dont la clé est déjà un nom CLI (minuscules + underscores).
+  // Passe 1 : les headers dont la clé est un nom de paramètre. Betaflight écrit
+  // ses clés CLI en minuscules + underscores ; INAV mélange avec du camelCase
+  // (dynamicGyroNotchQ, levelPID…) qu'un diff de tune doit voir aussi - la
+  // première lettre reste minuscule, ce qui écarte les clés structurelles à
+  // majuscule ou espace ("Craft name", "I interval").
   for (const [key, value] of Object.entries(headers)) {
-    if (!/^[a-z][a-z0-9_]*$/.test(key)) continue;
+    if (!/^[a-z][a-zA-Z0-9_]*$/.test(key)) continue;
     if (HEADER_SKIP.has(key)) continue;
     values[key] = value.trim();
   }
 
-  // Passe 2 : headers composites → noms CLI.
+  // Passe 2 : headers composites → noms CLI. La 4e composante (FF, INAV) est
+  // conservée : sans elle, un changement de feedforward entre deux passes
+  // sortirait comme « aucun réglage changé ».
   const pidAxes: Array<[string, string]> = [
     ['rollPID', 'roll'],
     ['pitchPID', 'pitch'],
@@ -67,10 +80,11 @@ export function configFromHeaders(headers: Record<string, string>): CliConfig {
   for (const [headerKey, axis] of pidAxes) {
     const raw = headers[headerKey];
     if (!raw) continue;
-    const [p, i, d] = raw.split(',').map((s) => s.trim());
+    const [p, i, d, ff] = raw.split(',').map((s) => s.trim());
     if (p) values[`p_${axis}`] = p;
     if (i) values[`i_${axis}`] = i;
     if (d !== undefined && d !== '') values[`d_${axis}`] = d;
+    if (ff !== undefined && ff !== '') values[`ff_${axis}`] = ff;
   }
 
   splitTriple(values, 'd_max', ['d_max_roll', 'd_max_pitch', 'd_max_yaw']);

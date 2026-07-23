@@ -183,6 +183,25 @@ export const es: Dict = {
       fix: 'Reactiva el registro de batería para recuperar los veredictos de sag y tensión en tus próximos logs.',
     },
 
+    rpmNotLogged: {
+      title: 'Régimen de motores ausente del log',
+      detail: (cause: string) =>
+        `El log no contiene telemetría eRPM: la frecuencia de rotación de los motores es desconocida. En el espectro, la línea «motores ~X Hz» no puede trazarse, el pico dominante no puede atribuirse a un motor concreto, y una desync pasaría desapercibida. ${cause}`,
+      causeFieldDisabled:
+        'dshot_bidir = 1: la telemetría funciona en vuelo (el filtro RPM está activo), es el campo RPM el que está desmarcado en los ajustes de blackbox.',
+      causeNoBidir:
+        'dshot_bidir = 0: la placa no recibe ningún retorno de régimen de los ESC, ni en vuelo ni en el log.',
+      causeUnknown:
+        'La config del log no permite saber si falta la telemetría DSHOT o solo su registro.',
+      evidence: (bidir: string) => `ningún campo eRPM[0..3] en las tramas - dshot_bidir = ${bidir}`,
+      fixFieldDisabled:
+        'Reactiva el registro del eRPM para recuperar la línea de motores y la atribución de picos en tus próximos logs.',
+      fixNoBidir:
+        'Activa el DSHOT bidireccional si tus ESC lo soportan (BLHeli_32, Bluejay, AM32): alimenta el filtro RPM en vuelo y el eRPM en los logs.',
+      fixUnknown:
+        'Comprueba que el DSHOT bidireccional está activo y que el campo RPM está marcado en los ajustes de blackbox.',
+    },
+
     yoyoDetected: {
       titleWarn: 'Yoyo detectado (oscilación de empuje)',
       titleInfo: 'Indicio de yoyo (por confirmar)',
@@ -258,6 +277,44 @@ export const es: Dict = {
       fix: 'Espera 8+ sats antes de despegar; aleja la antena GPS del VTX y de la cámara (interferencias).',
     },
 
+    gpsAcquisitionSlow: {
+      title: 'Fijación GPS incompleta o tardía',
+      detail:
+        'El receptor no alcanzó una cobertura sana (8 satélites o más) al despegar, o solo tarde en la sesión. Un GPS rescue disparado antes del fix completo es arriesgado. Causas típicas: despegar demasiado pronto tras encender, antena tapada, o ruido eléctrico que ralentiza la adquisición.',
+      evidence: (median: string, timeS: string | null) =>
+        timeS !== null
+          ? `8 sats alcanzados solo tras ${timeS} s de log (mediana de la sesión: ${median} sats)`
+          : `8 sats nunca alcanzados en la sesión (mediana: ${median} sats)`,
+      fix: 'Deja que el GPS fije antes de despegar (8+ sats en el OSD). Si la adquisición sigue lenta incluso en el suelo, aleja la antena GPS del VTX y del cableado de potencia: el ruido RF alarga la sincronización.',
+    },
+
+    gpsSatDrops: {
+      title: 'Caídas de satélites en vuelo',
+      detail:
+        'El número de satélites se desploma por momentos y luego se recupera: antena tapada por el frame en maniobras, conexión intermitente, o interferencia puntual. Cada caída degrada la posición; por debajo de 5 sats se pierde el propio fix 3D y un rescue volaría a ciegas.',
+      evidence: (count: string, from: string, to: string, atS: string) =>
+        `${count} caída(s) detectada(s), la peor de ${from} a ${to} sats en t=${atS} s`,
+      fix: 'Revisa la fijación y el cable de la antena GPS, despeja su vista del cielo (por encima del frame, lejos de la cámara HD) y repite un vuelo tranquilo para comparar.',
+    },
+
+    gpsEmiThrottle: {
+      title: 'Satélites a la baja cuando sube la potencia',
+      detail:
+        'El número de satélites baja claramente cuando sube el throttle: la firma de un ruido eléctrico (VTX, ESC, cableado de potencia) que ciega al receptor GPS. Ese es el ruido que impide que el GPS se sincronice bien aunque fije perfectamente posado en el suelo.',
+      evidence: (low: string, high: string) =>
+        `Mediana: ${low} sats a throttle bajo frente a ${high} sats a throttle alto`,
+      fix: 'Aleja la antena GPS del VTX y de los cables de batería/ESC (mástil o placa trasera), trenza los cables de potencia y prueba armado sin hélices: subir el throttle no debe mover los sats.',
+    },
+
+    gpsHdopHigh: {
+      title: 'Precisión GPS mediocre (HDOP alto)',
+      detail:
+        'El HDOP se mantiene alto: la posición es imprecisa incluso con satélites fijados. Geometría desfavorable (cielo tapado) o señal degradada por ruido RF cerca de la antena.',
+      evidence: (median: string, worst: string | null) =>
+        `HDOP mediano ${median}${worst !== null ? ` / peor ${worst}` : ''} (sano: < 2.5)`,
+      fix: 'Despeja la vista del cielo de la antena y alejala de las fuentes de ruido (VTX, cámara HD, cableado de potencia). Por debajo de 1.5 de HDOP la posición vuelve a ser fiable.',
+    },
+
     failsafeTriggered: {
       title: 'Failsafe disparado en vuelo',
       detail:
@@ -277,6 +334,13 @@ export const es: Dict = {
         `Duración ${durationS} s, muestreo ${rateHz} Hz`,
       fixLowRate: 'Pon el blackbox a resolución completa para los próximos logs de tuning.',
       fixShortLog: 'Vuela al menos 30 s con movimientos variados para un diagnóstico fiable.',
+    },
+
+    inavLimited: {
+      title: 'Log INAV: análisis parcial',
+      detail:
+        'Este log viene de INAV: las métricas de vuelo (ruido, filtros, seguimiento, step response, motores, batería) se analizan con normalidad, pero el lint de configuración y los comandos CLI son específicos de Betaflight y quedan desactivados. Aplica las correcciones con INAV Configurator.',
+      evidence: (firmware: string) => `Firmware: ${firmware}`,
     },
 
     allGood: {
@@ -311,6 +375,13 @@ export const es: Dict = {
         notes: [
           'Frame grande de 7": vigila la banda 40-120 Hz (resonancia de brazos/cámara, fuente de jello).',
           'Equilibrado de hélices crítico: un pico en la fundamental del motor se ve directo en la imagen.',
+        ],
+      },
+      akira: {
+        label: 'RRFPV RR Akira 9" X8 (6S)',
+        notes: [
+          'X8 coaxial: 8 motores, de momento solo M1-M4 entran en los análisis de motores.',
+          'Umbrales de partida sin calibrar en campo: ruido en bruto vigilado pronto (brazos largos de 9") y subida más lenta tolerada.',
         ],
       },
       generic: {
@@ -430,15 +501,17 @@ export const es: Dict = {
       `${cells}S ${max}→${min} V (sag ${sag} V)`,
     cliCurrentMax: (amps: string) => `corriente máx ${amps} A`,
     cliCurrentUnreliable: 'corriente: sensor no fiable, valor descartado',
+    cliGpsSummary: (median: string, min: string, hdop: string | null) =>
+      `GPS ${median} sats (mín ${min}${hdop !== null ? `, HDOP ${hdop}` : ''})`,
     headersUnreadable: 'Headers ilegibles (¿sesión corrupta?)',
     dataVersionUnsupported: 'Versión de datos desconocida para el decodificador (¿fragmento de log corrupto?)',
     decoderRejected: (raw: string) => `Imposible decodificar: ${raw}`,
     noFramesDecoded: 'Ningún frame decodificado (¿datos corruptos?)',
     essentialFieldsMissing: 'Faltan campos esenciales (gyroADC/setpoint/motor/rcCommand)',
-    firmwareTooOld: (version: string, minimum: string) =>
-      `Firmware demasiado antiguo (Betaflight ${version}) - el decodificador necesita ${minimum} como mínimo`,
+    firmwareTooOld: (firmware: string, minimum: string) =>
+      `Firmware demasiado antiguo (${firmware}) - el decodificador necesita ${minimum} como mínimo`,
     firmwareNotSupported: (flavour: string) =>
-      `Firmware no compatible: ${flavour} - solo Betaflight se decodifica de forma fiable`,
+      `Firmware no compatible: ${flavour} - solo Betaflight e INAV se decodifican de forma fiable`,
 
     wasmLoadFailed: (httpStatus: string) =>
       `No se pudo cargar el decodificador WASM (HTTP ${httpStatus})`,
@@ -481,12 +554,12 @@ export const es: Dict = {
     page: {
       heroTagline: 'Tu vuelo, decodificado.',
       heroIntro:
-        'Arrastra tus logs de blackbox de Betaflight: My Drone Can Fly Better los decodifica y te suelta veredictos con cifras - vibraciones, filtros, PID, motores, batería - con los comandos CLI listos para pegar. Sin subir nada: señal y reglas, todo trazable.',
+        'Arrastra tus logs de blackbox de Betaflight o INAV: My Drone Can Fly Better los decodifica y te suelta veredictos con cifras - vibraciones, filtros, PID, motores, batería - y, en Betaflight, los comandos CLI listos para pegar. Sin subir nada: señal y reglas, todo trazable.',
       heroAria: 'Presentación',
       steps: [
         {
           title: 'Arrastra tus logs',
-          text: '.bbl o .bfl, directo desde la tarjeta SD o la GUI. Varios archivos a la vez si quieres.',
+          text: '.bbl, .bfl o .txt (INAV), directo desde la tarjeta SD o la GUI. Varios archivos a la vez si quieres.',
         },
         {
           title: 'Análisis local',
@@ -515,8 +588,8 @@ export const es: Dict = {
     upload: {
       dropTitle: 'Arrastra tus logs de blackbox aquí',
       dropBrowse: ' - o haz clic para explorar',
-      dropHelp: '.bbl / .bfl · varios archivos aceptados · nada sale de tu navegador',
-      rejected: (names: string): string => `Ignorado (ni .bbl ni .bfl): ${names}`,
+      dropHelp: '.bbl / .bfl / .txt (INAV) · varios archivos aceptados · nada sale de tu navegador',
+      rejected: (names: string): string => `Ignorado (ni .bbl, ni .bfl, ni .txt): ${names}`,
       selectedFilesAria: 'Archivos seleccionados',
       removeFile: (name: string): string => `Quitar ${name}`,
     },
@@ -614,6 +687,9 @@ export const es: Dict = {
       tileSaturation: 'Saturación de motores',
       tileFlightTime: 'Tiempo de vuelo',
       flightTimeHint: 'throttle realmente en el aire',
+    tileGps: 'GPS',
+    gpsTileHint: (min: string, max: string, hdop: string | null): string =>
+      `mín ${min} / máx ${max}${hdop !== null ? ` / HDOP ${hdop}` : ''}`,
       timelineCaption: 'Timeline del vuelo',
       timelineEventLine: (
         tStart: string,
@@ -751,6 +827,7 @@ export const es: Dict = {
         bandMotors: 'motores',
         xAxis: 'Frecuencia (Hz)',
         motorLine: (hz: string): string => `motores ~${hz} Hz`,
+        motorLineMissing: 'línea de motores no disponible - sin eRPM en el log',
         beyondNyquist: (hz: string): string => `no medible - log grabado a ${hz} Hz`,
       },
       step: {

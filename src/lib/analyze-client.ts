@@ -43,23 +43,27 @@ export function useAnalyzer(): AnalyzerState & {
     setState({ status: 'working', step: getDict(locale).system.progressPreparing, report: null });
 
     worker.onmessage = (ev: MessageEvent<WorkerResponse>) => {
+      // Un message déjà en file au moment du terminate() peut encore arriver :
+      // il ne doit pas écraser l'état de l'analyse qui l'a remplacé.
+      if (workerRef.current !== worker) return;
       const msg = ev.data;
       if (msg.type === 'progress') {
         setState({ status: 'working', step: msg.step, report: null });
       } else if (msg.type === 'done') {
         setState({ status: 'ready', report: msg.report });
         worker.terminate();
-        if (workerRef.current === worker) workerRef.current = null;
+        workerRef.current = null;
       } else {
         setState({ status: 'error', report: null, error: msg.error });
         worker.terminate();
-        if (workerRef.current === worker) workerRef.current = null;
+        workerRef.current = null;
       }
     };
     worker.onerror = (ev) => {
+      if (workerRef.current !== worker) return;
       setState({ status: 'error', report: null, error: ev.message || getDict(locale).system.workerUnexpectedError });
       worker.terminate();
-      if (workerRef.current === worker) workerRef.current = null;
+      workerRef.current = null;
     };
 
     const payload: WorkerRequest = {

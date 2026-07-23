@@ -52,6 +52,16 @@ for (const file of report.files) {
         : dict.system.cliCurrentMax(p.ampMax?.toFixed(1) ?? '?');
       console.log(`  ${vbat}  ${amp}`);
     }
+    const g = sr.analysis.gps;
+    if (g.available && g.numSatMedian !== null && g.numSatMin !== null) {
+      console.log(
+        `  ${dict.system.cliGpsSummary(
+          g.numSatMedian.toFixed(0),
+          g.numSatMin.toFixed(0),
+          g.hdopMedian !== null ? g.hdopMedian.toFixed(1) : null,
+        )}`,
+      );
+    }
     for (const f of sr.findings) {
       // f.category est la clé d'enum (français) : l'UI la traduit via
       // dict.ui.categories, le terminal doit faire pareil.

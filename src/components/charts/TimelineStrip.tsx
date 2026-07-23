@@ -75,8 +75,13 @@ function fmt(n: number): string {
 
 function fmtTime(s: number): string {
   if (s < 60) return `${Math.round(s)} s`;
-  const m = Math.floor(s / 60);
-  const sec = Math.round(s - m * 60);
+  let m = Math.floor(s / 60);
+  let sec = Math.round(s - m * 60);
+  // 119,6 s : l'arrondi des secondes retombe sur la minute pleine.
+  if (sec === 60) {
+    m += 1;
+    sec = 0;
+  }
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 

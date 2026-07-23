@@ -186,6 +186,25 @@ export const en: Dict = {
       fix: 'Re-enable battery logging to get the sag and voltage verdicts back on your next logs.',
     },
 
+    rpmNotLogged: {
+      title: 'Motor RPM missing from the log',
+      detail: (cause: string) =>
+        `The log carries no eRPM telemetry: the motors' rotation frequency is unknown. On the spectrum, the "motors ~X Hz" line cannot be drawn, the dominant peak cannot be attributed to a specific motor, and a desync would go unnoticed. ${cause}`,
+      causeFieldDisabled:
+        'dshot_bidir = 1: telemetry works in flight (the RPM filter runs), it is the RPM field that is unticked in the blackbox settings.',
+      causeNoBidir:
+        'dshot_bidir = 0: the board receives no RPM feedback from the ESCs, in flight or in the log.',
+      causeUnknown:
+        'The log config cannot tell whether DSHOT telemetry or its recording is missing.',
+      evidence: (bidir: string) => `no eRPM[0..3] field in the frames - dshot_bidir = ${bidir}`,
+      fixFieldDisabled:
+        'Re-enable eRPM logging to get the motor line and peak attribution back on your next logs.',
+      fixNoBidir:
+        'Enable bidirectional DSHOT if your ESCs support it (BLHeli_32, Bluejay, AM32): it feeds the RPM filter in flight and the eRPM in the logs.',
+      fixUnknown:
+        'Check that bidirectional DSHOT is active and the RPM field is ticked in the blackbox settings.',
+    },
+
     yoyoDetected: {
       titleWarn: 'Yoyo detected (thrust oscillation)',
       titleInfo: 'Yoyo hint (to be confirmed)',
@@ -261,6 +280,44 @@ export const en: Dict = {
       fix: 'Wait for 8+ sats before taking off; move the GPS antenna away from the VTX and the camera (interference).',
     },
 
+    gpsAcquisitionSlow: {
+      title: 'GPS lock incomplete or late',
+      detail:
+        'The receiver never reached a healthy coverage (8 satellites or more) at takeoff, or only late into the session. A GPS rescue triggered before a full lock is risky. Usual causes: taking off too soon after power-up, a masked antenna, or electrical noise slowing the acquisition.',
+      evidence: (median: string, timeS: string | null) =>
+        timeS !== null
+          ? `8 sats only reached after ${timeS} s of log (session median: ${median} sats)`
+          : `8 sats never reached during the session (median: ${median} sats)`,
+      fix: 'Let the GPS lock before taking off (8+ sats on the OSD). If acquisition stays slow even on the ground, move the GPS antenna away from the VTX and power wiring: RF noise stretches sync time.',
+    },
+
+    gpsSatDrops: {
+      title: 'Satellite drops in flight',
+      detail:
+        'The satellite count collapses briefly then recovers: antenna masked by the frame during maneuvers, an intermittent connection, or momentary interference. Each drop degrades the position; below 5 sats the 3D fix itself is lost and a rescue would fly blind.',
+      evidence: (count: string, from: string, to: string, atS: string) =>
+        `${count} drop(s) detected, worst from ${from} to ${to} sats at t=${atS} s`,
+      fix: 'Check the GPS antenna mount and cable, clear its sky view (above the frame, away from the HD camera), then fly a calm pattern again to compare.',
+    },
+
+    gpsEmiThrottle: {
+      title: 'Satellites fall as power rises',
+      detail:
+        'The satellite count clearly drops when throttle goes up: the signature of electrical noise (VTX, ESCs, power wiring) blinding the GPS receiver. This is the noise that keeps the GPS from syncing properly even though it locks fine sitting on the ground.',
+      evidence: (low: string, high: string) =>
+        `Median: ${low} sats at low throttle vs ${high} sats at high throttle`,
+      fix: 'Move the GPS antenna away from the VTX and battery/ESC wires (mast or rear plate), twist the power leads, and test armed without props: raising the throttle should not move the sat count.',
+    },
+
+    gpsHdopHigh: {
+      title: 'Poor GPS accuracy (high HDOP)',
+      detail:
+        'HDOP stays high: the position is imprecise even with satellites locked. Unfavorable geometry (obstructed sky) or a signal degraded by RF noise near the antenna.',
+      evidence: (median: string, worst: string | null) =>
+        `Median HDOP ${median}${worst !== null ? ` / worst ${worst}` : ''} (healthy: < 2.5)`,
+      fix: 'Clear the antenna sky view and move it away from noise sources (VTX, HD camera, power wiring). Below 1.5 HDOP the position becomes reliable again.',
+    },
+
     failsafeTriggered: {
       title: 'Failsafe triggered in flight',
       detail:
@@ -280,6 +337,13 @@ export const en: Dict = {
         `Duration ${durationS} s, sample rate ${rateHz} Hz`,
       fixLowRate: 'Switch the blackbox to full resolution for your next tuning logs.',
       fixShortLog: 'Fly at least 30 s with varied moves for a reliable diagnosis.',
+    },
+
+    inavLimited: {
+      title: 'INAV log: partial analysis',
+      detail:
+        'This log comes from INAV: flight metrics (noise, filters, tracking, step response, motors, battery) are analyzed normally, but the config lint and CLI commands are Betaflight specific and stay disabled. Apply fixes through INAV Configurator.',
+      evidence: (firmware: string) => `Firmware: ${firmware}`,
     },
 
     allGood: {
@@ -314,6 +378,13 @@ export const en: Dict = {
         notes: [
           'Big 7" frame: watch the 40-120 Hz band (arm/camera resonance, the source of jello).',
           'Prop balancing is critical: a peak at the motor fundamental shows up straight away in the footage.',
+        ],
+      },
+      akira: {
+        label: 'RRFPV RR Akira 9" X8 (6S)',
+        notes: [
+          'Coaxial X8: 8 motors, only M1-M4 feed the motor analyses for now.',
+          'Starting thresholds, not field-calibrated yet: raw noise watched early (long 9" arms) and a slower rise tolerated.',
         ],
       },
       generic: {
@@ -433,15 +504,17 @@ export const en: Dict = {
       `${cells}S ${max}→${min} V (sag ${sag} V)`,
     cliCurrentMax: (amps: string) => `max current ${amps} A`,
     cliCurrentUnreliable: 'current: sensor unreliable, value discarded',
+    cliGpsSummary: (median: string, min: string, hdop: string | null) =>
+      `GPS ${median} sats (min ${min}${hdop !== null ? `, HDOP ${hdop}` : ''})`,
     headersUnreadable: 'Unreadable headers (corrupted session?)',
     dataVersionUnsupported: 'Data version unknown to the decoder (corrupted log fragment?)',
     decoderRejected: (raw: string) => `Cannot decode: ${raw}`,
     noFramesDecoded: 'No frames decoded (corrupted data?)',
     essentialFieldsMissing: 'Essential fields missing (gyroADC/setpoint/motor/rcCommand)',
-    firmwareTooOld: (version: string, minimum: string) =>
-      `Firmware too old (Betaflight ${version}) - the decoder needs ${minimum} or newer`,
+    firmwareTooOld: (firmware: string, minimum: string) =>
+      `Firmware too old (${firmware}) - the decoder needs ${minimum} or newer`,
     firmwareNotSupported: (flavour: string) =>
-      `Unsupported firmware: ${flavour} - only Betaflight decodes reliably`,
+      `Unsupported firmware: ${flavour} - only Betaflight and INAV decode reliably`,
 
     wasmLoadFailed: (httpStatus: string) =>
       `Could not load the WASM decoder (HTTP ${httpStatus})`,
@@ -485,12 +558,12 @@ export const en: Dict = {
     page: {
       heroTagline: 'Your flight, decoded.',
       heroIntro:
-        'Drop your Betaflight blackbox logs: My Drone Can Fly Better decodes them and gives you numbers-backed verdicts - vibrations, filters, PID, motors, battery - with CLI commands ready to paste. No upload: signal and rules, everything traceable.',
+        'Drop your Betaflight or INAV blackbox logs: My Drone Can Fly Better decodes them and gives you numbers-backed verdicts - vibrations, filters, PID, motors, battery - with, on Betaflight, CLI commands ready to paste. No upload: signal and rules, everything traceable.',
       heroAria: 'Introduction',
       steps: [
         {
           title: 'Drop your logs',
-          text: '.bbl or .bfl, straight from the SD card or the GUI. Several files at once if you want.',
+          text: '.bbl, .bfl or .txt (INAV), straight from the SD card or the GUI. Several files at once if you want.',
         },
         {
           title: 'Local analysis',
@@ -520,8 +593,8 @@ export const en: Dict = {
     upload: {
       dropTitle: 'Drop your blackbox logs here',
       dropBrowse: ' - or click to browse',
-      dropHelp: '.bbl / .bfl · several files accepted · nothing leaves your browser',
-      rejected: (names: string): string => `Skipped (neither .bbl nor .bfl): ${names}`,
+      dropHelp: '.bbl / .bfl / .txt (INAV) · several files accepted · nothing leaves your browser',
+      rejected: (names: string): string => `Skipped (neither .bbl, .bfl nor .txt): ${names}`,
       selectedFilesAria: 'Selected files',
       removeFile: (name: string): string => `Remove ${name}`,
     },
@@ -624,6 +697,9 @@ export const en: Dict = {
       tileSaturation: 'Motor saturation',
       tileFlightTime: 'Flight time',
       flightTimeHint: 'throttle actually in the air',
+    tileGps: 'GPS',
+    gpsTileHint: (min: string, max: string, hdop: string | null): string =>
+      `min ${min} / max ${max}${hdop !== null ? ` / HDOP ${hdop}` : ''}`,
       timelineCaption: 'Flight timeline',
       timelineEventLine: (
         tStart: string,
@@ -763,6 +839,7 @@ export const en: Dict = {
         bandMotors: 'motors',
         xAxis: 'Frequency (Hz)',
         motorLine: (hz: string): string => `motors ~${hz} Hz`,
+      motorLineMissing: 'motor line unavailable - no eRPM in this log',
         beyondNyquist: (hz: string): string => `not measurable - log recorded at ${hz} Hz`,
       },
       step: {

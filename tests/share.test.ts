@@ -171,7 +171,19 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
       flightTimeS: 105,
       throttleMaxUs: 1600,
     },
-    gps: { available: true, numSatMax: 14, numSatMin: 9, speedMaxMps: 20 },
+    gps: {
+      available: true,
+      numSatMax: 14,
+      numSatMin: 9,
+      numSatMedian: 12,
+      speedMaxMps: 20,
+      corruptFrameRatio: 0,
+      timeToHealthySatsS: 3,
+      satDrops: [],
+      satsVsThrottle: null,
+      hdopMedian: null,
+      hdopWorst: null,
+    },
     failsafe: { phases: { '0': 240_000 }, triggered: false },
   };
   mutate?.(a);
@@ -229,7 +241,19 @@ const CASES: Array<{ name: string; analysis: SessionAnalysis }> = [
     name: 'sans batterie ni GPS',
     analysis: makeAnalysis((a) => {
       a.power = null;
-      a.gps = { available: false, numSatMax: null, numSatMin: null, speedMaxMps: null };
+      a.gps = {
+        available: false,
+        numSatMax: null,
+        numSatMin: null,
+        numSatMedian: null,
+        speedMaxMps: null,
+        corruptFrameRatio: null,
+        timeToHealthySatsS: null,
+        satDrops: [],
+        satsVsThrottle: null,
+        hdopMedian: null,
+        hdopWorst: null,
+      };
     }),
   },
   {

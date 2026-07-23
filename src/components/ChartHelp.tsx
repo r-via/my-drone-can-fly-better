@@ -237,10 +237,16 @@ function HelpPanel({ topic, onClose }: { topic: ChartHelpTopic; onClose: () => v
   const t = h[topic];
   const closeRef = useRef<HTMLButtonElement>(null);
 
+  // onClose est une arrow recréée à chaque rendu du parent : passé en
+  // dépendance, l'effet se rejouerait et capturerait 'hidden' comme valeur
+  // à restaurer, laissant le scroll bloqué à la fermeture.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     window.addEventListener('keydown', onKey);
     // Le fond ne doit pas défiler sous le panneau.
@@ -250,7 +256,7 @@ function HelpPanel({ topic, onClose }: { topic: ChartHelpTopic; onClose: () => v
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [onClose]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50">

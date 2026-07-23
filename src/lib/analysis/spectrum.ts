@@ -97,7 +97,7 @@ function chartArrays(spec: Spectrum): { freqs: Float32Array; mags: Float32Array 
   return { freqs: outFreqs, mags: outMags };
 }
 
-function axisSpectrum(sig: Float32Array, fsHz: number): AxisSpectrum {
+function axisSpectrum(sig: Float32Array, fsHz: number): AxisSpectrum | null {
   const spec = welchSpectrum(sanitizeGyro(sig), fsHz);
   // Une bande (presque) entièrement au-delà de Nyquist n'est pas mesurable :
   // on l'omet plutôt que de rapporter un RMS 0 trompeur (logs à faible rate).
@@ -108,6 +108,8 @@ function axisSpectrum(sig: Float32Array, fsHz: number): AxisSpectrum {
     label,
     rms: bandRms(spec, lo, Math.min(hi, nyq)),
   }));
+  // Rate trop bas : toutes les bandes sont au-delà de Nyquist, rien à mesurer.
+  if (bands.length === 0) return null;
   // Bande dominante = max ; à égalité la première gagne (comme max() en python).
   let dominant = bands[0];
   for (const b of bands) if (b.rms > dominant.rms) dominant = b;
@@ -127,11 +129,13 @@ export function analyzeSpectrum(fd: FlightData, motorPoles: number): SpectrumMet
   if (src[0].length < MIN_SAMPLES_FOR_FFT) return null;
 
   const fs = fd.meta.sampleRateHz;
-  const axes = [axisSpectrum(src[0], fs), axisSpectrum(src[1], fs), axisSpectrum(src[2], fs)] as [
-    AxisSpectrum,
-    AxisSpectrum,
-    AxisSpectrum,
-  ];
+  const roll = axisSpectrum(src[0], fs);
+  const pitch = axisSpectrum(src[1], fs);
+  const yaw = axisSpectrum(src[2], fs);
+  // Nul seulement si le rate est trop bas pour la première bande : les trois
+  // axes partagent fs, donc ils tombent ensemble.
+  if (!roll || !pitch || !yaw) return null;
+  const axes: [AxisSpectrum, AxisSpectrum, AxisSpectrum] = [roll, pitch, yaw];
 
   // Régime moteur depuis l'eRPM (échantillons non nuls uniquement : au sol
   // l'ESC rapporte 0, ça fausserait la médiane).

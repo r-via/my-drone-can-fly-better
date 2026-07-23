@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'My Drone Can Fly Better',
     short_name: 'MDCFB',
     description:
-      'Fully local Betaflight blackbox analysis: DSP and deterministic rules, quantified verdicts, ready-to-paste CLI commands.',
+      'Fully local Betaflight and INAV blackbox analysis: DSP and deterministic rules, quantified verdicts, ready-to-paste CLI commands.',
     id: '/',
     start_url: '/',
     scope: '/',

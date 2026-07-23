@@ -3,7 +3,7 @@
 // affichés tels quels. La section n'apparaît que si au moins un groupe a des
 // membres.
 
-export type Contributor = {
+type Contributor = {
   /** Pseudo (Discord ou autre), affiché tel quel. */
   name: string;
   /** Lien optionnel (profil GitHub, chaîne YouTube…). */

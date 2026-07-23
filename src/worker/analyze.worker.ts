@@ -29,7 +29,12 @@ function ensureWasm(dict: Dict): Promise<void> {
     const res = await fetch(wasmUrl);
     if (!res.ok) throw new Error(dict.system.wasmLoadFailed(String(res.status)));
     await initWasm(await res.arrayBuffer());
-  })();
+  })().catch((e: unknown) => {
+    // Ne pas mettre l'échec en cache : un fetch transitoirement raté doit
+    // pouvoir être retenté au prochain message.
+    wasmReady = null;
+    throw e;
+  });
   return wasmReady;
 }
 

@@ -46,6 +46,22 @@ export function XIcon({ className }: { className?: string }) {
   );
 }
 
+export function SatelliteIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>
+      <circle cx="12" cy="16" r="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M12 14v-2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M7.5 8.5a6.4 6.4 0 0 1 9 0M5 6a9.9 9.9 0 0 1 14 0"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function ClockIcon({ className }: { className?: string }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>
