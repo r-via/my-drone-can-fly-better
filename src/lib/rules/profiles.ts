@@ -98,7 +98,6 @@ const AKIRA: DroneProfile = {
     riseTimeSlowMs: 90, // inertie d'un 9" X8 : montée encore plus lente qu'un 7"
   },
   // Seuils de départ non calibrés terrain : à resserrer avec les prochains vols.
-  // X8 : le log porte motor[0..7] mais FlightData n'en lit que 4 (voir limitations.md).
 };
 
 const GENERIC: DroneProfile = {

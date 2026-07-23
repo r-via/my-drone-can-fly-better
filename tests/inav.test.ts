@@ -5,6 +5,7 @@ import { initWasm, parseFile, spoofFirmware, unsupportedFirmware } from '../src/
 import { configFromHeaders } from '../src/lib/cli/config';
 import { getDict } from '../src/lib/i18n';
 import { buildSessionReport, composeFindings } from '../src/lib/report';
+import { evaluateSession } from '../src/lib/rules/engine';
 import type { FlightData } from '../src/lib/types';
 
 // Log INAV 9.0.1 réel (TMOTORF7V2, craft AKIRA) : 3 sessions, la première est
@@ -181,6 +182,9 @@ describe('log INAV réel', () => {
     expect(s.gyroUnfilt).not.toBeNull();
     expect(s.baroAlt).not.toBeNull();
     expect(s.erpm).toBeNull(); // pas d eRPM par moteur dans les frames main INAV
+    // X8 : les 8 canaux moteurs sont lus (validés réels contre orangebox :
+    // plages 1133-1422 dans motorOutput 1100-2000, dynamique corrélée)
+    expect(s.motor).toHaveLength(8);
     // Session « wobble » : la consigne dépasse 100 deg/s en crête
     const s2 = sessions[1];
     let peak = 0;
@@ -208,5 +212,38 @@ describe('log INAV réel', () => {
     const en = composeFindings(sr.analysis, sr.profile, { values: {} }, getDict('en'));
     const noticeEn = en.find((f) => f.id === 'inav-limited');
     expect(noticeEn!.title).not.toBe(notice!.title);
+  });
+
+  it('analyse les 8 moteurs du X8', () => {
+    const sr = buildSessionReport(sessions[0], fr);
+    const m = sr.analysis.motors;
+    expect(m.perMotorAvgPct).toHaveLength(8);
+    expect(m.desyncZeros).toHaveLength(8);
+    // Hover 6S : moyennes toutes dans une bande plausible et équilibrées
+    // (validé contre orangebox : moyennes brutes 1333-1383 sur 1100-2000)
+    for (const pct of m.perMotorAvgPct) {
+      expect(pct).toBeGreaterThan(20);
+      expect(pct).toBeLessThan(35);
+    }
+    expect(m.imbalancePctPts).toBeLessThan(12); // pas de faux positif imbalance sur ce vol sain
+    expect(sr.findings.some((f) => f.id === 'motors-imbalance')).toBe(false);
+  });
+
+  it('nomme les moteurs au-delà de M4 dans le verdict de déséquilibre', () => {
+    const sr = buildSessionReport(sessions[0], fr);
+    // Même vol, moyennes trafiquées : M8 nettement au-dessus, M2 en dessous.
+    const doctored = {
+      ...sr.analysis,
+      motors: {
+        ...sr.analysis.motors,
+        perMotorAvgPct: [30, 28, 30, 31, 30, 31, 30, 45],
+        imbalancePctPts: 17,
+      },
+    };
+    const f = evaluateSession(doctored, sr.profile, fr).find((x) => x.id === 'motors-imbalance');
+    expect(f).toBeDefined();
+    expect(f!.detail).toContain('M8'); // le moteur qui force
+    expect(f!.evidence).toContain('M5'); // la liste couvre bien les 8
+    expect(f!.evidence).toContain('M8 45');
   });
 });

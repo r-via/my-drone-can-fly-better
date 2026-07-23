@@ -136,6 +136,8 @@ export const zh: Dict = {
         `为了保持机身水平，${motorHigh} 明显比 ${motorLow} 更卖力：重心偏移（电池、摄像头）、桨叶变形，或这一侧的电机老化了。`,
       evidence: (m1: string, m2: string, m3: string, m4: string, spread: string, warn: number) =>
         `电机平均输出：M1 ${m1} / M2 ${m2} / M3 ${m3} / M4 ${m4}% - 差距 ${spread} 个百分点（阈值 ${warn}）`,
+      evidenceN: (motors: string, spread: string, warn: number) =>
+        `电机平均输出：${motors}% - 差距 ${spread} 个百分点（阈值 ${warn}）`,
       fix: (motorHigh: string) =>
         `把电池放回机架中心，并检查 ${motorHigh} 的桨叶和电机。`,
     },
@@ -193,7 +195,7 @@ export const zh: Dict = {
         'dshot_bidir = 1：遥测在飞行中正常工作（RPM 滤波器在运行），只是 blackbox 设置里没有勾选 RPM 字段。',
       causeNoBidir: 'dshot_bidir = 0：飞控收不到电调的任何转速回传，飞行和日志中都没有。',
       causeUnknown: '仅凭日志配置无法判断缺的是 DSHOT 遥测本身还是它的记录。',
-      evidence: (bidir: string) => `帧中没有 eRPM[0..3] 字段 - dshot_bidir = ${bidir}`,
+      evidence: (bidir: string) => `帧中没有按电机的 eRPM 字段 - dshot_bidir = ${bidir}`,
       fixFieldDisabled: '重新启用 eRPM 记录，下次的日志就能恢复电机参考线和峰值归属。',
       fixNoBidir:
         '如果你的电调支持（BLHeli_32、Bluejay、AM32），开启双向 DSHOT：它在飞行中驱动 RPM 滤波器，也向日志提供 eRPM。',
@@ -378,7 +380,7 @@ export const zh: Dict = {
       akira: {
         label: 'RRFPV RR Akira 9 英寸 X8（6S）',
         notes: [
-          '共轴 X8：共 8 个电机，目前只有 M1-M4 进入电机分析。',
+          '共轴 X8：全部 8 个电机进入分析（平均输出、出力不均、饱和、振荡）。',
           '起始阈值尚未实地校准：9 英寸长机臂的原始噪声提早预警，上升时间放宽。',
         ],
       },

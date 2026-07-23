@@ -83,12 +83,15 @@ export function analyzeYoyo(fd: FlightData): YoyoMetrics {
     return { applicable: false, ratio: null, verdict: null, peaks: [] };
   }
 
-  // Poussée collective (moyenne des 4 moteurs, valeurs brutes) et stick en vol.
+  // Poussée collective (moyenne de tous les moteurs, valeurs brutes) et stick en vol.
+  const nMotors = fd.motor.length;
   const col = new Float64Array(fly.length);
   const th = new Float64Array(fly.length);
   for (let k = 0; k < fly.length; k++) {
     const i = fly[k];
-    col[k] = (fd.motor[0][i] + fd.motor[1][i] + fd.motor[2][i] + fd.motor[3][i]) / 4;
+    let sum = 0;
+    for (let m = 0; m < nMotors; m++) sum += fd.motor[m][i];
+    col[k] = sum / nMotors;
     th[k] = fd.throttle[i];
   }
   const sdCol = std(col);

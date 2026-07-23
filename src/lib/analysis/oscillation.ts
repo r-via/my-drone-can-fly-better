@@ -103,20 +103,18 @@ export function analyzeOscillation(fd: FlightData): OscillationMetrics {
 
   // Écart de chaque moteur à la poussée collective. Retirer la collective
   // élimine le throttle : ne reste que ce que le mixer demande en différentiel.
-  // Indépendant de la géométrie (X, H, hexa…) : aucune hypothèse sur quel
+  // Indépendant de la géométrie (X, H, hexa, X8…) : aucune hypothèse sur quel
   // moteur porte quel axe, contrairement à un différentiel roll/pitch câblé.
-  const dev: Float64Array[] = [
-    new Float64Array(n),
-    new Float64Array(n),
-    new Float64Array(n),
-    new Float64Array(n),
-  ];
+  const nMotors = fd.motor.length;
+  const dev: Float64Array[] = Array.from({ length: nMotors }, () => new Float64Array(n));
   const valid = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
     if (!motorsValid(i)) continue; // frame corrompue : dev reste à 0
     valid[i] = 1;
-    const col = (fd.motor[0][i] + fd.motor[1][i] + fd.motor[2][i] + fd.motor[3][i]) / 4;
-    for (let m = 0; m < 4; m++) dev[m][i] = fd.motor[m][i] - col;
+    let sum = 0;
+    for (let m = 0; m < nMotors; m++) sum += fd.motor[m][i];
+    const col = sum / nMotors;
+    for (let m = 0; m < nMotors; m++) dev[m][i] = fd.motor[m][i] - col;
   }
 
   // Passe-bande [8, 200] Hz par différence de moyennes glissantes : le
@@ -124,19 +122,19 @@ export function analyzeOscillation(fd: FlightData): OscillationMetrics {
   const wHi = boxcarWidth(fs, BAND_LO_HZ, n);
   const wLo = boxcarWidth(fs, BAND_HI_HZ, n);
   const bp: Float64Array[] = [];
-  for (let m = 0; m < 4; m++) {
+  for (let m = 0; m < nMotors; m++) {
     const trend = movingAverage(dev[m], wHi);
     const hp = new Float64Array(n);
     for (let i = 0; i < n; i++) hp[i] = dev[m][i] - trend[i];
     bp.push(wLo > 1 ? movingAverage(hp, wLo) : hp);
   }
 
-  // Enveloppe : RMS instantanée sur les 4 moteurs, lissée sur ENVELOPE_S.
+  // Enveloppe : RMS instantanée sur tous les moteurs, lissée sur ENVELOPE_S.
   const inst = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     let sq = 0;
-    for (let m = 0; m < 4; m++) sq += bp[m][i] * bp[m][i];
-    inst[i] = sq / 4;
+    for (let m = 0; m < nMotors; m++) sq += bp[m][i] * bp[m][i];
+    inst[i] = sq / nMotors;
   }
   const smooth = movingAverage(inst, boxcarWidth(fs, 1 / ENVELOPE_S, n));
   const env = new Float64Array(n);
@@ -205,14 +203,14 @@ function segment(
 
     // Butées : un moteur coincé en haut pendant que sa diagonale est coupée,
     // c'est la perte d'autorité, indépendamment de l'amplitude relative.
-    const atStop = [false, false, false, false];
+    const atStop: boolean[] = new Array<boolean>(fd.motor.length).fill(false);
     let satSamples = 0;
     let count = 0;
     for (let i = s; i <= e; i++) {
       if (!valid[i]) continue;
       count++;
       let any = false;
-      for (let m = 0; m < 4; m++) {
+      for (let m = 0; m < fd.motor.length; m++) {
         const v = fd.motor[m][i];
         if (v >= motorHigh - STOP_MARGIN || v <= motorLow + STOP_MARGIN) {
           atStop[m] = true;
@@ -271,7 +269,7 @@ function segment(
 
 /**
  * Fréquence dominante du différentiel sur la fenêtre ET concentration
- * spectrale : spectres des 4 moteurs sommés (une oscillation les excite tous,
+ * spectrale : spectres de tous les moteurs sommés (une oscillation les excite tous,
  * le bruit propre à un moteur non).
  *
  * La concentration est ce qui sépare un cycle limite d'un choc : une
@@ -290,7 +288,7 @@ function dominantFreq(
 
   let acc: Float32Array | null = null;
   let freqs: Float32Array | null = null;
-  for (let m = 0; m < 4; m++) {
+  for (let m = 0; m < bp.length; m++) {
     const spec = welchSpectrum(bp[m].subarray(s, e + 1), fs, 1024);
     if (spec.mags.length === 0) return null;
     if (!acc) {

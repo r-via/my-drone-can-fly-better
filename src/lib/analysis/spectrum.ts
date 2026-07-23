@@ -144,7 +144,7 @@ export function analyzeSpectrum(fd: FlightData, motorPoles: number): SpectrumMet
   if (fd.erpm) {
     perMotorHz = [];
     const all: number[] = [];
-    for (let m = 0; m < 4; m++) {
+    for (let m = 0; m < fd.erpm.length; m++) {
       const arr = fd.erpm[m];
       const vals: number[] = [];
       for (let i = 0; i < arr.length; i++) {
@@ -163,7 +163,7 @@ export function analyzeSpectrum(fd: FlightData, motorPoles: number): SpectrumMet
   }
 
   // Pic global dominant (tous axes, fMin 15) attribué au moteur le plus proche
-  // en Hz - en hover les 4 moteurs tournent à des régimes distincts.
+  // en Hz - en hover chaque moteur tourne à un régime distinct.
   let dominantPeak: SpectrumMetrics['dominantPeak'] = null;
   if (motorFundamentalHz !== null && perMotorHz) {
     let bestAxis = -1;
@@ -180,7 +180,7 @@ export function analyzeSpectrum(fd: FlightData, motorPoles: number): SpectrumMet
     if (bestAxis >= 0) {
       let nearestMotor = -1;
       let distanceHz = Infinity;
-      for (let m = 0; m < 4; m++) {
+      for (let m = 0; m < perMotorHz.length; m++) {
         // Un moteur sans télémétrie eRPM (median 0) capturerait tous les pics
         // basse fréquence (prop wash) → faux diagnostic de balourd : on l'exclut.
         if (perMotorHz[m].median <= 0) continue;

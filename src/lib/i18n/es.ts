@@ -134,6 +134,8 @@ export const es: Dict = {
         `${motorHigh} trabaja bastante más que ${motorLow} para mantener el quad plano: centro de gravedad desplazado (pack, cámara), hélice doblada o motor desgastado de ese lado.`,
       evidence: (m1: string, m2: string, m3: string, m4: string, spread: string, warn: number) =>
         `Medias de motor: M1 ${m1} / M2 ${m2} / M3 ${m3} / M4 ${m4} % - diferencia ${spread} pts (umbral ${warn})`,
+      evidenceN: (motors: string, spread: string, warn: number) =>
+        `Medias de motor: ${motors} % - diferencia ${spread} pts (umbral ${warn})`,
       fix: (motorHigh: string) =>
         `Recentra el pack en el frame e inspecciona la hélice/el motor ${motorHigh}.`,
     },
@@ -193,7 +195,7 @@ export const es: Dict = {
         'dshot_bidir = 0: la placa no recibe ningún retorno de régimen de los ESC, ni en vuelo ni en el log.',
       causeUnknown:
         'La config del log no permite saber si falta la telemetría DSHOT o solo su registro.',
-      evidence: (bidir: string) => `ningún campo eRPM[0..3] en las tramas - dshot_bidir = ${bidir}`,
+      evidence: (bidir: string) => `ningún campo eRPM por motor en las tramas - dshot_bidir = ${bidir}`,
       fixFieldDisabled:
         'Reactiva el registro del eRPM para recuperar la línea de motores y la atribución de picos en tus próximos logs.',
       fixNoBidir:
@@ -380,7 +382,7 @@ export const es: Dict = {
       akira: {
         label: 'RRFPV RR Akira 9" X8 (6S)',
         notes: [
-          'X8 coaxial: 8 motores, de momento solo M1-M4 entran en los análisis de motores.',
+          'X8 coaxial: los 8 motores entran en los análisis (medias, desequilibrio, saturación, oscilaciones).',
           'Umbrales de partida sin calibrar en campo: ruido en bruto vigilado pronto (brazos largos de 9") y subida más lenta tolerada.',
         ],
       },

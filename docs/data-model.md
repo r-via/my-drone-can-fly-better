@@ -67,8 +67,8 @@ interface FlightData {
   gyroUnfilt: F32x3 | null;        // deg/s, present only if logged
   setpoint: F32x3;                 // deg/s
   throttle: Float32Array;          // rcCommand[3], microseconds
-  motor: F32x4;                    // raw
-  erpm: F32x4 | null;              // raw, hundreds of eRPM
+  motor: Float32Array[];           // raw, one channel per motor (4 to 8, X8 = 8)
+  erpm: Float32Array[] | null;     // raw, hundreds of eRPM, same indices as motor
   vbat: Float32Array | null;       // volts
   amperage: Float32Array | null;   // amps
   baroAlt: Float32Array | null;    // metres

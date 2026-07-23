@@ -251,11 +251,12 @@ export function analyzeMotors(fd: FlightData): MotorMetrics {
   const satThreshold = fd.meta.motorOutputHigh - SATURATION_MARGIN;
 
   const hi = fd.meta.motorOutputHigh;
+  const nMotors = fd.motor.length;
   const perMotorAvgPct: number[] = [];
   let sumAll = 0;
   let countAll = 0;
   let satCount = 0;
-  for (let m = 0; m < 4; m++) {
+  for (let m = 0; m < nMotors; m++) {
     const arr = fd.motor[m];
     let sum = 0;
     let count = 0;
@@ -270,10 +271,11 @@ export function analyzeMotors(fd: FlightData): MotorMetrics {
     perMotorAvgPct.push(count > 0 ? pct(sum / count) : 0);
   }
 
-  const desyncZeros: [number, number, number, number] = [0, 0, 0, 0];
+  // Une entrée par moteur même sans eRPM : les indices doivent rester alignés sur fd.motor.
+  const desyncZeros: number[] = new Array<number>(nMotors).fill(0);
   const erpmAvailable = fd.erpm !== null;
   if (fd.erpm) {
-    for (let m = 0; m < 4; m++) {
+    for (let m = 0; m < Math.min(nMotors, fd.erpm.length); m++) {
       const arr = fd.erpm[m];
       let zeros = 0;
       for (let i = 0; i < arr.length; i++) {
@@ -286,7 +288,7 @@ export function analyzeMotors(fd: FlightData): MotorMetrics {
 
   return {
     avgPct: countAll > 0 ? pct(sumAll / countAll) : 0,
-    perMotorAvgPct: perMotorAvgPct as [number, number, number, number],
+    perMotorAvgPct,
     imbalancePctPts: Math.max(...perMotorAvgPct) - Math.min(...perMotorAvgPct),
     saturationPct: countAll > 0 ? (100 * satCount) / countAll : 0,
     desyncZeros,
@@ -355,8 +357,8 @@ export function analyzeTracking(fd: FlightData): TrackingMetrics {
 interface SliceAcc {
   count: number;
   stickSum: number;
-  colSum: number; // poussée collective brute (moyenne des 4 moteurs)
-  colCount: number; // frames dont les 4 moteurs sont valides
+  colSum: number; // poussée collective brute (moyenne de tous les moteurs)
+  colCount: number; // frames dont tous les moteurs sont valides
   vbSum: number;
   vbCount: number;
 }
@@ -364,6 +366,7 @@ interface SliceAcc {
 export function analyzeTimeline(fd: FlightData): TimelineMetrics {
   const pct = motorPctFn(fd);
   const hi = fd.meta.motorOutputHigh;
+  const nMotors = fd.motor.length;
   const buckets = new Map<number, SliceAcc>();
   const n = fd.time.length;
   for (let i = 0; i < n; i++) {
@@ -375,17 +378,18 @@ export function analyzeTimeline(fd: FlightData): TimelineMetrics {
     }
     b.count++;
     b.stickSum += fd.throttle[i];
-    const m0 = fd.motor[0][i];
-    const m1 = fd.motor[1][i];
-    const m2 = fd.motor[2][i];
-    const m3 = fd.motor[3][i];
-    if (
-      isMotorSampleValid(m0, hi) &&
-      isMotorSampleValid(m1, hi) &&
-      isMotorSampleValid(m2, hi) &&
-      isMotorSampleValid(m3, hi)
-    ) {
-      b.colSum += (m0 + m1 + m2 + m3) / 4;
+    let colSum = 0;
+    let allValid = true;
+    for (let m = 0; m < nMotors; m++) {
+      const v = fd.motor[m][i];
+      if (!isMotorSampleValid(v, hi)) {
+        allValid = false;
+        break;
+      }
+      colSum += v;
+    }
+    if (allValid) {
+      b.colSum += colSum / nMotors;
       b.colCount++;
     }
     if (fd.vbat && fd.vbat[i] > 0) {

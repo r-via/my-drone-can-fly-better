@@ -134,8 +134,11 @@ export const rules = {
     title: 'Déséquilibre entre moteurs',
     detail: (motorHigh: string, motorLow: string) =>
       `${motorHigh} travaille nettement plus que ${motorLow} pour tenir le quad à plat : centre de gravité décalé (pack, caméra), hélice voilée ou moteur fatigué de ce côté.`,
+    /** Legacy 4 moteurs : ne sert plus qu'à rejouer les liens partagés émis avant le passage à N moteurs (arguments positionnels capturés). Les nouveaux rapports passent par evidenceN. */
     evidence: (m1: string, m2: string, m3: string, m4: string, spread: string, warn: number) =>
       `Moyennes moteur : M1 ${m1} / M2 ${m2} / M3 ${m3} / M4 ${m4} % - écart ${spread} pts (seuil ${warn})`,
+    evidenceN: (motors: string, spread: string, warn: number) =>
+      `Moyennes moteur : ${motors} % - écart ${spread} pts (seuil ${warn})`,
     fix: (motorHigh: string) =>
       `Recentre le pack sur le châssis et inspecte l'hélice/le moteur ${motorHigh}.`,
   },
@@ -196,7 +199,7 @@ export const rules = {
     causeUnknown:
       "La config du log ne permet pas de dire si c'est la télémétrie DSHOT ou son enregistrement qui manque.",
     evidence: (bidir: string) =>
-      `aucun champ eRPM[0..3] dans les trames - dshot_bidir = ${bidir}`,
+      `aucun champ eRPM par moteur dans les trames - dshot_bidir = ${bidir}`,
     fixFieldDisabled:
       "Réactive l'enregistrement de l'eRPM pour retrouver la ligne moteurs et l'attribution des pics sur les prochains logs.",
     fixNoBidir:
@@ -385,7 +388,7 @@ export const rules = {
     akira: {
       label: 'RRFPV RR Akira 9" X8 (6S)',
       notes: [
-        'X8 coaxial : 8 moteurs, seuls M1-M4 entrent dans les analyses moteurs pour le moment.',
+        'X8 coaxial : les 8 moteurs entrent dans les analyses (moyennes, déséquilibre, saturation, oscillations).',
         'Seuils de départ non calibrés terrain : bruit brut surveillé tôt (bras longs de 9") et montée tolérée plus lente.',
       ],
     },

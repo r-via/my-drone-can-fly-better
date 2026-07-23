@@ -118,7 +118,7 @@ Python's `max()`.
 
 **Peaks**: top 5 per axis via `topPeaks(spec, { fMin: 15, k: 5 })`.
 
-**Motor fundamental**: median of the non zero eRPM samples of all four motors,
+**Motor fundamental**: median of the non zero eRPM samples of all motors,
 converted with the profile's pole count. Zero samples are excluded because a
 grounded ESC reports zero and would drag the median down.
 
@@ -132,7 +132,7 @@ dominantPeak = { freqHz, axis, nearestMotor, distanceHz }
 
 Motors with a median of 0, no eRPM telemetry, are excluded from the search,
 otherwise they would capture every low frequency peak and produce a fake
-imbalance diagnosis. In a hover the four motors run at visibly different speeds,
+imbalance diagnosis. In a hover the motors run at visibly different speeds,
 which is what makes attribution possible at all. The rule fires when
 `distanceHz < 30`.
 

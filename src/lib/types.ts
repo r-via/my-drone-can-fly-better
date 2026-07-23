@@ -27,6 +27,7 @@ export interface SessionMeta {
 }
 
 export type F32x3 = [Float32Array, Float32Array, Float32Array];
+/** Encore utilisé par des fixtures de tests ; le contrat runtime (motor/erpm) est passé à Float32Array[]. */
 export type F32x4 = [Float32Array, Float32Array, Float32Array, Float32Array];
 
 export interface FlightData {
@@ -36,8 +37,10 @@ export interface FlightData {
   gyroUnfilt: F32x3 | null; // deg/s
   setpoint: F32x3; // deg/s
   throttle: Float32Array; // rcCommand[3], ~1000..2000
-  motor: F32x4; // brut (voir meta.motorOutputLow/High)
-  erpm: F32x4 | null; // brut : centaines d'eRPM (hz méca = v*100/(poles/2)/60)
+  /** Un canal par moteur, 4 à 8 selon le mixer (X8 = 8). Brut, voir meta.motorOutputLow/High. */
+  motor: Float32Array[];
+  /** Mêmes indices que motor. Brut : centaines d'eRPM (hz méca = v*100/(poles/2)/60). */
+  erpm: Float32Array[] | null;
   vbat: Float32Array | null; // volts
   amperage: Float32Array | null; // ampères
   baroAlt: Float32Array | null; // mètres
@@ -110,12 +113,13 @@ export interface PowerMetrics {
 }
 
 export interface MotorMetrics {
-  avgPct: number; // moyenne des 4 moteurs en % de la plage
-  perMotorAvgPct: [number, number, number, number];
+  avgPct: number; // moyenne de tous les moteurs en % de la plage
+  /** Une entrée par moteur du log (4 à 8, même longueur que FlightData.motor). */
+  perMotorAvgPct: number[];
   /** Écart max entre moteurs en points de % (déséquilibre mécanique/CG). */
   imbalancePctPts: number;
   saturationPct: number; // % d'échantillons moteur >= high-8
-  desyncZeros: [number, number, number, number]; // eRPM==0 en vol par moteur
+  desyncZeros: number[]; // eRPM==0 en vol, par moteur (mêmes indices que motor)
   erpmAvailable: boolean;
 }
 

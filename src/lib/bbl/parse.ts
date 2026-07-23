@@ -14,7 +14,7 @@ import { Parser } from 'blackbox-log/slim';
 import { fr } from '../i18n/fr';
 
 import type { Dict } from '../i18n/fr';
-import type { F32x3, F32x4, FlightData, ParsedFile, SessionMeta, SkippedSession } from '../types';
+import type { F32x3, FlightData, ParsedFile, SessionMeta, SkippedSession } from '../types';
 
 const MAGIC = 'H Product:Blackbox flight data recorder';
 
@@ -418,10 +418,16 @@ async function parseSession(
     has(`${base}[0]`) && has(`${base}[1]`) && has(`${base}[2]`)
       ? [toF32(rows, col[`${base}[0]`]), toF32(rows, col[`${base}[1]`]), toF32(rows, col[`${base}[2]`])]
       : null;
-  const quad = (base: string): F32x4 | null =>
-    has(`${base}[0]`) && has(`${base}[3]`)
-      ? [toF32(rows, col[`${base}[0]`]), toF32(rows, col[`${base}[1]`]), toF32(rows, col[`${base}[2]`]), toF32(rows, col[`${base}[3]`])]
-      : null;
+  // Un canal par moteur, dans l'ordre du mixer : 4 pour un quad, 8 pour un X8.
+  // Minimum 4 canaux consécutifs, sinon null (bicoptères/tricoptères hors périmètre).
+  const MAX_MOTORS = 8;
+  const bank = (base: string): Float32Array[] | null => {
+    const out: Float32Array[] = [];
+    for (let m = 0; m < MAX_MOTORS && has(`${base}[${m}]`); m++) {
+      out.push(toF32(rows, col[`${base}[${m}]`]));
+    }
+    return out.length >= 4 ? out : null;
+  };
   const scaled = (name: string, k: number): Float32Array | null => {
     if (!has(name)) return null;
     const a = toF32(rows, col[name]);
@@ -431,7 +437,7 @@ async function parseSession(
 
   const gyro = triple('gyroADC');
   const setpoint = triple(N.setpoint);
-  const motor = quad('motor');
+  const motor = bank('motor');
   if (!gyro || !setpoint || !motor || !has('rcCommand[3]')) {
     throw new Error(dict.system.essentialFieldsMissing);
   }
@@ -444,7 +450,7 @@ async function parseSession(
     setpoint,
     throttle: toF32(rows, col['rcCommand[3]']),
     motor,
-    erpm: quad('eRPM'),
+    erpm: bank('eRPM'),
     vbat: scaled(N.vbat, 0.01),
     amperage: scaled(N.amperage, 0.01),
     baroAlt: scaled(N.baroAlt, 0.01),

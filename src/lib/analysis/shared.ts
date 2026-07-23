@@ -12,7 +12,7 @@ export function sampleRate(fd: FlightData): number {
 }
 
 /**
- * Frame moteur saine : les 4 valeurs brutes dans [0, motorOutputHigh + margin].
+ * Frame moteur saine : toutes les valeurs brutes dans [0, motorOutputHigh + margin].
  * Le parseur WASM laisse passer quelques frames corrompues (valeurs 2^32…)
  * que orangebox droppait - on les exclut, sinon std(poussée) explose.
  * `margin` élargit la borne haute quand un léger dépassement est du vrai
@@ -20,8 +20,9 @@ export function sampleRate(fd: FlightData): number {
  */
 export function motorsValidFn(fd: FlightData, margin = 0): (i: number) => boolean {
   const hi = (fd.meta.motorOutputHigh > 0 ? fd.meta.motorOutputHigh : 2047) + margin;
+  const nMotors = fd.motor.length;
   return (i: number) => {
-    for (let m = 0; m < 4; m++) {
+    for (let m = 0; m < nMotors; m++) {
       const v = fd.motor[m][i];
       if (!(v >= 0 && v <= hi)) return false;
     }

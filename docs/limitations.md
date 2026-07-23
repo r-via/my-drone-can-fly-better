@@ -22,12 +22,6 @@ info finding says so. INAV has no per motor eRPM in main frames either: desync
 detection and motor fundamental tracking stay off. Old INAV (before 5.0) is
 rejected as too old, like Betaflight before 4.2.
 
-**X8 craft: only motors 1-4 are analysed.**
-`FlightData.motor` carries four motors. An X8 like the RR Akira logs
-`motor[0..7]`, so saturation, imbalance and the timeline only see the first
-four (the top plate on INAV's coax layout). A real problem on motors 5-8 stays
-invisible until the contract grows to eight motors.
-
 **INAV throttle is floored at minthrottle.**
 INAV logs `rcCommand[3]` clamped to `minthrottle` (1100 by default), and the
 analysis thresholds are absolute microseconds (`FLIGHT_THROTTLE_US = 1100`).

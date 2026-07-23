@@ -185,7 +185,7 @@ export function evaluateSession(
   // --- motor-noise-peak : pic dominant à la fondamentale d'un moteur --------
   const dp = analysis.spectrum?.dominantPeak;
   if (dp && dp.distanceHz < 30) {
-    // nearestMotor est un index 0-based → affichage M1..M4
+    // nearestMotor est un index 0-based → affichage M1..M8
     const motorLabel = `M${dp.nearestMotor + 1}`;
     let rpmNote = '';
     if (!analysis.motors.erpmAvailable) {
@@ -436,7 +436,7 @@ export function evaluateSession(
     const per = analysis.motors.perMotorAvgPct;
     let hi = 0;
     let lo = 0;
-    for (let i = 1; i < 4; i++) {
+    for (let i = 1; i < per.length; i++) {
       if (per[i] > per[hi]) hi = i;
       if (per[i] < per[lo]) lo = i;
     }
@@ -446,11 +446,10 @@ export function evaluateSession(
       category: 'moteurs',
       title: r.motorsImbalance.title,
       detail: r.motorsImbalance.detail(`M${hi + 1}`, `M${lo + 1}`),
-      evidence: r.motorsImbalance.evidence(
-        f0(per[0]),
-        f0(per[1]),
-        f0(per[2]),
-        f0(per[3]),
+      // evidenceN et pas evidence : l'ancienne signature 4-aire reste dans les
+      // dictionnaires uniquement pour rejouer les liens partagés déjà émis.
+      evidence: r.motorsImbalance.evidenceN(
+        per.map((v, i) => `M${i + 1} ${f0(v)}`).join(' / '),
         f1(analysis.motors.imbalancePctPts),
         t.imbalanceWarn,
       ),

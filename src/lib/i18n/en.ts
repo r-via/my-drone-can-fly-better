@@ -137,6 +137,8 @@ export const en: Dict = {
         `${motorHigh} works noticeably harder than ${motorLow} to keep the quad level: off-center weight (pack, camera), bent prop, or a tired motor on that side.`,
       evidence: (m1: string, m2: string, m3: string, m4: string, spread: string, warn: number) =>
         `Motor averages: M1 ${m1} / M2 ${m2} / M3 ${m3} / M4 ${m4}% - spread ${spread} pts (threshold ${warn})`,
+      evidenceN: (motors: string, spread: string, warn: number) =>
+        `Motor averages: ${motors}% - spread ${spread} pts (threshold ${warn})`,
       fix: (motorHigh: string) =>
         `Recenter the pack on the frame and inspect the prop/motor on ${motorHigh}.`,
     },
@@ -196,7 +198,7 @@ export const en: Dict = {
         'dshot_bidir = 0: the board receives no RPM feedback from the ESCs, in flight or in the log.',
       causeUnknown:
         'The log config cannot tell whether DSHOT telemetry or its recording is missing.',
-      evidence: (bidir: string) => `no eRPM[0..3] field in the frames - dshot_bidir = ${bidir}`,
+      evidence: (bidir: string) => `no per-motor eRPM field in the frames - dshot_bidir = ${bidir}`,
       fixFieldDisabled:
         'Re-enable eRPM logging to get the motor line and peak attribution back on your next logs.',
       fixNoBidir:
@@ -383,7 +385,7 @@ export const en: Dict = {
       akira: {
         label: 'RRFPV RR Akira 9" X8 (6S)',
         notes: [
-          'Coaxial X8: 8 motors, only M1-M4 feed the motor analyses for now.',
+          'Coaxial X8: all 8 motors feed the analyses (averages, imbalance, saturation, oscillations).',
           'Starting thresholds, not field-calibrated yet: raw noise watched early (long 9" arms) and a slower rise tolerated.',
         ],
       },

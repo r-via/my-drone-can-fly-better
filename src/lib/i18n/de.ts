@@ -134,6 +134,8 @@ export const de: Dict = {
         `${motorHigh} arbeitet deutlich härter als ${motorLow}, um den Quad gerade zu halten: verschobener Schwerpunkt (Pack, Kamera), verbogener Prop oder müder Motor auf dieser Seite.`,
       evidence: (m1: string, m2: string, m3: string, m4: string, spread: string, warn: number) =>
         `Motor-Mittelwerte: M1 ${m1} / M2 ${m2} / M3 ${m3} / M4 ${m4} % - Abstand ${spread} Pkt (Schwelle ${warn})`,
+      evidenceN: (motors: string, spread: string, warn: number) =>
+        `Motor-Mittelwerte: ${motors} % - Abstand ${spread} Pkt (Schwelle ${warn})`,
       fix: (motorHigh: string) =>
         `Zentriere den Pack auf dem Frame und inspiziere Prop/Motor ${motorHigh}.`,
     },
@@ -193,7 +195,7 @@ export const de: Dict = {
         'dshot_bidir = 0: die Karte erhält keinerlei Drehzahl-Rückmeldung von den ESCs, weder im Flug noch im Log.',
       causeUnknown:
         'Die Log-Konfiguration verrät nicht, ob die DSHOT-Telemetrie oder nur ihre Aufzeichnung fehlt.',
-      evidence: (bidir: string) => `kein eRPM[0..3]-Feld in den Frames - dshot_bidir = ${bidir}`,
+      evidence: (bidir: string) => `kein eRPM-Feld pro Motor in den Frames - dshot_bidir = ${bidir}`,
       fixFieldDisabled:
         'Aktiviere das eRPM-Logging wieder, um bei den nächsten Logs die Motorlinie und die Peak-Zuordnung zurückzubekommen.',
       fixNoBidir:
@@ -380,7 +382,7 @@ export const de: Dict = {
       akira: {
         label: 'RRFPV RR Akira 9" X8 (6S)',
         notes: [
-          'Koaxiales X8: 8 Motoren, vorerst gehen nur M1-M4 in die Motoranalysen ein.',
+          'Koaxiales X8: alle 8 Motoren gehen in die Analysen ein (Mittelwerte, Ungleichgewicht, Saettigung, Oszillationen).',
           'Startschwellen, noch nicht im Feld kalibriert: Rohrauschen früh überwacht (lange 9"-Arme), langsamerer Anstieg toleriert.',
         ],
       },
