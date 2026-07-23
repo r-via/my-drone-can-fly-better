@@ -571,6 +571,11 @@ export const en: Dict = {
       listAria: 'Sessions in this file',
     },
 
+    notFound: {
+      text: 'This page does not exist.',
+      cta: 'Back to the analyzer',
+    },
+
     // ReportView.
     report: {
       title: 'Flight report',

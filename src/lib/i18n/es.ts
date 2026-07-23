@@ -561,6 +561,11 @@ export const es: Dict = {
       listAria: 'Sesiones del archivo',
     },
 
+    notFound: {
+      text: 'Esta página no existe.',
+      cta: 'Volver al análisis',
+    },
+
     report: {
       title: 'Informe de vuelo',
       newAnalysis: 'Nuevo análisis',

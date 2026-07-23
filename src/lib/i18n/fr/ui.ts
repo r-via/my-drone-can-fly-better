@@ -124,6 +124,12 @@ export const ui = {
     listAria: 'Sessions du fichier',
   },
 
+  // Page 404 (sert aussi de filet aux liens /s hors Netlify).
+  notFound: {
+    text: "Cette page n'existe pas.",
+    cta: "Retour à l'analyse",
+  },
+
   // ReportView.
   report: {
     title: 'Rapport de vol',

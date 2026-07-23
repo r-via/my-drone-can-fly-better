@@ -575,6 +575,11 @@ export const zh: Dict = {
       listAria: '文件中的会话',
     },
 
+    notFound: {
+      text: '这个页面不存在。',
+      cta: '返回分析页',
+    },
+
     // ReportView。
     report: {
       title: '飞行报告',
