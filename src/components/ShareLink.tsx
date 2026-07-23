@@ -34,7 +34,6 @@ export default function ShareLink({ sessionReport, fileName }: ShareLinkProps) {
 
   const [status, setStatus] = useState<Status>('idle');
   const [link, setLink] = useState('');
-  const [trimmed, setTrimmed] = useState(false);
   const [overBudget, setOverBudget] = useState(false);
   const [copied, setCopied] = useState(false);
   /** Copie refusée : le panneau montre alors le lien, sélectionnable à la main. */
@@ -83,9 +82,11 @@ export default function ShareLink({ sessionReport, fileName }: ShareLinkProps) {
         d: `${dict.ui.verdict[worst]} · ${axisSummary}`,
       });
 
+      // res.trimmed n'est pas montré ici : le destinataire voit déjà la note
+      // « les courbes ne tenaient pas dans le lien » sur le rapport reçu, et
+      // côté envoi ce détail technique n'aide pas au geste de partage.
       const url = `${window.location.origin}/s?${og.toString()}#r=${res.encoded}`;
       setLink(url);
-      setTrimmed(res.trimmed);
       setOverBudget(res.overBudget || url.length > DEFAULT_MAX_CHARS + 300);
       setStatus('ready');
       return url;
@@ -99,20 +100,8 @@ export default function ShareLink({ sessionReport, fileName }: ShareLinkProps) {
     const url = link || (await build());
     if (!url) return;
 
-    // Écran tactile avec Web Share : la feuille de partage du système (Discord,
-    // Messages, …). Au clavier/souris, la copie reste le geste attendu.
-    const coarse = window.matchMedia('(pointer: coarse)').matches;
-    if (coarse && typeof navigator.share === 'function') {
-      try {
-        await navigator.share({ url });
-        return;
-      } catch (e) {
-        // Feuille fermée par l'utilisateur : ne rien faire de plus.
-        if (e instanceof DOMException && e.name === 'AbortError') return;
-        // Autre échec : on retombe sur la copie.
-      }
-    }
-
+    // Un seul geste : copier le lien. Pas de feuille de partage système, le
+    // pilote colle où il veut (Discord en tête).
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -126,7 +115,7 @@ export default function ShareLink({ sessionReport, fileName }: ShareLinkProps) {
   };
 
   const showPanel =
-    (status === 'ready' && (trimmed || overBudget || copyFailed)) || status === 'error';
+    (status === 'ready' && (overBudget || copyFailed)) || status === 'error';
 
   return (
     <div className="relative">
@@ -163,11 +152,9 @@ export default function ShareLink({ sessionReport, fileName }: ShareLinkProps) {
                   className="mb-1.5 w-full rounded-lg border border-line bg-bg/60 px-2 py-1.5 font-mono text-[11px] text-ink-2"
                 />
               ) : null}
-              {trimmed ? <p className="text-xs leading-relaxed text-ink-2">{t.trimmed}</p> : null}
               {overBudget ? (
-                <p className="mt-1.5 text-xs font-semibold text-warn">{t.overBudget}</p>
+                <p className="text-xs font-semibold text-warn">{t.overBudget}</p>
               ) : null}
-              <p className="mt-1.5 font-mono text-[11px] text-ink-3">{t.charCount(link.length)}</p>
             </>
           )}
         </div>

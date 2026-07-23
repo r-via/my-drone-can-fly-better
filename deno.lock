@@ -11,6 +11,7 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
+        "npm:@netlify/blobs@^10.7.9",
         "npm:@tailwindcss/postcss@^4.1.0",
         "npm:@types/node@24",
         "npm:@types/react-dom@19",
