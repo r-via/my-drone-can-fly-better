@@ -788,9 +788,11 @@ export const es: Dict = {
 
     // Switch de opt-in: comparte el .bbl bruto con el dev (final de ReportView).
     shareLog: {
-      title: 'Ayudar a mejorar la herramienta',
+      title: 'Ayudar a mejorar la herramienta y venir a hablar de ello en Discord',
       description:
         'Envía el/los log(s) .bbl bruto(s) de este análisis a Rémi (el dev del sitio): el archivo se deposita en el almacenamiento privado del sitio y se publica un enlace de descarga en un canal privado. Sirve para detectar casos reales que las reglas no pillan. No se envía nada hasta que pulses el botón.',
+      messageLabel: 'Un mensaje para Rémi (opcional)',
+      messagePlaceholder: 'Tu usuario de Discord y algo de contexto, para que sepa de quién es el log',
       buttonLabel: (count: number): string =>
         count > 1 ? `Compartir los ${count} logs` : 'Compartir este log',
       sending: 'Enviando…',

@@ -799,9 +799,11 @@ export const en: Dict = {
 
     // Opt-in switch: share the raw .bbl with the dev (bottom of ReportView).
     shareLog: {
-      title: 'Help improve the tool',
+      title: 'Help improve the tool and come on Discord to talk about it',
       description:
         "Sends the raw .bbl log(s) from this analysis to Rémi (the site's dev): the file goes to the site's private storage and a download link is posted on a private channel. Helps catch real-world cases the rules miss. Nothing is sent unless you click the button.",
+      messageLabel: 'A note for Rémi (optional)',
+      messagePlaceholder: 'Your Discord handle and a bit of context, so he knows whose log this is',
       buttonLabel: (count: number): string =>
         count > 1 ? `Share the ${count} logs` : 'Share this log',
       sending: 'Sending…',

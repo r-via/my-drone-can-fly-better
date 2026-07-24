@@ -792,9 +792,11 @@ export const zh: Dict = {
 
     // 分享开关（opt-in）：把原始 .bbl 发给开发者（ReportView 底部）。
     shareLog: {
-      title: '帮忙改进这个工具',
+      title: '帮忙改进这个工具，来 Discord 一起聊聊',
       description:
         '把这次分析用到的原始 .bbl 日志发给 Rémi（本站开发者）：文件存入本站的私有存储，并在私密频道发布下载链接。这能帮他发现规则漏掉的真实案例。点击按钮之前不会发送任何内容。',
+      messageLabel: '给 Rémi 留言（可选）',
+      messagePlaceholder: '你的 Discord 用户名和一点背景说明，好让他知道这份日志是谁的',
       buttonLabel: (count: number): string => (count > 1 ? `分享这 ${count} 个日志` : '分享这个日志'),
       sending: '发送中…',
       sendingPart: (done: number, total: number): string => `发送中 ${done}/${total}…`,

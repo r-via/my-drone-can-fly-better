@@ -225,9 +225,11 @@ export const ui = {
 
   // Bouton d'opt-in : partage du .bbl brut avec le dev (bas de ReportView).
   shareLog: {
-    title: "Aider à améliorer l'outil",
+    title: "Aider à améliorer l'outil et venir en discuter sur Discord",
     description:
       "Envoie le(s) log(s) .bbl brut(s) de cette analyse à Rémi (dev du site) : le fichier est déposé sur le stockage privé du site et un lien de téléchargement est posté sur un salon privé. Ça sert à repérer des cas réels que les règles ratent. Rien n'est envoyé tant que tu n'as pas cliqué sur le bouton.",
+    messageLabel: 'Un mot pour Rémi (optionnel)',
+    messagePlaceholder: "Ton pseudo Discord et un peu de contexte, pour qu'il sache de qui vient le log",
     buttonLabel: (count: number): string =>
       count > 1 ? `Partager les ${count} logs` : 'Partager ce log',
     sending: 'Envoi en cours…',

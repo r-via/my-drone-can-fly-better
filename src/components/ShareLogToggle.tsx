@@ -40,6 +40,7 @@ export default function ShareLogToggle({ files, craftNames }: ShareLogToggleProp
   const t = dict.ui.shareLog;
   const [status, setStatus] = useState<Status>('idle');
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [message, setMessage] = useState('');
 
   if (files.length === 0) return null;
 
@@ -63,6 +64,10 @@ export default function ShareLogToggle({ files, craftNames }: ShareLogToggleProp
           craft: craftNames.join(', '),
           locale,
         });
+        // Message facultatif : joint au premier envoi seulement, pour ne pas
+        // répéter la même note sur chaque fichier d'un lot.
+        const note = message.trim();
+        if (note && i === 0) qs.set('note', note);
         const res = await fetch(`/api/submit-log?${qs.toString()}`, {
           method: 'POST',
           body: blob,
@@ -97,6 +102,18 @@ export default function ShareLogToggle({ files, craftNames }: ShareLogToggleProp
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold text-ink">{t.title}</p>
         <p className="mt-1 text-xs leading-relaxed text-ink-2">{t.description}</p>
+        <label className="mt-3 block">
+          <span className="text-xs font-semibold text-ink-2">{t.messageLabel}</span>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            disabled={busy || sent}
+            maxLength={280}
+            rows={2}
+            placeholder={t.messagePlaceholder}
+            className="mt-1 w-full resize-y rounded-lg border border-line bg-bg/60 px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-3 focus:border-line-strong focus:outline-none disabled:opacity-60"
+          />
+        </label>
         <button
           type="button"
           disabled={busy || sent || status === 'too-large'}
