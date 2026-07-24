@@ -30,6 +30,40 @@ export type F32x3 = [Float32Array, Float32Array, Float32Array];
 /** Encore utilisé par des fixtures de tests ; le contrat runtime (motor/erpm) est passé à Float32Array[]. */
 export type F32x4 = [Float32Array, Float32Array, Float32Array, Float32Array];
 
+/**
+ * Sondes de température. Côté INAV (frames lentes) : esc = télémétrie ESC
+ * agrégée pour tous les ESCs, imu/baro = capteurs de la carte, sens0-7 = les
+ * 8 slots de capteurs externes (DS18B20/LM75). Côté Betaflight : esc0-7 =
+ * température PAR ESC via debug_mode = ESC_SENSOR_TMP (champs debug[] des
+ * frames principales). Les deux familles ne se mélangent jamais dans une
+ * même session.
+ */
+export type TempProbeId =
+  | 'esc'
+  | 'imu'
+  | 'baro'
+  | 'sens0'
+  | 'sens1'
+  | 'sens2'
+  | 'sens3'
+  | 'sens4'
+  | 'sens5'
+  | 'sens6'
+  | 'sens7'
+  | 'esc0'
+  | 'esc1'
+  | 'esc2'
+  | 'esc3'
+  | 'esc4'
+  | 'esc5'
+  | 'esc6'
+  | 'esc7';
+
+export interface TempProbeSeries {
+  id: TempProbeId;
+  celsius: Float32Array; // même longueur que temps.time
+}
+
 export interface FlightData {
   meta: SessionMeta;
   time: Float64Array; // secondes, démarre à ~0
@@ -48,6 +82,11 @@ export interface FlightData {
    *  conversion poles ici. INAV uniquement - toujours null sur Betaflight,
    *  jamais fusionné avec erpm (granularités incomparables). */
   escRpm: { time: Float64Array; rpm: Float32Array } | null;
+  /** Températures des frames lentes INAV, en °C, ancrées comme escRpm.
+   *  Seules les sondes VIVANTES sont présentes : un champ à la sentinelle
+   *  -125 °C (capteur absent) ou sans un seul échantillon plausible est
+   *  écarté au parsing. INAV uniquement - null sur Betaflight. */
+  temps: { time: Float64Array; probes: TempProbeSeries[] } | null;
   vbat: Float32Array | null; // volts
   amperage: Float32Array | null; // ampères
   baroAlt: Float32Array | null; // mètres
@@ -190,6 +229,22 @@ export interface ControlLossMetrics {
   applicable: boolean; // assez d'échantillons en vol
   events: ControlLossEvent[]; // triés par excès décroissant
   worst: ControlLossEvent | null;
+}
+
+/** Courbe d'une sonde, décimée pour le tracé (moyenne par panier de temps). */
+export interface TempProbeCurve {
+  id: TempProbeId;
+  minC: number;
+  maxC: number;
+  firstC: number;
+  lastC: number;
+  t: Float32Array; // secondes
+  c: Float32Array; // °C, même longueur que t
+}
+
+/** Températures de la session (INAV) : null si aucune sonde vivante. */
+export interface TemperatureMetrics {
+  probes: TempProbeCurve[]; // dans l'ordre fixe esc, imu, baro, sens0..7
 }
 
 export interface AxisNoise {
@@ -406,6 +461,7 @@ export interface SessionAnalysis {
   propwash: PropwashMetrics | null;
   oscillation: OscillationMetrics | null;
   controlLoss: ControlLossMetrics | null;
+  temperature: TemperatureMetrics | null;
   filters: FilterMetrics;
   timeline: TimelineMetrics;
   gps: GpsMetrics;

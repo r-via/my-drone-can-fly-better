@@ -63,6 +63,18 @@
   --chart-band-resonance: rgba(248, 113, 113, 0.1);
   --chart-band-motors: rgba(56, 189, 248, 0.08);
   --chart-band-overshoot: rgba(248, 113, 113, 0.07);
+
+  /* Sondes de température - palette validée CVD sur la surface sombre
+     (esc/imu réutilisent --chart-motor/--chart-roll dans le composant) */
+  --chart-temp-baro: #d97706;
+  --chart-temp-sens0: #16a34a;
+  --chart-temp-sens1: #2563eb;
+  --chart-temp-sens2: #db2777;
+  --chart-temp-sens3: #ca8a04;
+  --chart-temp-sens4: #7c3aed;
+  --chart-temp-sens5: #0d9488;
+  --chart-temp-sens6: #ea580c;
+  --chart-temp-sens7: #c026d3;
 }
 
 @media (prefers-color-scheme: light) {
@@ -114,6 +126,17 @@
     --chart-band-resonance: rgba(185, 28, 28, 0.08);
     --chart-band-motors: rgba(3, 105, 161, 0.07);
     --chart-band-overshoot: rgba(185, 28, 28, 0.06);
+
+    /* Sondes de température - palette validée CVD sur surface blanche */
+    --chart-temp-baro: #b45309;
+    --chart-temp-sens0: #15803d;
+    --chart-temp-sens1: #1d4ed8;
+    --chart-temp-sens2: #be185d;
+    --chart-temp-sens3: #a16207;
+    --chart-temp-sens4: #6d28d9;
+    --chart-temp-sens5: #0d9488;
+    --chart-temp-sens6: #c2410c;
+    --chart-temp-sens7: #86198f;
   }
 }
 

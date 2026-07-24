@@ -563,6 +563,7 @@ export const es: Dict = {
     cliCurrentUnreliable: 'corriente: sensor no fiable, valor descartado',
     cliGpsSummary: (median: string, min: string, hdop: string | null) =>
       `GPS ${median} sats (mín ${min}${hdop !== null ? `, HDOP ${hdop}` : ''})`,
+    cliTemps: (probes: string) => `Temperaturas ${probes} °C`,
     headersUnreadable: 'Headers ilegibles (¿sesión corrupta?)',
     dataVersionUnsupported: 'Versión de datos desconocida para el decodificador (¿fragmento de log corrupto?)',
     decoderRejected: (raw: string) => `Imposible decodificar: ${raw}`,
@@ -904,6 +905,17 @@ export const es: Dict = {
         noData: 'No hay suficiente excitación de stick para estimar la respuesta.',
       noDataWhy: 'En estacionario la consigna se queda plana: el bucle PID no recibe ninguna orden que medir.',
       noDataHint: 'Haz una pasada con golpes de stick francos (roll y luego pitch, una decena por eje) y la curva se rellenará.',
+      },
+      temperature: {
+        title: 'Temperaturas (°C)',
+        ariaLabel: 'Curvas de temperatura de las sondas del log, superpuestas, en °C',
+        xAxis: 'Tiempo (s)',
+        filterHint: 'Haz clic en una sonda de la leyenda para ocultar/mostrar su curva',
+        probeEsc: 'ESC (telemetría)',
+        probeImu: 'IMU',
+        probeBaro: 'Baro',
+        probeSens: (n: string): string => `Sonda ${n}`,
+        probeEscN: (n: string): string => `ESC ${n}`,
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>

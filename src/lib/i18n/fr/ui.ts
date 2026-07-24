@@ -347,6 +347,17 @@ export const ui = {
       noDataWhy: 'En stationnaire la consigne reste plate : la boucle PID ne reçoit aucun ordre à mesurer.',
       noDataHint: 'Refais une passe avec des coups de stick francs (roll puis pitch, une dizaine par axe) : la courbe se remplira.',
     },
+    temperature: {
+      title: 'Températures (°C)',
+      ariaLabel: 'Courbes de température des sondes du log, superposées, en °C',
+      xAxis: 'Temps (s)',
+      filterHint: 'Clique une sonde dans la légende pour masquer/afficher sa courbe',
+      probeEsc: 'ESC (télémétrie)',
+      probeImu: 'IMU',
+      probeBaro: 'Baro',
+      probeSens: (n: string): string => `Sonde ${n}`,
+      probeEscN: (n: string): string => `ESC ${n}`,
+    },
     timeline: {
       ariaLabel: (duration: string, segmentCount: string): string =>
         `Timeline du log : ${duration}, ${segmentCount} segments (au sol / gaz bas / en vol)`,

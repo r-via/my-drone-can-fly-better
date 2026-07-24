@@ -14,7 +14,15 @@ import { Parser } from 'blackbox-log/slim';
 import { fr } from '../i18n/fr';
 
 import type { Dict } from '../i18n/fr';
-import type { F32x3, FlightData, ParsedFile, SessionMeta, SkippedSession } from '../types';
+import type {
+  F32x3,
+  FlightData,
+  ParsedFile,
+  SessionMeta,
+  SkippedSession,
+  TempProbeId,
+  TempProbeSeries,
+} from '../types';
 
 const MAGIC = 'H Product:Blackbox flight data recorder';
 
@@ -342,6 +350,22 @@ async function parseSession(
   // l'eRPM par moteur du DShot bidirectionnel). Ancré comme les frames G.
   const escAnchor: number[] = [];
   const escRpmVals: number[] = [];
+  // Températures des mêmes frames S : escTemperature déjà en °C, les autres en
+  // dixièmes de °C. Les champs sont présents dans le header même sans capteur
+  // (sentinelle -125 °C sur les sensN) : le tri vivant/mort se fait après la
+  // boucle, ici on accumule tout ce qui est numérique.
+  const TEMP_FIELDS: Array<{ id: TempProbeId; field: string; scale: number }> = [
+    { id: 'esc', field: 'escTemperature', scale: 1 },
+    { id: 'imu', field: 'IMUTemperature', scale: 0.1 },
+    { id: 'baro', field: 'baroTemperature', scale: 0.1 },
+    ...Array.from({ length: 8 }, (_, k) => ({
+      id: `sens${k}` as TempProbeId,
+      field: `sens${k}Temp`,
+      scale: 0.1,
+    })),
+  ];
+  const tempAnchor: number[] = [];
+  const tempVals: number[][] = TEMP_FIELDS.map(() => []);
 
   const dp = h.getDataParser();
   for (const pe of dp) {
@@ -365,6 +389,22 @@ async function parseSession(
         if (Number.isFinite(rpm)) {
           escAnchor.push(rows.length - 1);
           escRpmVals.push(rpm);
+        }
+        // Une frame S ne porte pas forcément tous les champs : on n'ancre que
+        // les frames où AU MOINS une température est numérique, et chaque
+        // sonde reçoit NaN sinon pour garder les colonnes alignées.
+        let any = false;
+        const frameTemps = TEMP_FIELDS.map(({ field, scale }) => {
+          const v = Number(f.get(field));
+          if (Number.isFinite(v)) {
+            any = true;
+            return v * scale;
+          }
+          return NaN;
+        });
+        if (any) {
+          tempAnchor.push(rows.length - 1);
+          for (let k = 0; k < frameTemps.length; k++) tempVals[k].push(frameTemps[k]);
         }
       }
     }
@@ -454,6 +494,47 @@ async function parseSession(
     throw new Error(dict.system.essentialFieldsMissing);
   }
 
+  /** Température plausible : hors de [-50, 150] °C c'est une sentinelle ou un canal mort. */
+  const plausibleC = (v: number): boolean => Number.isFinite(v) && v > -50 && v < 150;
+  /**
+   * Sondes de température, deux sources exclusives : frames lentes INAV
+   * (accumulées ci-dessus), ou canaux debug Betaflight quand
+   * debug_mode = ESC_SENSOR_TMP (une température PAR ESC, en °C, dans les
+   * frames principales - décimées à ~10 Hz, une courbe de température n'a
+   * pas besoin du kHz). Les sondes sans un seul échantillon plausible sont
+   * écartées ici : l'aval ne connaît jamais la sentinelle -125 °C.
+   */
+  const buildTemps = (): FlightData['temps'] => {
+    if (tempAnchor.length > 0) {
+      const probes: TempProbeSeries[] = [];
+      TEMP_FIELDS.forEach(({ id }, k) => {
+        const vals = tempVals[k];
+        if (!vals.some(plausibleC)) return;
+        probes.push({ id, celsius: Float32Array.from(vals, (v) => (plausibleC(v) ? v : NaN)) });
+      });
+      if (probes.length === 0) return null;
+      return { time: Float64Array.from(tempAnchor, (a) => (a >= 0 ? time[a] : 0)), probes };
+    }
+    if (!isInav && /^ESC_SENSOR_TMP$/i.test(h.debugMode ?? '')) {
+      const stride = Math.max(1, Math.round(sampleRateHz / 10));
+      const idxs: number[] = [];
+      for (let i = 0; i < rows.length; i += stride) idxs.push(i);
+      const probes: TempProbeSeries[] = [];
+      for (let m = 0; m < 8 && has(`debug[${m}]`); m++) {
+        const c = col[`debug[${m}]`];
+        const vals = idxs.map((i) => rows[i][c]);
+        if (!vals.some(plausibleC)) continue;
+        probes.push({
+          id: `esc${m}` as TempProbeId,
+          celsius: Float32Array.from(vals, (v) => (plausibleC(v) ? v : NaN)),
+        });
+      }
+      if (probes.length === 0) return null;
+      return { time: Float64Array.from(idxs, (i) => time[i]), probes };
+    }
+    return null;
+  };
+
   return {
     meta,
     time,
@@ -472,6 +553,7 @@ async function parseSession(
             rpm: Float32Array.from(escRpmVals),
           }
         : null,
+    temps: buildTemps(),
     vbat: scaled(N.vbat, 0.01),
     amperage: scaled(N.amperage, 0.01),
     baroAlt: scaled(N.baroAlt, 0.01),

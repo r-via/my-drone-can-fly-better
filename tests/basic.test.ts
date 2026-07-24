@@ -342,6 +342,7 @@ function synth(over: Partial<FlightData> = {}, n = 8): FlightData {
     motor: [z(), z(), z(), z()] as F32x4,
     erpm: null,
     escRpm: null,
+    temps: null,
     vbat: null,
     amperage: null,
     baroAlt: null,

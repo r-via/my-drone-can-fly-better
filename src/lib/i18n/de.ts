@@ -563,6 +563,7 @@ export const de: Dict = {
     cliCurrentUnreliable: 'Strom: Sensor unzuverlässig, Wert verworfen',
     cliGpsSummary: (median: string, min: string, hdop: string | null) =>
       `GPS ${median} Sats (min ${min}${hdop !== null ? `, HDOP ${hdop}` : ''})`,
+    cliTemps: (probes: string) => `Temperaturen ${probes} °C`,
     headersUnreadable: 'Header unlesbar (Session beschädigt?)',
     dataVersionUnsupported: 'Datenversion dem Decoder unbekannt (beschädigtes Log-Fragment?)',
     decoderRejected: (raw: string) => `Dekodierung nicht möglich: ${raw}`,
@@ -904,6 +905,17 @@ export const de: Dict = {
         noData: 'Nicht genug Stick-Anregung, um die Antwort zu schätzen.',
       noDataWhy: 'Im Schwebeflug bleibt der Setpoint flach: der PID-Loop bekommt keinen Befehl zum Messen.',
       noDataHint: 'Flieg einen Pass mit klaren Stick-Eingaben (erst Roll, dann Pitch, etwa zehn pro Achse), dann füllt sich die Kurve.',
+      },
+      temperature: {
+        title: 'Temperaturen (°C)',
+        ariaLabel: 'Temperaturkurven der Sonden des Logs, überlagert, in °C',
+        xAxis: 'Zeit (s)',
+        filterHint: 'Klick eine Sonde in der Legende, um ihre Kurve aus- oder einzublenden',
+        probeEsc: 'ESC (Telemetrie)',
+        probeImu: 'IMU',
+        probeBaro: 'Baro',
+        probeSens: (n: string): string => `Sonde ${n}`,
+        probeEscN: (n: string): string => `ESC ${n}`,
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>

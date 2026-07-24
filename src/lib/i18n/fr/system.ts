@@ -21,6 +21,8 @@ export const system = {
   cliCurrentUnreliable: 'courant : capteur non fiable, valeur écartée',
   cliGpsSummary: (median: string, min: string, hdop: string | null) =>
     `GPS ${median} sats (min ${min}${hdop !== null ? `, HDOP ${hdop}` : ''})`,
+  /** probes = liste "ESC 36→49" pré-jointe par le runner CLI. */
+  cliTemps: (probes: string) => `Températures ${probes} °C`,
   headersUnreadable: 'Headers illisibles (session corrompue ?)',
   dataVersionUnsupported: 'Version de données inconnue du décodeur (fragment de log corrompu ?)',
   decoderRejected: (raw: string) => `Décodage impossible : ${raw}`,

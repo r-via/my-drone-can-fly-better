@@ -813,6 +813,7 @@ function neutralAnalysis(p: SharePayload): SessionAnalysis {
     propwash: null,
     oscillation: null,
     controlLoss: null,
+    temperature: null,
     filters: { available: false, axes: null },
     timeline: {
       segments: p.timeline.map((s, i, all) => ({

@@ -561,6 +561,7 @@ export const zh: Dict = {
     cliCurrentUnreliable: '电流：传感器不可靠，读数已忽略',
     cliGpsSummary: (median: string, min: string, hdop: string | null) =>
       `GPS ${median} 颗卫星（最低 ${min}${hdop !== null ? `，HDOP ${hdop}` : ''}）`,
+    cliTemps: (probes: string) => `温度 ${probes} °C`,
     headersUnreadable: '头部无法读取（会话损坏？）',
     dataVersionUnsupported: '解码器无法识别的数据版本（日志片段损坏？）',
     decoderRejected: (raw: string) => `无法解码：${raw}`,
@@ -905,6 +906,17 @@ export const zh: Dict = {
         noData: '摇杆激励不足，无法估计响应。',
       noDataWhy: '悬停时指令保持平直：PID 环路没有收到任何可测量的指令。',
       noDataHint: '飞一趟带干脆摇杆输入的航段（先 roll 后 pitch，每轴十次左右），曲线就会出现。',
+      },
+      temperature: {
+        title: '温度（°C）',
+        ariaLabel: '日志各温度探头的曲线，叠加显示，单位 °C',
+        xAxis: '时间（s）',
+        filterHint: '点击图例中的探头即可隐藏/显示其曲线',
+        probeEsc: '电调（回传）',
+        probeImu: 'IMU',
+        probeBaro: '气压计',
+        probeSens: (n: string): string => `探头 ${n}`,
+        probeEscN: (n: string): string => `电调 ${n}`,
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>

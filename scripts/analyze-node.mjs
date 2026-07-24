@@ -62,6 +62,21 @@ for (const file of report.files) {
         )}`,
       );
     }
+    const temp = sr.analysis.temperature;
+    if (temp) {
+      // Mêmes libellés de sonde que le graphe web (dict.ui.charts.temperature).
+      const tl = dict.ui.charts.temperature;
+      const label = (id) =>
+        id === 'esc' ? tl.probeEsc
+        : id === 'imu' ? tl.probeImu
+        : id === 'baro' ? tl.probeBaro
+        : id.startsWith('sens') ? tl.probeSens(id.slice(4))
+        : tl.probeEscN(String(Number(id.slice(3)) + 1));
+      const probes = temp.probes
+        .map((p) => `${label(p.id)} ${p.firstC.toFixed(0)}→${p.lastC.toFixed(0)} (max ${p.maxC.toFixed(0)})`)
+        .join(' | ');
+      console.log(`  ${dict.system.cliTemps(probes)}`);
+    }
     for (const f of sr.findings) {
       // f.category est la clé d'enum (français) : l'UI la traduit via
       // dict.ui.categories, le terminal doit faire pareil.

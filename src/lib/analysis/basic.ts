@@ -10,6 +10,8 @@ import type {
   GpsMetrics,
   MotorBalanceShift,
   MotorMetrics,
+  TempProbeCurve,
+  TemperatureMetrics,
   NoiseMetrics,
   PowerMetrics,
   TimelineMetrics,
@@ -526,6 +528,61 @@ export function analyzeMotors(fd: FlightData): MotorMetrics {
       !bench && steadyCount >= MIN_STEADY_SAMPLES ? (100 * floorClipCount) / steadyCount : 0,
     balanceShift: bench ? null : detectBalanceShift(devBins, binT),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Températures : courbes par sonde, décimées pour le tracé
+// ---------------------------------------------------------------------------
+
+/** Assez pour un tracé lisse, dix fois moins qu'une frame lente par pixel. */
+const TEMP_MAX_POINTS = 600;
+
+export function analyzeTemperature(fd: FlightData): TemperatureMetrics | null {
+  if (!fd.temps || fd.temps.probes.length === 0) return null;
+  const { time, probes } = fd.temps;
+  const n = time.length;
+
+  const curves: TempProbeCurve[] = [];
+  for (const probe of probes) {
+    // Moyenne par panier de temps : les échantillons NaN (frame S sans ce
+    // champ) sont simplement ignorés, un panier vide ne produit pas de point.
+    const stride = Math.max(1, Math.ceil(n / TEMP_MAX_POINTS));
+    const t: number[] = [];
+    const c: number[] = [];
+    let minC = Infinity;
+    let maxC = -Infinity;
+    let firstC = NaN;
+    let lastC = NaN;
+    for (let s = 0; s < n; s += stride) {
+      let sum = 0;
+      let count = 0;
+      for (let i = s; i < Math.min(s + stride, n); i++) {
+        const v = probe.celsius[i];
+        if (Number.isNaN(v)) continue;
+        sum += v;
+        count++;
+      }
+      if (count === 0) continue;
+      const avg = sum / count;
+      t.push(time[Math.min(s + Math.floor(stride / 2), n - 1)]);
+      c.push(avg);
+      if (avg < minC) minC = avg;
+      if (avg > maxC) maxC = avg;
+      if (Number.isNaN(firstC)) firstC = avg;
+      lastC = avg;
+    }
+    if (t.length === 0) continue;
+    curves.push({
+      id: probe.id,
+      minC,
+      maxC,
+      firstC,
+      lastC,
+      t: Float32Array.from(t),
+      c: Float32Array.from(c),
+    });
+  }
+  return curves.length > 0 ? { probes: curves } : null;
 }
 
 // ---------------------------------------------------------------------------

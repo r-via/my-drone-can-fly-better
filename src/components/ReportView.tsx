@@ -35,6 +35,7 @@ import ShareLink from '@/components/ShareLink';
 import ShareLogToggle from '@/components/ShareLogToggle';
 import { SpectrumChart } from '@/components/charts/SpectrumChart';
 import { StepResponseChart } from '@/components/charts/StepResponseChart';
+import { TemperatureChart } from '@/components/charts/TemperatureChart';
 import { TimelineStrip } from '@/components/charts/TimelineStrip';
 
 import type { Dict, Locale } from '@/lib/i18n';
@@ -498,6 +499,19 @@ function SessionBlock({
           <div className="overflow-x-auto">
             <div className="min-w-[600px]">
               <StepResponseChart axes={analysis.step.axes} labels={dict.ui.charts.step} />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {analysis.temperature ? (
+        <div className="rounded-2xl border border-line bg-surface p-4">
+          <div className="overflow-x-auto">
+            <div className="min-w-[600px]">
+              <TemperatureChart
+                probes={analysis.temperature.probes}
+                labels={dict.ui.charts.temperature}
+              />
             </div>
           </div>
         </div>

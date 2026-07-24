@@ -91,6 +91,7 @@ function makeAnalysis(over: Partial<SessionAnalysis> = {}): SessionAnalysis {
     propwash: { applicable: true, events: [], worstSeverity: 8, avgSeverity: 4 },
     oscillation: { applicable: false, baselineAmp: 0, events: [], worst: null },
     controlLoss: { applicable: true, events: [], worst: null },
+    temperature: null,
     filters: { available: false, axes: null },
     timeline: { segments: [], flightTimeS: 110, throttleMaxUs: 1600 },
     gps: {

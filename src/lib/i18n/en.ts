@@ -566,6 +566,7 @@ export const en: Dict = {
     cliCurrentUnreliable: 'current: sensor unreliable, value discarded',
     cliGpsSummary: (median: string, min: string, hdop: string | null) =>
       `GPS ${median} sats (min ${min}${hdop !== null ? `, HDOP ${hdop}` : ''})`,
+    cliTemps: (probes: string) => `Temperatures ${probes} °C`,
     headersUnreadable: 'Unreadable headers (corrupted session?)',
     dataVersionUnsupported: 'Data version unknown to the decoder (corrupted log fragment?)',
     decoderRejected: (raw: string) => `Cannot decode: ${raw}`,
@@ -916,6 +917,17 @@ export const en: Dict = {
         noData: 'Not enough stick input to estimate the response.',
       noDataWhy: 'In a hover the setpoint stays flat: the PID loop gets no command to measure.',
       noDataHint: 'Fly a pass with sharp stick inputs (roll then pitch, about ten per axis) and the curve will fill in.',
+      },
+      temperature: {
+        title: 'Temperatures (°C)',
+        ariaLabel: 'Temperature curves of the log probes, overlaid, in °C',
+        xAxis: 'Time (s)',
+        filterHint: 'Click a probe in the legend to hide/show its curve',
+        probeEsc: 'ESC (telemetry)',
+        probeImu: 'IMU',
+        probeBaro: 'Baro',
+        probeSens: (n: string): string => `Probe ${n}`,
+        probeEscN: (n: string): string => `ESC ${n}`,
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>

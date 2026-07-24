@@ -8,6 +8,7 @@ import {
   analyzeMotors,
   analyzeNoise,
   analyzePower,
+  analyzeTemperature,
   analyzeTimeline,
   analyzeTracking,
 } from './analysis/basic';
@@ -53,6 +54,7 @@ export function analyzeFlightData(fd: FlightData, motorPoles: number): SessionAn
     propwash: analyzePropwash(fd),
     oscillation: analyzeOscillation(fd),
     controlLoss: analyzeControlLoss(fd),
+    temperature: analyzeTemperature(fd),
     filters: analyzeFilters(fd),
     timeline: analyzeTimeline(fd),
     gps: analyzeGps(fd),

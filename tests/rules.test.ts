@@ -129,6 +129,7 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
     propwash: { applicable: true, events: [], worstSeverity: 5, avgSeverity: 4 },
     oscillation: { applicable: true, baselineAmp: 20, events: [], worst: null },
     controlLoss: { applicable: true, events: [], worst: null },
+    temperature: null,
     filters: {
       available: true,
       axes: [

@@ -91,6 +91,7 @@ function makeFd(fs: number, setpoint: F32x3, gyro: F32x3): FlightData {
     motor: [z(), z(), z(), z()],
     erpm: null,
     escRpm: null,
+    temps: null,
     vbat: null,
     amperage: null,
     baroAlt: null,
