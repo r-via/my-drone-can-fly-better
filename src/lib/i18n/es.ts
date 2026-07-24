@@ -877,6 +877,22 @@ export const es: Dict = {
             'Subida lenta que solo alcanza el objetivo muy tarde: el quad va por detrás de los sticks (P baja o filtrado pesado).',
         },
       },
+      temperature: {
+        title: 'Las temperaturas',
+        intro:
+          'Todas las sondas de temperatura del log en un mismo gráfico: telemetría ESC, IMU y baro (INAV, más las sondas externas si las hay), o una curva por ESC en Betaflight con debug_mode ESC_SENSOR_TMP. Pulsa una sonda en la leyenda para ocultar su curva y aislar las demás.',
+        points: [
+          'Una subida regular que termina en meseta es normal: la electrónica se calienta y el flujo de aire equilibra.',
+          'Una curva ESC que sube sin estabilizarse nunca anuncia sobrecalentamiento: aterriza antes del corte térmico.',
+          'En Betaflight, compara los ESC entre sí: un ESC claramente más caliente que sus vecinos señala un motor duro, un ESC defectuoso o una hélice dañada.',
+          'La IMU y el baro siguen la temperatura de la placa: útil para detectar un FC que se cuece en un montaje cerrado.',
+          'La forma importa más que los números: una meseta a 60 °C es más sana que una pendiente continua que pasa de 70 °C.',
+        ],
+        examples: {
+          good: 'Subida suave y luego meseta: la ventilación absorbe el calor, sesión sana.',
+          bad: 'La curva ESC sube de forma continua sin meseta mientras el resto se mantiene plano: sobrecalentamiento en curso, aterriza y busca la causa (motor duro, ESC defectuoso, refrigeración insuficiente).',
+        },
+      },
     },
 
     charts: {

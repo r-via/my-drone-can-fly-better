@@ -888,6 +888,22 @@ export const en: Dict = {
             'Sluggish rise that only reaches the target very late: the quad lags behind the sticks (low P or heavy filtering).',
         },
       },
+      temperature: {
+        title: 'Temperatures',
+        intro:
+          'Every temperature probe of the log on one chart: ESC telemetry, IMU and baro (INAV, plus external sensors if any), or one curve per ESC on Betaflight with debug_mode ESC_SENSOR_TMP. Click a probe in the legend to hide its curve and isolate the others.',
+        points: [
+          'A steady rise that ends in a plateau is normal: the electronics warm up, then airflow balances the heat.',
+          'An ESC curve that keeps climbing without ever levelling off means overheating: land before thermal shutdown.',
+          'On Betaflight, compare ESCs with each other: one ESC clearly hotter than its neighbours points at a tight motor, a failing ESC or a damaged prop.',
+          'IMU and baro track the board temperature: useful to spot a flight controller cooking inside a closed build.',
+          'The shape matters more than the numbers: a plateau at 60 °C is healthier than a steady climb through 70 °C.',
+        ],
+        examples: {
+          good: 'Gentle rise then plateau: airflow absorbs the heat, healthy session.',
+          bad: 'The ESC curve climbs continuously with no plateau while the rest stays flat: overheating in progress, land and find the cause (tight motor, failing ESC, poor cooling).',
+        },
+      },
     },
 
     // SVG charts - flat objects passed as the `labels` prop (pure components, no hooks).

@@ -506,6 +506,9 @@ function SessionBlock({
 
       {analysis.temperature ? (
         <div className="rounded-2xl border border-line bg-surface p-4">
+          <div className="mb-1 flex justify-end">
+            <ChartHelp topic="temperature" />
+          </div>
           <div className="overflow-x-auto">
             <div className="min-w-[600px]">
               <TemperatureChart

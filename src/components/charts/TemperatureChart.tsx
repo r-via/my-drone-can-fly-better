@@ -4,14 +4,18 @@
 // et filtrables sonde par sonde depuis la légende. SVG pur, état local pour
 // le filtre uniquement.
 //
+// Même squelette que SpectrumChart/StepResponseChart : titre en haut à gauche,
+// légende en haut à droite (elle passe à la ligne au-delà de 4 ESC Betaflight),
+// note sous le titre, tracé pleine largeur, axe X légendé au centre en bas.
+//
 // Choix dataviz : couleur fixe par sonde (jamais recalculée quand on filtre),
 // étiquette directe en bout de courbe (l'identité ne repose pas que sur la
 // couleur), échelle Y calée sur TOUTES les sondes vivantes pour que le cadre
 // ne saute pas quand on masque une courbe.
 //
 // Variables thème (fallbacks = thème sombre) : --chart-text, --chart-text-dim,
-// --chart-axis, --chart-grid, --chart-baseline, --chart-motor, --chart-roll
-// et les --chart-temp-*.
+// --chart-axis, --chart-grid, --chart-baseline, --chart-surface, --chart-motor,
+// --chart-roll et les --chart-temp-*.
 
 import * as React from 'react';
 import type { JSX } from 'react';
@@ -50,6 +54,7 @@ const INK_DIM = 'var(--chart-text-dim, #c3c2b7)';
 const INK_AXIS = 'var(--chart-axis, #898781)';
 const GRID = 'var(--chart-grid, #2c2c2a)';
 const BASELINE = 'var(--chart-baseline, #383835)';
+const SURFACE = 'var(--chart-surface, #1a1a19)';
 const FONT = "system-ui, -apple-system, 'Segoe UI', sans-serif";
 
 function fmt(n: number): string {
@@ -125,6 +130,51 @@ export function buildTemperaturePaths(
   return { paths, ends, ticksX, ticksY, yMin, yMax };
 }
 
+// --- Légende en haut à droite ----------------------------------------------
+// Même géométrie d'entrée que les autres graphes (pastille 14x3, texte 10px),
+// mais le nombre de sondes varie (3 en INAV nu, 8 ESC en Betaflight X8) : les
+// entrées avancent d'un pas proportionnel au libellé (comme TimelineStrip) et
+// passent à la ligne quand la rangée est pleine, chaque rangée calée à droite.
+
+/** Pastille + espace avant le texte, en px du viewBox. */
+const LEGEND_SWATCH = 18;
+/** Approximation de la largeur d'un caractère à fontSize 10 (sans-serif). */
+const LEGEND_CHAR_W = 5.2;
+/** Espace entre deux entrées de légende. */
+const LEGEND_GAP = 14;
+
+export function layoutTemperatureLegend(
+  labels: string[],
+  /** Largeur dispo pour la 1re rangée (le titre occupe la gauche). */
+  firstRowW: number,
+  /** Largeur dispo pour les rangées suivantes (sous le titre). */
+  nextRowW: number,
+): { rows: number; items: Array<{ row: number; x: number }> } {
+  const widths = labels.map((l) => LEGEND_SWATCH + Math.ceil(l.length * LEGEND_CHAR_W));
+  const items: Array<{ row: number; x: number }> = [];
+  let row = 0;
+  let used = 0;
+  for (const w of widths) {
+    const avail = row === 0 ? firstRowW : nextRowW;
+    if (used > 0 && used + LEGEND_GAP + w > avail) {
+      row++;
+      used = 0;
+    }
+    if (used > 0) used += LEGEND_GAP;
+    items.push({ row, x: used });
+    used += w;
+  }
+  // Cale chaque rangée à droite : x devient un décalage depuis le bord droit.
+  const rowW = new Array<number>(row + 1).fill(0);
+  items.forEach(({ row: r, x }, i) => {
+    rowW[r] = Math.max(rowW[r], x + widths[i]);
+  });
+  return {
+    rows: row + 1,
+    items: items.map(({ row: r, x }) => ({ row: r, x: x - rowW[r] })),
+  };
+}
+
 export interface TemperatureChartLabels {
   title: string;
   ariaLabel: string;
@@ -173,12 +223,24 @@ export function TemperatureChart(props: {
   };
 
   const W = 640;
-  const H = 320;
-  // Légende à droite : une ligne par sonde, cliquable.
-  const legendW = 150;
-  const pad = { top: 30, right: 14 + legendW, bottom: 34, left: 38 };
+  const pad = { top: 0, right: 14, bottom: 34, left: 38 };
+  const plotH = 226; // même hauteur de tracé que StepResponseChart
+
+  const legendLabels = props.probes.map(
+    (p) => `${probeLabel(p.id, L)} ${Math.round(p.lastC)}°`,
+  );
+  // 1re rangée : la place restante à droite du titre ; suivantes : tout le cadre.
+  const legend = layoutTemperatureLegend(
+    legendLabels,
+    W - pad.right - pad.left - 170,
+    W - pad.right - pad.left,
+  );
+  // Sous le titre (y 18) et les rangées de légende (pas 16), la note-filtre,
+  // puis le tracé : l'en-tête grandit avec la légende, jamais l'inverse.
+  const hintY = 20 + legend.rows * 16;
+  pad.top = hintY + 12;
+  const H = pad.top + plotH + pad.bottom;
   const plotW = W - pad.left - pad.right;
-  const plotH = H - pad.top - pad.bottom;
   const { paths, ends, ticksX, ticksY } = buildTemperaturePaths(props.probes, plotW, plotH);
 
   return (
@@ -192,9 +254,53 @@ export function TemperatureChart(props: {
       <text x={pad.left} y={18} fontSize={13} fontWeight={600} fill={INK}>
         {L.title}
       </text>
-      <text x={W - 14} y={18} fontSize={9} fill={INK_AXIS} textAnchor="end">
+      <text x={pad.left} y={hintY} fontSize={9} fill={INK_AXIS}>
         {L.filterHint}
       </text>
+
+      {/* Légende cliquable en haut à droite : filtre par sonde. La couleur
+          reste celle de la sonde même masquée (estompée), l'identité ne
+          bouge jamais. */}
+      {props.probes.map((p, i) => {
+        const x = W - pad.right + legend.items[i].x;
+        const yRow = legend.items[i].row * 16;
+        const off = hidden.has(p.id);
+        return (
+          <g
+            key={p.id}
+            onClick={() => toggle(p.id)}
+            role="button"
+            aria-pressed={!off}
+            style={{ cursor: 'pointer' }}
+          >
+            <rect
+              x={x - 2}
+              y={yRow + 7}
+              width={LEGEND_SWATCH + legendLabels[i].length * LEGEND_CHAR_W + 4}
+              height={14}
+              fill="transparent"
+            />
+            <rect
+              x={x}
+              y={yRow + 13}
+              width={14}
+              height={3}
+              rx={1.5}
+              fill={probeColor(p.id)}
+              opacity={off ? 0.25 : 1}
+            />
+            <text
+              x={x + LEGEND_SWATCH}
+              y={yRow + 18}
+              fontSize={10}
+              fill={off ? INK_AXIS : INK_DIM}
+              style={{ textDecoration: off ? 'line-through' : undefined }}
+            >
+              {legendLabels[i]}
+            </text>
+          </g>
+        );
+      })}
 
       {/* Grille + ticks Y (°C) */}
       {ticksY.map((t) => (
@@ -249,7 +355,9 @@ export function TemperatureChart(props: {
         {L.xAxis}
       </text>
 
-      {/* Courbes + étiquette directe en bout de trace */}
+      {/* Courbes + étiquette directe en bout de trace. La courbe finit au bord
+          droit du cadre : l'étiquette est ancrée à droite, posée au-dessus de
+          la ligne, avec un halo surface pour rester lisible en la croisant. */}
       <g transform={`translate(${pad.left},${pad.top})`}>
         {props.probes.map((p, i) =>
           hidden.has(p.id) || !paths[i] ? null : (
@@ -263,10 +371,14 @@ export function TemperatureChart(props: {
                 strokeLinecap="round"
               />
               <text
-                x={ends[i].x + 4}
-                y={Math.max(8, Math.min(plotH - 2, ends[i].y + 3))}
+                x={ends[i].x - 4}
+                y={Math.max(9, Math.min(plotH - 3, ends[i].y - 5))}
                 fontSize={9}
                 fill={INK_DIM}
+                textAnchor="end"
+                stroke={SURFACE}
+                strokeWidth={3}
+                paintOrder="stroke"
               >
                 {probeLabel(p.id, L)}
               </text>
@@ -274,43 +386,6 @@ export function TemperatureChart(props: {
           ),
         )}
       </g>
-
-      {/* Légende cliquable : filtre par sonde. La couleur reste celle de la
-          sonde même masquée (estompée), l'identité ne bouge jamais. */}
-      {props.probes.map((p, i) => {
-        const x = W - legendW - 6;
-        const y = pad.top + 4 + i * 18;
-        const off = hidden.has(p.id);
-        return (
-          <g
-            key={p.id}
-            onClick={() => toggle(p.id)}
-            role="button"
-            aria-pressed={!off}
-            style={{ cursor: 'pointer' }}
-          >
-            <rect x={x} y={y - 8} width={legendW} height={16} fill="transparent" />
-            <rect
-              x={x}
-              y={y - 2}
-              width={14}
-              height={3}
-              rx={1.5}
-              fill={probeColor(p.id)}
-              opacity={off ? 0.25 : 1}
-            />
-            <text
-              x={x + 18}
-              y={y + 2}
-              fontSize={10}
-              fill={off ? INK_AXIS : INK_DIM}
-              style={{ textDecoration: off ? 'line-through' : undefined }}
-            >
-              {probeLabel(p.id, L)} {fmt(Math.round(p.lastC))}°
-            </text>
-          </g>
-        );
-      })}
     </svg>
   );
 }

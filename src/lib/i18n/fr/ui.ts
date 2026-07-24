@@ -315,6 +315,22 @@ export const ui = {
           "Montée molle qui n'atteint la cible que très tard : le quad traîne derrière les sticks (P faible ou filtrage trop lourd).",
       },
     },
+    temperature: {
+      title: 'Les températures',
+      intro:
+        "Toutes les sondes de température du log sur un même graphe : télémétrie ESC, IMU et baro (INAV, plus les sondes externes s'il y en a), ou une courbe par ESC en Betaflight avec debug_mode ESC_SENSOR_TMP. Clique une sonde dans la légende pour masquer sa courbe et isoler les autres.",
+      points: [
+        "Une montée régulière qui finit en plateau est normale : l'électronique chauffe, puis le flux d'air équilibre.",
+        'Une courbe ESC qui grimpe sans jamais se stabiliser annonce la surchauffe : pose-toi avant la coupure thermique.',
+        'En Betaflight, compare les ESC entre eux : un ESC nettement plus chaud que ses voisins pointe un moteur dur, un ESC en défaut ou une hélice abîmée.',
+        "L'IMU et le baro suivent la température de la carte : utile pour repérer un FC qui cuit dans une conf fermée.",
+        "Les valeurs comptent moins que la forme : un plateau à 60 °C est plus sain qu'une pente continue qui passe 70 °C.",
+      ],
+      examples: {
+        good: 'Montée douce puis plateau : la ventilation absorbe la chaleur, session saine.',
+        bad: "La courbe ESC grimpe en continu sans plateau pendant que le reste stagne : surchauffe en cours, atterris et cherche la cause (moteur dur, ESC en défaut, refroidissement insuffisant).",
+      },
+    },
   },
 
   // Graphes SVG - objets plats passés en prop `labels` (composants purs, sans hook).

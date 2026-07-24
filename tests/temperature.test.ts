@@ -5,7 +5,12 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { analyzeTemperature } from '../src/lib/analysis/basic';
 import { initWasm, parseFile } from '../src/lib/bbl/parse';
-import { buildTemperaturePaths, probeColor, probeLabel } from '../src/components/charts/TemperatureChart';
+import {
+  buildTemperaturePaths,
+  layoutTemperatureLegend,
+  probeColor,
+  probeLabel,
+} from '../src/components/charts/TemperatureChart';
 import type { FlightData, TempProbeCurve } from '../src/lib/types';
 
 const AKIRA_FLYAWAY = '/home/rviau/projects/drones/akira/02 - Acro flyaway.TXT';
@@ -129,6 +134,34 @@ describe('buildTemperaturePaths', () => {
     const out = buildTemperaturePaths([], 600, 200);
     expect(out.paths).toHaveLength(0);
     expect(out.ticksX).toHaveLength(0);
+  });
+});
+
+describe('layoutTemperatureLegend', () => {
+  it('3 sondes INAV : une seule rangée, entrées calées au bord droit', () => {
+    const { rows, items } = layoutTemperatureLegend(
+      ['ESC (télémétrie) 49°', 'IMU 46°', 'Baro 50°'],
+      418,
+      588,
+    );
+    expect(rows).toBe(1);
+    // Décalages négatifs depuis le bord droit ; la dernière entrée le touche.
+    for (const it of items) expect(it.x).toBeLessThan(0);
+    expect(Math.min(...items.map((i) => i.x))).toBeGreaterThanOrEqual(-418);
+  });
+
+  it('8 ESC Betaflight : passe à la ligne sans déborder du cadre', () => {
+    const labels = Array.from({ length: 8 }, (_, i) => `ESC ${i + 1} 63°`);
+    const { rows, items } = layoutTemperatureLegend(labels, 418, 588);
+    expect(rows).toBeGreaterThan(1);
+    for (const it of items) {
+      const avail = it.row === 0 ? 418 : 588;
+      expect(it.x).toBeGreaterThanOrEqual(-avail);
+      expect(it.x).toBeLessThan(0);
+    }
+    // L'ordre des sondes est conservé rangée par rangée.
+    const byRow = items.map((i) => i.row);
+    expect([...byRow].sort((a, b) => a - b)).toEqual(byRow);
   });
 });
 

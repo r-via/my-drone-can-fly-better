@@ -11,7 +11,7 @@ import type { JSX } from 'react';
 import { useLocale } from '@/lib/i18n/locale';
 import { InfoIcon, XIcon } from '@/components/icons';
 
-export type ChartHelpTopic = 'timeline' | 'spectrum' | 'step';
+export type ChartHelpTopic = 'timeline' | 'spectrum' | 'step' | 'temperature';
 
 const TRACE = 'var(--chart-roll, #0891b2)';
 const BASELINE = 'var(--chart-baseline, rgba(148, 163, 184, 0.35))';
@@ -203,6 +203,67 @@ function TimelineBad() {
   );
 }
 
+/** Décor commun des températures : grille discrète + axe. */
+function TemperatureDecor() {
+  return (
+    <>
+      <line x1={6} y1={30} x2={214} y2={30} stroke={BASELINE} strokeWidth={0.5} />
+      <line x1={6} y1={60} x2={214} y2={60} stroke={BASELINE} strokeWidth={0.5} />
+      <line x1={6} y1={88} x2={214} y2={88} stroke={BASELINE} strokeWidth={1} />
+    </>
+  );
+}
+
+function TemperatureGood() {
+  return (
+    <Frame>
+      <TemperatureDecor />
+      {/* ESC : montée puis plateau ; IMU : quasi plate. */}
+      <path
+        d="M6,72 C40,66 70,52 100,46 C130,41 170,39 214,39"
+        fill="none"
+        stroke={MOTOR}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path
+        d="M6,62 C60,60 140,58 214,56"
+        fill="none"
+        stroke={TRACE}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </Frame>
+  );
+}
+
+function TemperatureBad() {
+  return (
+    <Frame>
+      <TemperatureDecor />
+      {/* ESC : grimpe sans jamais se stabiliser ; IMU : quasi plate. */}
+      <path
+        d="M6,80 C40,74 70,62 100,48 C140,29 180,16 214,8"
+        fill="none"
+        stroke={MOTOR}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path
+        d="M6,64 C60,62 140,60 214,58"
+        fill="none"
+        stroke={TRACE}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </Frame>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Registre : ordre et dessin des exemples par graphe ; les légendes viennent
 // du dictionnaire (dict.ui.chartHelp.<topic>.examples, mêmes clés).
@@ -224,6 +285,10 @@ const EXAMPLES: Record<
     { key: 'good', Svg: StepGood },
     { key: 'bad', Svg: StepBadOvershoot },
     { key: 'badSlow', Svg: StepBadSlow },
+  ],
+  temperature: [
+    { key: 'good', Svg: TemperatureGood },
+    { key: 'bad', Svg: TemperatureBad },
   ],
 };
 

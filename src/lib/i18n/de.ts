@@ -877,6 +877,22 @@ export const de: Dict = {
             'Träger Anstieg, der das Ziel erst sehr spät erreicht: der Quad hängt den Sticks hinterher (P zu niedrig oder Filter zu schwer).',
         },
       },
+      temperature: {
+        title: 'Die Temperaturen',
+        intro:
+          'Alle Temperaturfühler des Logs in einem Diagramm: ESC-Telemetrie, IMU und Baro (INAV, plus externe Sensoren falls vorhanden), oder eine Kurve pro ESC bei Betaflight mit debug_mode ESC_SENSOR_TMP. Klicke einen Fühler in der Legende, um seine Kurve auszublenden und die anderen zu isolieren.',
+        points: [
+          'Ein stetiger Anstieg, der in ein Plateau mündet, ist normal: die Elektronik erwärmt sich, dann gleicht der Luftstrom aus.',
+          'Eine ESC-Kurve, die immer weiter klettert und sich nie stabilisiert, kündigt Überhitzung an: lande vor der thermischen Abschaltung.',
+          'Bei Betaflight die ESCs untereinander vergleichen: ein deutlich heißerer ESC als seine Nachbarn deutet auf einen schwergängigen Motor, einen defekten ESC oder einen beschädigten Propeller.',
+          'IMU und Baro folgen der Platinentemperatur: nützlich, um einen FC zu erkennen, der in einem geschlossenen Aufbau gart.',
+          'Die Form zählt mehr als die Zahlen: ein Plateau bei 60 °C ist gesünder als ein stetiger Anstieg über 70 °C hinaus.',
+        ],
+        examples: {
+          good: 'Sanfter Anstieg, dann Plateau: der Luftstrom nimmt die Wärme auf, gesunde Session.',
+          bad: 'Die ESC-Kurve klettert ohne Plateau weiter, während der Rest flach bleibt: Überhitzung im Gange, lande und suche die Ursache (schwergängiger Motor, defekter ESC, schlechte Kühlung).',
+        },
+      },
     },
 
     charts: {
