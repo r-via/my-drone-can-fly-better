@@ -14,7 +14,7 @@ import {
 } from './analysis/basic';
 import { analyzeSpectrum, analyzeFilters } from './analysis/spectrum';
 import { analyzeStepResponse } from './analysis/step';
-import { configFromHeaders, lintConfig } from './cli/config';
+import { configFromHeaders, lintConfig, parseNum } from './cli/config';
 import { fr } from './i18n/fr';
 import { evaluateSession } from './rules/engine';
 import { pickProfile } from './rules/profiles';
@@ -108,7 +108,16 @@ export function composeFindings(
 
 export function buildSessionReport(fd: FlightData, dict: Dict = fr): SessionReport {
   const profile = pickProfile(fd.meta.craftName);
-  const analysis = analyzeFlightData(fd, profile.motorPoles);
+  // Nombre de pôles : le header d'abord, le profil en secours. motor_poles est
+  // la valeur que le filtre RPM du FC utilise pour convertir l'eRPM, c'est donc
+  // LA référence pour retrouver la fondamentale moteur en Hz. Mesuré sur
+  // btfl_all2 (craft inconnu → profil generic, 14 pôles supposés, header à 12) :
+  // pic dominant 356 Hz attribué à 51 Hz de M3 avec les pôles du profil, à
+  // 0.6 Hz avec ceux du header - motor-noise-peak restait muet sur un balourd
+  // pourtant nominatif. Le secours profil couvre INAV et les logs sans header.
+  const headerPoles = parseNum(fd.meta.headers['motor_poles']);
+  const motorPoles = headerPoles !== null && headerPoles >= 4 ? headerPoles : profile.motorPoles;
+  const analysis = analyzeFlightData(fd, motorPoles);
   const config = configFromHeaders(fd.meta.headers);
   return { analysis, profile, findings: composeFindings(analysis, profile, config, dict) };
 }

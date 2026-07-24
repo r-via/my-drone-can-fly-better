@@ -230,6 +230,21 @@ export function suggestAntiGravity(config: CliConfig, delta: number): string | n
   return `set anti_gravity_gain = ${next}`;
 }
 
+/**
+ * Ajustement de dyn_idle_min_rpm (centaines de tr/min). À 0 (désactivé) on
+ * propose le point de départ du profil ; sinon on renforce de +5 (500 tr/min),
+ * un pas sensible sans changer le comportement au disarm. Plafond 70 : au-delà
+ * le plancher approche le régime de hover des petites machines. Null si la
+ * valeur courante manque du log ou si le plafond annule l'ajustement.
+ */
+export function suggestDynIdle(config: CliConfig, startValue: number): string | null {
+  const cur = parseNum(config.values['dyn_idle_min_rpm']);
+  if (cur === null) return null;
+  const next = cur > 0 ? Math.min(70, cur + 5) : startValue;
+  if (next === cur) return null;
+  return `set dyn_idle_min_rpm = ${next}`;
+}
+
 const SEVERITY_RANK = { crit: 3, warn: 2, info: 1, ok: 0 } as const;
 
 /** Applique les règles de lint sur une config. Retourne les findings triés par sévérité. */

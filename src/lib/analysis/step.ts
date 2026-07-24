@@ -460,7 +460,19 @@ function computeMetrics(y: Float32Array, fs: number, kSettle: number): StepCurve
   const t90 = crossingTimeS(y, fs, 0.9 * settle);
   const riseTimeMs = t10 !== null && t90 !== null && t90 >= t10 ? (t90 - t10) * 1000 : null;
 
-  const overshoot = (peak / settle - 1) * 100;
+  // Dénominateur borné à 1 (la consigne) : un dépassement se mesure au-dessus
+  // de ce que le pilote a demandé, jamais au-dessus d'un plateau estimé SOUS la
+  // consigne. La déconvolution sous-estime le gain DC sur les fenêtres non
+  // stationnaires (gaz coupés pendant un flip → TPA change les gains en pleine
+  // fenêtre) alors qu'elle estime bien le pic ; diviser un bon pic par un
+  // mauvais plateau fabrique du dépassement. Mesuré sur btfl_all2 roll :
+  // suivi réel du plateau 0.95-1.03 et pic réel ~10 %, mais settle estimé 0.81
+  // → 37 % publié, verdict fantôme. Avec la borne : 11 %, pas de verdict.
+  // Sur les 9 verdicts overshoot du parc, seuls les deux fantômes de ce log
+  // disparaissent, les 7 vrais (settle ≥ 1.0, où la borne est neutre) bougent
+  // de moins d'un point. Le cas « plateau vraiment bas » reste couvert par
+  // step-settle-off et tracking-poor.
+  const overshoot = (peak / Math.max(settle, 1) - 1) * 100;
 
   return {
     riseTimeMs,

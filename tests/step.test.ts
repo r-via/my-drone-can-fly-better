@@ -169,6 +169,25 @@ describe('analyzeStepResponse — synthétique', () => {
     expect(roll!.settleValue!).toBeLessThan(1.1);
   });
 
+  it('plateau sous la consigne (gain 0.8, zeta=0.5) : pas de dépassement publié', () => {
+    // Le pic vaut 0.8·1.163 ≈ 0.93 : la réponse ne dépasse JAMAIS la consigne.
+    // L'ancien ratio peak/settle aurait pourtant publié ~16 % - c'est le
+    // mécanisme du verdict fantôme de btfl_all2 (settle sous-estimé par la
+    // déconvolution, pic correct). Le dénominateur borné à 1 rend le plateau
+    // bas au verdict step-settle-off, seul à devoir en parler.
+    const x = stepSequence(N, FS, mulberry32(2026));
+    const raw = secondOrder(x, FS, 2 * Math.PI * 15, 0.5);
+    const y = new Float32Array(N);
+    for (let i = 0; i < N; i++) y[i] = 0.8 * raw[i];
+    const roll = analyzeStepResponse(makeFd(FS, [x, x, x], [y, y, y]))!.axes[0];
+
+    expect(roll!.settleValue).not.toBeNull();
+    expect(roll!.settleValue!).toBeGreaterThan(0.7);
+    expect(roll!.settleValue!).toBeLessThan(0.9);
+    expect(roll!.peakValue!).toBeLessThan(1);
+    expect(roll!.overshootPct).toBeNull();
+  });
+
   it('réponse pathologique (gain ~0.05) : métriques null mais courbe conservée', () => {
     const x = stepSequence(N, FS, mulberry32(99));
     const raw = firstOrder(x, FS, 0.02);

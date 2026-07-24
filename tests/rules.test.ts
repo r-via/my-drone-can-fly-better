@@ -451,6 +451,52 @@ describe('evaluateSession', () => {
     expect(findings.find((fd) => fd.id === 'step-settle-off')?.title).toContain('Yaw');
   });
 
+  // Le verdict propwash-severe ne dépend que de la mesure ; seul le conseil
+  // s'adapte à la config (dynamic idle coupé / actif / inaccessible).
+  describe('propwash-severe : conseil dynamic idle selon la config', () => {
+    const severe = (x: SessionAnalysis): void => {
+      x.propwash = {
+        applicable: true,
+        events: [{ tStart: 10, tEnd: 11, severity: 30 }],
+        worstSeverity: 30,
+        avgSeverity: 30,
+      };
+    };
+    const configWith = (dynIdle: string, bidir = '1', harmonics = '3') => ({
+      values: {
+        dshot_bidir: bidir,
+        rpm_filter_harmonics: harmonics,
+        dyn_idle_min_rpm: dynIdle,
+      },
+    });
+    const propwashOf = (findings: Finding[]) => findings.find((fd) => fd.id === 'propwash-severe');
+
+    it('dynamic idle coupé + filtre RPM actif → « active-le » avec la valeur du profil', () => {
+      const f = propwashOf(evaluateSession(makeAnalysis(severe), chimera, undefined, configWith('0')));
+      expect(f).toBeDefined();
+      expect(f?.severity).toBe('warn');
+      expect(f?.fix?.cli).toEqual(['set dyn_idle_min_rpm = 25']); // chimera7.dynIdleSuggested
+    });
+
+    it('dynamic idle déjà actif → renforcement +5 et plancher courant cité en tr/min', () => {
+      const f = propwashOf(evaluateSession(makeAnalysis(severe), chimera, undefined, configWith('35')));
+      expect(f?.fix?.text).toContain('3500');
+      expect(f?.fix?.cli).toEqual(['set dyn_idle_min_rpm = 40']);
+    });
+
+    it('sans retour eRPM (bidir 0) → pas de commande ni de mention dynamic idle', () => {
+      const f = propwashOf(evaluateSession(makeAnalysis(severe), chimera, undefined, configWith('0', '0')));
+      expect(f?.fix?.cli).toBeUndefined();
+      expect(f?.fix?.text.toLowerCase()).not.toContain('idle');
+    });
+
+    it('config nulle (INAV) → même conseil neutre, sans vocabulaire Betaflight', () => {
+      const f = propwashOf(evaluateSession(makeAnalysis(severe), chimera));
+      expect(f?.fix?.cli).toBeUndefined();
+      expect(f?.fix?.text.toLowerCase()).not.toContain('idle');
+    });
+  });
+
   it('GPS faible → gps-low-sats warn', () => {
     const a = makeAnalysis((x) => {
       x.gps = {

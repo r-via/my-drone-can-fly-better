@@ -286,7 +286,9 @@ export const zh: Dict = {
       evidence: (worst: string, warn: number, eventCount: number, avg: string | null) =>
         `最大严重度 ${worst} deg/s RMS（阈值 ${warn}），共 ${eventCount} 次事件` +
         (avg !== null ? `，平均 ${avg}` : ''),
-      fix: '加 D（或者有 RPM filter 的话启用/加强 dynamic idle），并且用状态良好的桨飞。',
+      fixNoRpm: '加 D，并且用状态良好的桨飞。',
+      fixEnableDynIdle: '加 D，并启用 dynamic idle：你的 RPM filter 已经在工作，这是对付 prop wash 最有效的手段。',
+      fixRaiseDynIdle: (rpm: string) => `加 D，或者加强 dynamic idle（当前下限 ${rpm} rpm），在乱流里保住控制权。`,
     },
 
     oscillationEvent: {

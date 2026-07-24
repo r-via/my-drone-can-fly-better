@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { analyzeFilters, analyzeSpectrum } from '../src/lib/analysis/spectrum';
 import { initWasm, parseFile } from '../src/lib/bbl/parse';
+import { buildSessionReport } from '../src/lib/report';
 import type { F32x3, FlightData, SessionMeta, SpectrumMetrics } from '../src/lib/types';
 
 const CHIMERA = '/home/rviau/projects/drones/chimera/blackbox/btfl_016.bbl';
@@ -279,5 +280,32 @@ describe('signaux synthétiques', () => {
     expect(result).not.toBeNull();
     expect(result!.source).toBe('filt');
     expect(Math.abs(result!.axes[0].peaks[0].freqHz - 80)).toBeLessThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Câblage report : le nombre de pôles vient du header, le profil est le secours
+// ---------------------------------------------------------------------------
+
+describe('buildSessionReport - motor_poles du header prioritaire sur le profil', () => {
+  // Cas btfl_all2 : craft inconnu (profil generic, 14 pôles supposés) mais
+  // motor_poles:12 dans les headers. Avec les pôles du profil, la fondamentale
+  // moteur sortait 14 % trop bas et motor-noise-peak restait muet sur un
+  // balourd attribuable à 0.6 Hz près. Le header est LA référence : c'est la
+  // valeur que le filtre RPM du FC utilise pour convertir l'eRPM.
+  it('un craft inconnu avec motor_poles:12 est analysé à 12 pôles, pas aux 14 du generic', () => {
+    const fd = makeFd({ n: 8192, fsHz: 2000, freqHz: 356, ampUnfilt: 50, ampFilt: 1 });
+    fd.meta.headers = { motor_poles: '12' };
+    const sr = buildSessionReport(fd);
+    expect(sr.profile.id).toBe('generic');
+    expect(sr.analysis.spectrum?.motorPolesAssumed).toBe(12);
+  });
+
+  it('header absent ou invalide : les pôles du profil servent de secours', () => {
+    const fd = makeFd({ n: 8192, fsHz: 2000, freqHz: 356, ampUnfilt: 50, ampFilt: 1 });
+    expect(buildSessionReport(fd).analysis.spectrum?.motorPolesAssumed).toBe(14);
+    const fd2 = makeFd({ n: 8192, fsHz: 2000, freqHz: 356, ampUnfilt: 50, ampFilt: 1 });
+    fd2.meta.headers = { motor_poles: '0' };
+    expect(buildSessionReport(fd2).analysis.spectrum?.motorPolesAssumed).toBe(14);
   });
 });

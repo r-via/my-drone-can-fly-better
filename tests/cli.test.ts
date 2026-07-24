@@ -12,6 +12,7 @@ const PROFILE: DroneProfile = {
   craftMatch: /shimera|chimera/i,
   motorPoles: 14,
   expectedCells: 6,
+  dynIdleSuggested: 25,
   thresholds: {
     filtNoiseWarn: 5,
     filtNoiseCrit: 10,

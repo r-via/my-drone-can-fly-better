@@ -6,7 +6,7 @@
 
 import { eventSeverity, qualifyingEvents } from '../analysis/oscillation';
 import { MIN_STEP_QUALITY } from '../analysis/step';
-import { parseNum, suggestAntiGravity, suggestSliderBump } from '../cli/config';
+import { parseNum, suggestAntiGravity, suggestDynIdle, suggestSliderBump } from '../cli/config';
 import { fr } from '../i18n/fr';
 import { AXIS_NAMES } from '../types';
 import type { Dict } from '../i18n/fr';
@@ -790,6 +790,27 @@ export function evaluateSession(
       analysis.propwash.worstSeverity !== null &&
       analysis.propwash.worstSeverity >= t.propwashWarn
     ) {
+      // Le verdict ne dépend que de la mesure ; seul le CONSEIL s'adapte à la
+      // config (même principe que motors-balance-shift). Trois situations sur
+      // le parc : dynamic idle coupé alors que le filtre RPM tourne (le levier
+      // le plus efficace est à un `set` près), déjà actif (on le renforce au
+      // lieu de conseiller de l'« activer »), pas de retour eRPM ou config
+      // inconnue/INAV (on ne cite pas un réglage inatteignable).
+      const rpmFilterOn =
+        cfgNum('dshot_bidir') === 1 && (cfgNum('rpm_filter_harmonics') ?? 0) > 0;
+      const dynIdle = cfgNum('dyn_idle_min_rpm');
+      const fix =
+        config === null || !rpmFilterOn
+          ? { text: r.propwashSevere.fixNoRpm }
+          : dynIdle !== null && dynIdle > 0
+            ? {
+                text: r.propwashSevere.fixRaiseDynIdle(f0(dynIdle * 100)),
+                cli: cliOf(suggestDynIdle(config, profile.dynIdleSuggested)),
+              }
+            : {
+                text: r.propwashSevere.fixEnableDynIdle,
+                cli: cliOf(suggestDynIdle(config, profile.dynIdleSuggested)),
+              };
       findings.push({
         id: 'propwash-severe',
         severity: 'warn',
@@ -802,7 +823,7 @@ export function evaluateSession(
           analysis.propwash.events.length,
           analysis.propwash.avgSeverity !== null ? f1(analysis.propwash.avgSeverity) : null,
         ),
-        fix: { text: r.propwashSevere.fix },
+        fix,
       });
     }
   }

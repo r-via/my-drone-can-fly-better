@@ -289,7 +289,11 @@ export const es: Dict = {
       evidence: (worst: string, warn: number, eventCount: number, avg: string | null) =>
         `Severidad máx ${worst} deg/s RMS (umbral ${warn}) en ${eventCount} evento(s)` +
         (avg !== null ? `, media ${avg}` : ''),
-      fix: 'Sube D (o activa/refuerza el dynamic idle si tienes el RPM filter), y vuela con hélices en buen estado.',
+      fixNoRpm: 'Sube D y vuela con hélices en buen estado.',
+      fixEnableDynIdle:
+        'Sube D y activa el dynamic idle: tu RPM filter ya está en marcha, y es la palanca más eficaz contra el prop wash.',
+      fixRaiseDynIdle: (rpm: string) =>
+        `Sube D, o refuerza el dynamic idle (suelo actual ${rpm} rpm) para conservar autoridad en las turbulencias.`,
     },
 
     oscillationEvent: {

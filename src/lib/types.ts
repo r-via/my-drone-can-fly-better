@@ -606,6 +606,13 @@ export interface DroneProfile {
   craftMatch: RegExp;
   motorPoles: number; // pour eRPM → Hz
   expectedCells: number | null;
+  /**
+   * Point de départ proposé pour `set dyn_idle_min_rpm` (centaines de tr/min)
+   * quand le conseil prop wash suggère d'activer le dynamic idle. Dépend de la
+   * taille d'hélice : un whoop ducted a besoin d'un plancher haut, une grosse
+   * hélice d'un plancher bas.
+   */
+  dynIdleSuggested: number;
   thresholds: ProfileThresholds;
 }
 

@@ -297,7 +297,13 @@ export const rules = {
     evidence: (worst: string, warn: number, eventCount: number, avg: string | null) =>
       `Sévérité max ${worst} deg/s RMS (seuil ${warn}) sur ${eventCount} événement(s)` +
       (avg !== null ? `, moyenne ${avg}` : ''),
-    fix: 'Monte D (ou active/renforce dynamic idle si tu as le RPM filter), et vole avec des hélices en bon état.',
+    // Trois variantes selon la config (le verdict, lui, ne dépend que du vol) :
+    // sans filtre RPM le dynamic idle est inaccessible, on ne le cite pas.
+    fixNoRpm: 'Monte D et vole avec des hélices en bon état.',
+    fixEnableDynIdle:
+      "Monte D, et active le dynamic idle : ton filtre RPM est en place, c'est le levier le plus efficace contre le prop wash.",
+    fixRaiseDynIdle: (rpm: string) =>
+      `Monte D, ou renforce le dynamic idle (plancher actuel ${rpm} tr/min) pour garder de l'autorité dans les remous.`,
   },
 
   oscillationEvent: {

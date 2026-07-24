@@ -289,7 +289,11 @@ export const de: Dict = {
       evidence: (worst: string, warn: number, eventCount: number, avg: string | null) =>
         `Max. Schweregrad ${worst} deg/s RMS (Schwelle ${warn}) bei ${eventCount} Event(s)` +
         (avg !== null ? `, Durchschnitt ${avg}` : ''),
-      fix: 'Heb D an (oder aktiviere/verstärke Dynamic Idle, wenn du den RPM-Filter hast) und flieg mit Props in gutem Zustand.',
+      fixNoRpm: 'Heb D an und flieg mit Props in gutem Zustand.',
+      fixEnableDynIdle:
+        'Heb D an und aktiviere Dynamic Idle: dein RPM-Filter läuft bereits, und das ist der wirksamste Hebel gegen Prop Wash.',
+      fixRaiseDynIdle: (rpm: string) =>
+        `Heb D an oder verstärke Dynamic Idle (aktuelle Untergrenze ${rpm} U/min), um in den Wirbeln Autorität zu behalten.`,
     },
 
     oscillationEvent: {

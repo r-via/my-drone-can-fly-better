@@ -42,6 +42,7 @@ const PICO: DroneProfile = {
   craftMatch: /pavo\s*pico/i, // craft name réel : "Pavo Pico"
   motorPoles: 12, // moteurs 1102
   expectedCells: 2,
+  dynIdleSuggested: 50, // ducts : plancher haut pour garder de l'autorité pales à plat
   thresholds: {
     ...GENERIC_THRESHOLDS,
     filtNoiseWarn: 4, // châssis léger + conduits : plus de bruit résiduel toléré
@@ -65,6 +66,7 @@ const LR4: DroneProfile = {
   craftMatch: /lr4/i, // craft name réel : "LR4-O4PRO"
   motorPoles: 12, // moteurs 1404
   expectedCells: 4,
+  dynIdleSuggested: 35, // 4 pouces : entre le 5" et le whoop
   thresholds: {
     ...GENERIC_THRESHOLDS,
     trackingWarn: 6, // long range : suivi propre = moins de corrections = autonomie
@@ -81,6 +83,7 @@ const CHIMERA7: DroneProfile = {
   craftMatch: /[cs]himera/i, // craft name réel : "SHIMERA7PRO"
   motorPoles: 14, // moteurs 2806.5
   expectedCells: 6,
+  dynIdleSuggested: 25, // grosses hélices 7" : plancher bas, l'inertie fait le reste
   thresholds: {
     ...GENERIC_THRESHOLDS,
     unfiltNoiseWarn: 20, // bras longs de 7" = jello facile : on déclenche tôt sur le brut
@@ -95,6 +98,7 @@ const AKIRA: DroneProfile = {
   craftMatch: /akira/i, // craft name réel : "AKIRA" (RRFPV RR Akira 9" X8 6S, sous INAV)
   motorPoles: 14, // moteurs classe 28xx ; sans eRPM dans les logs INAV, la valeur ne sert qu'au jour où ça change
   expectedCells: 6,
+  dynIdleSuggested: 25, // 9" : même logique que le 7" (inutilisé tant que les logs sont INAV)
   thresholds: {
     ...GENERIC_THRESHOLDS,
     unfiltNoiseWarn: 20, // bras longs de 9" : jello facile, même vigilance que le 7"
@@ -109,6 +113,7 @@ const GENERIC: DroneProfile = {
   craftMatch: /./, // attrape tout : doit rester en dernier dans PROFILES
   motorPoles: 14, // valeur la plus courante (22xx/28xx)
   expectedCells: null, // pas de vérification du nombre de cellules
+  dynIdleSuggested: 30, // point de départ Betaflight pour un 5" classique
   thresholds: { ...GENERIC_THRESHOLDS },
 };
 

@@ -292,7 +292,11 @@ export const en: Dict = {
       evidence: (worst: string, warn: number, eventCount: number, avg: string | null) =>
         `Max severity ${worst} deg/s RMS (threshold ${warn}) over ${eventCount} event(s)` +
         (avg !== null ? `, average ${avg}` : ''),
-      fix: 'Raise D (or enable/strengthen dynamic idle if you have the RPM filter), and fly with props in good shape.',
+      fixNoRpm: 'Raise D and fly with props in good shape.',
+      fixEnableDynIdle:
+        'Raise D, and enable dynamic idle: your RPM filter is already running, and this is the most effective lever against prop wash.',
+      fixRaiseDynIdle: (rpm: string) =>
+        `Raise D, or strengthen dynamic idle (current floor ${rpm} rpm) to keep authority in the wake.`,
     },
 
     oscillationEvent: {
