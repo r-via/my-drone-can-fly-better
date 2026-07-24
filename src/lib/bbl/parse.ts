@@ -343,6 +343,9 @@ async function parseSession(
   const gpsSat: number[] = [];
   const gpsSpeed: number[] = [];
   const gpsHdop: number[] = [];
+  const gpsLat: number[] = [];
+  const gpsLon: number[] = [];
+  const gpsAlt: number[] = [];
   let gpsHasHdop = false;
   const failsafeCounts: Record<string, number> = {};
   // escRPM des frames S : INAV uniquement (Betaflight n'écrit pas ce champ, et
@@ -380,6 +383,12 @@ async function parseSession(
       const hdop = f.get('GPS_hdop'); // INAV seulement, en centièmes
       if (hdop !== undefined) gpsHasHdop = true;
       gpsHdop.push(hdop ?? 0);
+      // Coordonnées en degrés x 1e7 (même échelle BF et INAV), 0/0 = pas de fix.
+      gpsLat.push((f.get('GPS_coord[0]') ?? 0) / 1e7);
+      gpsLon.push((f.get('GPS_coord[1]') ?? 0) / 1e7);
+      // Altitude en décimètres (BF et INAV écrivent llh.alt/10) - vérifié sur
+      // le parc : 2498 bruts = 249,8 m ASL, cohérent avec le terrain.
+      gpsAlt.push((f.get('GPS_altitude') ?? 0) / 10);
     } else if (pe.kind === 'slow') {
       const f = pe.data.fields as Map<string, unknown>;
       const phase = String(f.get('failsafePhase') ?? '?');
@@ -574,6 +583,9 @@ async function parseSession(
             numSat: Float32Array.from(gpsSat),
             speedMps: Float32Array.from(gpsSpeed, (v) => v / 100), // brut en cm/s
             hdop: gpsHasHdop ? Float32Array.from(gpsHdop, (v) => v / 100) : null,
+            latDeg: Float64Array.from(gpsLat),
+            lonDeg: Float64Array.from(gpsLon),
+            altM: Float32Array.from(gpsAlt),
           }
         : null,
     failsafePhaseCounts: failsafeCounts,

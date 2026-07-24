@@ -13,6 +13,10 @@ type Contributor = {
 export type CreditGroup = {
   /** Nom de la communauté (ou du groupe). */
   name: string;
+  /** Clé de traduction du titre : posée quand le nom est un libellé générique
+   *  (« Professionnels ») et non un nom propre. Le composant la résout via
+   *  dict.ui.credits.groups ; `name` reste le repli. */
+  labelKey?: 'professionals';
   /** Lien optionnel (invitation Discord, site…). */
   url?: string;
   members: ReadonlyArray<Contributor>;
@@ -26,5 +30,10 @@ export const CREDIT_GROUPS: ReadonlyArray<CreditGroup> = [
       { name: 'Feisar', url: 'https://www.youtube.com/@feisarfpv' },
       { name: '(outea)' },
     ],
+  },
+  {
+    name: 'Professionals',
+    labelKey: 'professionals',
+    members: [{ name: 'puzzlemedia.ch', url: 'https://www.puzzlemedia.ch/' }],
   },
 ];

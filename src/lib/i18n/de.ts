@@ -605,6 +605,9 @@ export const de: Dict = {
       title: 'Danksagung',
       intro:
         'Danke an die Piloten, die die Seite vorangebracht haben: Tests, geteilte Logs, gemeldete Bugs und gute Ideen.',
+      groups: {
+        professionals: 'Profis',
+      },
     },
 
     units: {
@@ -893,6 +896,21 @@ export const de: Dict = {
           bad: 'Die ESC-Kurve klettert ohne Plateau weiter, während der Rest flach bleibt: Überhitzung im Gange, lande und suche die Ursache (schwergängiger Motor, defekter ESC, schlechte Kühlung).',
         },
       },
+      gpsTrack: {
+        title: 'Die GPS-Spur',
+        intro:
+          'Der Flug von oben, Norden oben, rekonstruiert aus den GPS-Positionen des Logs. Bewusst ohne Kartenhintergrund: Kacheln von einem Server anzufordern hieße, ihm deine Position zu senden. Die Spur ist relativ zum Startpunkt gezeichnet - keine Koordinate wird angezeigt oder übertragen.',
+        points: [
+          'Die Farbe kodiert die Geschwindigkeit über Grund, von gedeckt (langsam) bis kräftig (schnell), relativ zum Top-Speed des Flugs.',
+          'Der grüne Punkt ist der Start, das Quadrat das Ende: liegen sie weit auseinander, ist der Quad nicht dort gelandet, wo er gestartet ist.',
+          'Der Maßstabsbalken unten gibt die Größenordnung an: die einzige metrische Referenz im Bild.',
+          'Sägezahnsegmente oder unmögliche Sprünge verraten schlechten GPS-Empfang: mit der Satellitenzahl abgleichen.',
+        ],
+        examples: {
+          good: 'Durchgehende, flüssige Spur mit sauberen Schleifen: gesunder Empfang, belastbare Trajektorie.',
+          bad: 'Zerhackte Spur, die von Punkt zu Punkt springt: das GPS verliert den Fix, Positionen unzuverlässig (und RTH riskant).',
+        },
+      },
     },
 
     charts: {
@@ -932,6 +950,29 @@ export const de: Dict = {
         probeBaro: 'Baro',
         probeSens: (n: string): string => `Sonde ${n}`,
         probeEscN: (n: string): string => `ESC ${n}`,
+      },
+      gpsTrack: {
+        title: 'GPS-Spur (Draufsicht)',
+        ariaLabel: 'Bodenspur des Flugs, Norden oben, nach Geschwindigkeit über Grund eingefärbt',
+        stats: (dist: string, range: string, vmax: string): string =>
+          `Distanz ${dist} · max. Entfernung ${range} · Top-Speed ${vmax}`,
+        start: 'Start',
+        end: 'Ende',
+        legendSpeed: 'Geschwindigkeit (langsam → schnell)',
+        privacyNote: 'Spur relativ zum Startpunkt - keine GPS-Koordinate wird angezeigt oder übertragen',
+        north: 'N',
+        showMap: 'Karte anzeigen',
+        hideMap: 'Karte ausblenden',
+        mapConsent:
+          'OpenStreetMap-Hintergrund (freie Kartografie): die Kacheln werden von openstreetmap.org geladen, das Fluggebiet wird für diesen Server also sichtbar. Sonst verlässt nichts den Browser.',
+        attribution: '© OpenStreetMap-Mitwirkende',
+      },
+      gpsAlt: {
+        title: 'GPS-Höhe (m, relativ zum Start)',
+        ariaLabel: 'GPS-Höhenprofil des Flugs, relativ zum Startpunkt',
+        xAxis: 'Zeit (s)',
+        zeroLine: 'Start',
+        maxLine: (m: string): string => `max +${m} m`,
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>

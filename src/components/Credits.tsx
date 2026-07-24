@@ -23,7 +23,11 @@ export default function Credits() {
       <h2 className="font-display text-sm font-bold tracking-wide text-ink">{t.title}</h2>
       <p className="mt-1 max-w-2xl text-xs leading-relaxed text-ink-2">{t.intro}</p>
       <div className="mt-4 space-y-4">
-        {groups.map((group) => (
+        {groups.map((group) => {
+          // Libellé générique traduit (ex. « Professionnels ») ; les noms
+          // propres de communautés restent tels quels.
+          const label = group.labelKey ? t.groups[group.labelKey] : group.name;
+          return (
           <div key={group.name}>
             {group.url ? (
               <a
@@ -32,10 +36,10 @@ export default function Credits() {
                 rel="noopener noreferrer"
                 className="text-sm font-bold text-accent hover:underline"
               >
-                {group.name}
+                {label}
               </a>
             ) : (
-              <p className="text-sm font-bold text-ink">{group.name}</p>
+              <p className="text-sm font-bold text-ink">{label}</p>
             )}
             <ul className="mt-2 flex flex-wrap gap-2">
               {group.members.map((c) => (
@@ -56,7 +60,8 @@ export default function Credits() {
               ))}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

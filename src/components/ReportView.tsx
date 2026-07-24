@@ -13,7 +13,7 @@ import type {
 } from '@/lib/types';
 import { buildComparisons } from '@/lib/compare';
 import { computeFlightScore } from '@/lib/score';
-import ChartHelp from '@/components/ChartHelp';
+import ChartHelp, { ChartThumb, type ChartHelpTopic } from '@/components/ChartHelp';
 import CliExport from '@/components/CliExport';
 import ComparisonPanel from '@/components/ComparisonPanel';
 import FindingCard, { SEVERITY_META } from '@/components/FindingCard';
@@ -21,6 +21,7 @@ import {
   AlertIcon,
   BatteryIcon,
   BoltIcon,
+  CATEGORY_ICONS,
   CheckIcon,
   ClockIcon,
   GaugeIcon,
@@ -33,10 +34,14 @@ import ScoreGauge, { type GaugeSegment } from '@/components/ScoreGauge';
 import SessionPicker, { type SessionPickerItem } from '@/components/SessionPicker';
 import ShareLink from '@/components/ShareLink';
 import ShareLogToggle from '@/components/ShareLogToggle';
+import { GpsAltitudeChart } from '@/components/charts/GpsAltitudeChart';
+import { GpsTrackChart } from '@/components/charts/GpsTrackChart';
 import { SpectrumChart } from '@/components/charts/SpectrumChart';
 import { StepResponseChart } from '@/components/charts/StepResponseChart';
 import { TemperatureChart } from '@/components/charts/TemperatureChart';
 import { TimelineStrip } from '@/components/charts/TimelineStrip';
+
+import type { ReactNode } from 'react';
 
 import type { Dict, Locale } from '@/lib/i18n';
 
@@ -77,6 +82,78 @@ function makeFormatters(locale: Locale, dict: Dict): Formatters {
       ? `${fixed(n / 1_000_000, 1)} ${dict.ui.units.mega}`
       : `${Math.max(1, Math.round(n / 1000))} ${dict.ui.units.kilo}`;
   return { fixed, duration, clock, hz, bytes };
+}
+
+/** Distance affichable : mètres ronds sous 1 km, kilomètres à 2 décimales au-delà. */
+function fmtMeters(m: number, fmt: Formatters): string {
+  return m >= 1000 ? `${fmt.fixed(m / 1000, 2)} km` : `${Math.round(m)} m`;
+}
+
+/**
+ * Tuile visuelle d'une courbe : vignette SVG représentative (silhouette
+ * « bonne courbe » du panneau d'aide) + titre. Un tap ouvre le panneau de la
+ * courbe sous la grille, un second le referme. La timeline reste seule
+ * toujours visible - elle raconte le vol, les courbes sont des zooms.
+ */
+function ChartThumbTile({
+  title,
+  topic,
+  open,
+  onToggle,
+}: {
+  title: string;
+  topic: ChartHelpTopic;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      aria-controls={`chart-${topic}`}
+      className={`rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_40px_-24px_rgba(0,0,0,0.7)] ${
+        open
+          ? 'border-line-strong bg-surface-2'
+          : 'border-line bg-surface hover:border-line-strong'
+      }`}
+    >
+      <div className="pointer-events-none opacity-90">
+        <ChartThumb topic={topic} />
+      </div>
+      <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-ink">
+        <span
+          aria-hidden="true"
+          className={`font-mono text-xs text-ink-3 transition-transform ${open ? 'rotate-90' : ''}`}
+        >
+          ▶
+        </span>
+        {title}
+      </p>
+    </button>
+  );
+}
+
+/** Panneau d'une courbe ouverte : carte pleine largeur sous la grille de
+ *  tuiles. `actions` : boutons à côté de « Comment lire » (ex. opt-in carte). */
+function ChartPanel({
+  topic,
+  actions,
+  children,
+}: {
+  topic: ChartHelpTopic;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div id={`chart-${topic}`} className="scroll-mt-6 rounded-2xl border border-line bg-surface p-4">
+      <div className="mb-1 flex items-center justify-end gap-2">
+        {actions}
+        <ChartHelp topic={topic} />
+      </div>
+      {children}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +237,41 @@ function SessionBlock({
   const th = profile.thresholds;
   const profileText = dict.rules.profiles[profile.id];
 
+  // Trace GPS : fond de carte opt-in, jamais chargé par défaut. L'état vit ici
+  // (composant monté par vol) : changer d'onglet redemande le consentement.
+  const track = analysis.gps.track;
+  const tg = dict.ui.charts.gpsTrack;
+  const showAltProfile = track !== null && track.altMaxM - track.altMinM >= 2;
+  const [showMap, setShowMap] = useState(false);
+
+  // Courbes disponibles pour ce vol → tuiles ; fermées par défaut. UNE SEULE
+  // courbe ouverte à la fois : ouvrir une tuile referme la précédente, retaper
+  // la tuile active referme tout.
+  const [openChart, setOpenChart] = useState<ChartHelpTopic | null>(null);
+  const chartTiles: Array<{ topic: ChartHelpTopic; title: string }> = [
+    ...(analysis.spectrum
+      ? [{ topic: 'spectrum' as const, title: dict.ui.charts.spectrum.title }]
+      : []),
+    ...(analysis.step ? [{ topic: 'step' as const, title: dict.ui.charts.step.title }] : []),
+    ...(analysis.temperature
+      ? [{ topic: 'temperature' as const, title: dict.ui.charts.temperature.title }]
+      : []),
+    ...(track ? [{ topic: 'gpsTrack' as const, title: tg.title }] : []),
+  ];
+  const toggleChart = (topic: ChartHelpTopic) => {
+    const opening = openChart !== topic;
+    setOpenChart(opening ? topic : null);
+    // À l'ouverture, amener le panneau en vue : il apparaît sous la grille.
+    if (opening) {
+      setTimeout(() => {
+        const el = document.getElementById(`chart-${topic}`);
+        if (!el) return;
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'nearest' });
+      }, 80);
+    }
+  };
+
   // Marqueurs de la frise : mêmes événements que le verdict oscillation-event,
   // via le sélecteur partagé. Un marqueur sans verdict (ou l'inverse) laisserait
   // le pilote chercher un problème qu'on n'a pas confirmé.
@@ -215,6 +327,7 @@ function SessionBlock({
       weight: a.weight,
       tone: a.evaluated ? a.worst : ('absent' as const),
       label,
+      icon: CATEGORY_ICONS[a.category],
       status: a.evaluated ? `${a.score}/100` : t.axisNoData,
       share: t.axisShare(a.weight),
       detail: t.axisDetails[a.category as keyof typeof t.axisDetails],
@@ -241,13 +354,15 @@ function SessionBlock({
   });
   const chips = chipCategories.map((cat) => {
     if (cat === 'batterie' && power === null) {
-      return { category: cat, worst: 'ok' as Severity, absent: true };
+      return { category: cat, worst: 'ok' as Severity, absent: true, targetId: null };
     }
     const group = groups.find((g) => g.category === cat);
     return {
       category: cat,
       worst: group ? worstSeverity(group.findings) : ('ok' as Severity),
       absent: false,
+      /* Même ancre que les tranches de la jauge : la puce mène à sa section. */
+      targetId: group ? `findings-${cat}` : null,
     };
   });
 
@@ -362,9 +477,11 @@ function SessionBlock({
         ) : null}
       </div>
 
-      {/* Aperçu rapide par catégorie */}
+      {/* Aperçu rapide par catégorie - l'icône de gauche dit la section, celle
+          de droite (forme + couleur) dit la sévérité. */}
       <div className="flex flex-wrap gap-2">
         {chips.map((chip) => {
+          const CatIcon = CATEGORY_ICONS[chip.category];
           if (chip.absent) {
             return (
               <span
@@ -372,27 +489,58 @@ function SessionBlock({
                 title={t.axisNotEvaluated(dict.ui.categories[chip.category])}
                 className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-3 py-1.5 text-xs font-semibold text-ink-3 opacity-70"
               >
+                <CatIcon className="size-3.5" />
+                {dict.ui.categories[chip.category]}
                 <span aria-hidden="true" className="font-mono">
                   ∅
                 </span>
-                {dict.ui.categories[chip.category]}
               </span>
             );
           }
           const chipSev = SEVERITY_META[chip.worst];
           const ChipIcon = chipSev.icon;
-          return (
-            <span
-              key={chip.category}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                chip.worst === 'ok'
-                  ? 'border-line text-ink-2'
-                  : 'border-line-strong text-ink'
-              }`}
-            >
-              <ChipIcon className={`size-3.5 ${chipSev.text}`} />
+          const chipClass = `inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+            chip.worst === 'ok'
+              ? 'border-line text-ink-2'
+              : 'border-line-strong text-ink'
+          }`;
+          const content = (
+            <>
+              <CatIcon className="size-3.5 text-ink-3" />
               {dict.ui.categories[chip.category]}
-            </span>
+              <ChipIcon className={`size-3.5 ${chipSev.text}`} />
+            </>
+          );
+          const targetId = chip.targetId;
+          if (!targetId) {
+            return (
+              <span key={chip.category} className={chipClass}>
+                {content}
+              </span>
+            );
+          }
+          return (
+            /* La puce mène à sa section de verdicts - même ancre et même
+               défilement que les tranches de la jauge. */
+            <a
+              key={chip.category}
+              href={`#${targetId}`}
+              title={t.axisGoto}
+              className={`${chipClass} transition-colors ${
+                chip.worst === 'ok'
+                  ? 'hover:border-line-strong hover:text-ink'
+                  : 'hover:bg-surface-2'
+              }`}
+              onClick={(e) => {
+                e.preventDefault();
+                const el = document.getElementById(targetId);
+                if (!el) return;
+                const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+              }}
+            >
+              {content}
+            </a>
           );
         })}
       </div>
@@ -463,11 +611,23 @@ function SessionBlock({
           ) : null}
         </figure>
       ) : null}
-      {analysis.spectrum ? (
-        <div className="rounded-2xl border border-line bg-surface p-4">
-          <div className="mb-1 flex justify-end">
-            <ChartHelp topic="spectrum" />
-          </div>
+      {/* Courbes : une grille de tuiles visuelles (vignette + titre), chaque
+          tap ouvre ou referme le panneau de la courbe sous la grille. */}
+      {chartTiles.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {chartTiles.map(({ topic, title }) => (
+            <ChartThumbTile
+              key={topic}
+              topic={topic}
+              title={title}
+              open={openChart === topic}
+              onToggle={() => toggleChart(topic)}
+            />
+          ))}
+        </div>
+      ) : null}
+      {analysis.spectrum && openChart === 'spectrum' ? (
+        <ChartPanel topic="spectrum">
           <div className="overflow-x-auto">
             <div className="min-w-[600px]">
               <SpectrumChart
@@ -489,26 +649,19 @@ function SessionBlock({
               />
             </div>
           </div>
-        </div>
+        </ChartPanel>
       ) : null}
-      {analysis.step ? (
-        <div className="rounded-2xl border border-line bg-surface p-4">
-          <div className="mb-1 flex justify-end">
-            <ChartHelp topic="step" />
-          </div>
+      {analysis.step && openChart === 'step' ? (
+        <ChartPanel topic="step">
           <div className="overflow-x-auto">
             <div className="min-w-[600px]">
               <StepResponseChart axes={analysis.step.axes} labels={dict.ui.charts.step} />
             </div>
           </div>
-        </div>
+        </ChartPanel>
       ) : null}
-
-      {analysis.temperature ? (
-        <div className="rounded-2xl border border-line bg-surface p-4">
-          <div className="mb-1 flex justify-end">
-            <ChartHelp topic="temperature" />
-          </div>
+      {analysis.temperature && openChart === 'temperature' ? (
+        <ChartPanel topic="temperature">
           <div className="overflow-x-auto">
             <div className="min-w-[600px]">
               <TemperatureChart
@@ -517,7 +670,64 @@ function SessionBlock({
               />
             </div>
           </div>
-        </div>
+        </ChartPanel>
+      ) : null}
+      {track && openChart === 'gpsTrack' ? (
+        <ChartPanel
+          topic="gpsTrack"
+          actions={
+            <button
+              type="button"
+              onClick={() => setShowMap((v) => !v)}
+              title={tg.mapConsent}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[11px] font-semibold text-ink-3 transition-colors hover:border-line-strong hover:text-ink"
+            >
+              <SatelliteIcon className="size-3.5" />
+              {showMap ? tg.hideMap : tg.showMap}
+            </button>
+          }
+        >
+          {/* Consentement : visible dès que les tuiles sont demandées. */}
+          {showMap ? (
+            <p className="mb-2 text-xs leading-relaxed text-ink-2">{tg.mapConsent}</p>
+          ) : null}
+
+          {/* Trace (fond de carte opt-in DANS le graphe) + profil d'altitude
+              côte à côte (empilés sous xl) ; le profil disparaît quand le log
+              n'a pas d'altitude exploitable. */}
+          <div
+            className={
+              showAltProfile ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,340px)]' : undefined
+            }
+          >
+            <div className="overflow-x-auto">
+              <div className="min-w-[600px]">
+                <GpsTrackChart
+                  track={track}
+                  stats={{
+                    dist: fmtMeters(track.totalDistM, fmt),
+                    range: fmtMeters(track.maxDistM, fmt),
+                    vmax: `${Math.round(track.maxSpeedMps * 3.6)} km/h`,
+                  }}
+                  showMap={showMap}
+                  labels={tg}
+                />
+              </div>
+            </div>
+            {showAltProfile ? (
+              <div className="overflow-x-auto">
+                <div className="min-w-[280px]">
+                  <GpsAltitudeChart
+                    points={track.points}
+                    altMinM={track.altMinM}
+                    altMaxM={track.altMaxM}
+                    labels={dict.ui.charts.gpsAlt}
+                  />
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </ChartPanel>
       ) : null}
 
       {/* Verdicts par catégorie */}
@@ -526,7 +736,9 @@ function SessionBlock({
           <CheckIcon className="size-4 shrink-0 text-ok" /> {t.noFindings}
         </p>
       ) : (
-        groups.map((group) => (
+        groups.map((group) => {
+          const CatIcon = CATEGORY_ICONS[group.category];
+          return (
           <section
             key={group.category}
             /* Ancre visée par les tranches de la jauge (et par l'URL). */
@@ -534,7 +746,8 @@ function SessionBlock({
             aria-label={dict.ui.categories[group.category]}
             className="scroll-mt-6"
           >
-            <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-3">
+            <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-3">
+              <CatIcon className="size-4 shrink-0" />
               {dict.ui.categories[group.category]}
             </h4>
             <div className="space-y-2">
@@ -543,7 +756,8 @@ function SessionBlock({
               ))}
             </div>
           </section>
-        ))
+          );
+        })
       )}
 
     </div>

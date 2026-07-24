@@ -26,6 +26,10 @@ export const ui = {
     title: 'Remerciements',
     intro:
       'Merci aux pilotes qui ont fait avancer le site : tests, logs partagés, bugs remontés et bonnes idées.',
+    /** Titres des groupes génériques (les noms propres restent tels quels). */
+    groups: {
+      professionals: 'Professionnels',
+    },
   },
 
   // Unités dépendantes de la langue (Mo/Ko ↔ MB/KB).
@@ -331,6 +335,21 @@ export const ui = {
         bad: "La courbe ESC grimpe en continu sans plateau pendant que le reste stagne : surchauffe en cours, atterris et cherche la cause (moteur dur, ESC en défaut, refroidissement insuffisant).",
       },
     },
+    gpsTrack: {
+      title: 'La trace GPS',
+      intro:
+        "Le vol vu du dessus, nord en haut, reconstruit depuis les positions GPS du log. Pas de fond de carte, et c'est voulu : demander des tuiles à un serveur reviendrait à lui envoyer ta position. La trace est dessinée par rapport au point de départ - aucune coordonnée n'est affichée ni transmise.",
+      points: [
+        'La couleur code la vitesse sol, du plus discret (lent) au plus contrasté (rapide), relative à la vitesse max du vol.',
+        "Le rond vert est le départ, le carré la fin : loin l'un de l'autre, le quad ne s'est pas posé où il a décollé.",
+        "La barre d'échelle en bas donne l'ordre de grandeur : c'est le seul repère métrique du cadre.",
+        'Des dents de scie ou des sauts impossibles trahissent une réception GPS médiocre : croise avec le nombre de sats.',
+      ],
+      examples: {
+        good: 'Trace continue et fluide, boucles nettes : réception saine, trajectoire exploitable.',
+        bad: "Trace hachée qui saute d'un point à l'autre : le GPS décroche, positions peu fiables (et RTH risqué).",
+      },
+    },
   },
 
   // Graphes SVG - objets plats passés en prop `labels` (composants purs, sans hook).
@@ -373,6 +392,29 @@ export const ui = {
       probeBaro: 'Baro',
       probeSens: (n: string): string => `Sonde ${n}`,
       probeEscN: (n: string): string => `ESC ${n}`,
+    },
+    gpsTrack: {
+      title: 'Trace GPS (vue du dessus)',
+      ariaLabel: 'Trace au sol du vol, nord en haut, colorée par vitesse sol',
+      stats: (dist: string, range: string, vmax: string): string =>
+        `distance ${dist} · éloignement max ${range} · vitesse max ${vmax}`,
+      start: 'départ',
+      end: 'fin',
+      legendSpeed: 'vitesse sol (lent → rapide)',
+      privacyNote: 'trace relative au point de départ - aucune coordonnée GPS affichée ni transmise',
+      north: 'N',
+      showMap: 'Afficher la carte',
+      hideMap: 'Masquer la carte',
+      mapConsent:
+        "Fond de carte OpenStreetMap (cartographie libre) : les tuiles sont chargées depuis openstreetmap.org, la zone du vol devient donc visible de ce serveur. Rien d'autre ne quitte le navigateur.",
+      attribution: '© contributeurs OpenStreetMap',
+    },
+    gpsAlt: {
+      title: 'Altitude GPS (m, relative au départ)',
+      ariaLabel: "Profil d'altitude GPS du vol, relatif au point de départ",
+      xAxis: 'Temps (s)',
+      zeroLine: 'départ',
+      maxLine: (m: string): string => `max +${m} m`,
     },
     timeline: {
       ariaLabel: (duration: string, segmentCount: string): string =>

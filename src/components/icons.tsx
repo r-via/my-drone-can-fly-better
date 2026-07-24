@@ -1,6 +1,10 @@
 // Icônes traits fins (stroke=currentColor), remplacent les emoji de statut.
 // Même esprit que KofiIcon dans Shell.tsx : petits composants purs, sans état.
 
+import type { ComponentType } from 'react';
+
+import type { FindingCategory } from '@/lib/types';
+
 export function CheckIcon({ className }: { className?: string }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>
@@ -149,6 +153,135 @@ export function CopyIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Icônes de section - une par catégorie de verdicts (voir CATEGORY_ICONS).
+// ---------------------------------------------------------------------------
+
+export function ShieldIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>
+      <path
+        d="M12 3.4l6.7 2.5v5c0 4.2-2.8 7.2-6.7 8.7-3.9-1.5-6.7-4.5-6.7-8.7v-5L12 3.4Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function VibrationIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>
+      <rect x="9" y="6.5" width="6" height="11" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M5.7 9.4v5.2M2.9 10.7v2.6M18.3 9.4v5.2M21.1 10.7v2.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function FilterIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>
+      <path
+        d="M21 4H3l7.2 8.5v6l3.6-2v-4L21 4Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Trois potentiomètres verticaux - réglage P/I/D. */
+export function SlidersIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>
+      <path
+        d="M6 4v6.3M6 14.1v5.9M12 4v2.8M12 10.6v9.4M18 4v8.8M18 16.6v3.4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <circle cx="6" cy="12.2" r="1.9" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="12" cy="8.7" r="1.9" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="18" cy="14.7" r="1.9" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+/** Quatre moteurs vus de dessus - même vocabulaire que DroneIcon. */
+export function MotorIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>
+      <circle cx="7" cy="7" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="17" cy="7" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="7" cy="17" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="17" cy="17" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="7" cy="7" r="0.9" fill="currentColor" />
+      <circle cx="17" cy="7" r="0.9" fill="currentColor" />
+      <circle cx="7" cy="17" r="0.9" fill="currentColor" />
+      <circle cx="17" cy="17" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function WrenchIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>
+      <path
+        d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function FileTextIcon({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className}>
+      <path
+        d="M13.5 3H7a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 7 21h10a1.5 1.5 0 0 0 1.5-1.5V8L13.5 3Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M13.5 3v5h5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M9 13h6M9 16.5h6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * Icône d'identité de chaque catégorie de verdicts. Partout où une section est
+ * nommée (titre, puce, tooltip de la jauge), son icône l'accompagne - la forme
+ * dit QUELLE section, la couleur reste réservée à la sévérité.
+ */
+export const CATEGORY_ICONS: Record<FindingCategory, ComponentType<{ className?: string }>> = {
+  securite: ShieldIcon,
+  vibrations: VibrationIcon,
+  filtres: FilterIcon,
+  pid: SlidersIcon,
+  moteurs: MotorIcon,
+  batterie: BatteryIcon,
+  config: WrenchIcon,
+  gps: SatelliteIcon,
+  log: FileTextIcon,
+};
 
 /** Petit quad stylisé pour la zone de dépôt - le LED central clignote au survol via .group-hover. */
 export function DroneIcon({ className }: { className?: string }) {

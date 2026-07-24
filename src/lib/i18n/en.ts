@@ -608,6 +608,9 @@ export const en: Dict = {
       title: 'Thanks',
       intro:
         'Thanks to the pilots who helped this site move forward: testing, shared logs, bug reports and good ideas.',
+      groups: {
+        professionals: 'Professionals',
+      },
     },
 
     // Language-dependent units (Mo/Ko in French, MB/KB in English).
@@ -904,6 +907,21 @@ export const en: Dict = {
           bad: 'The ESC curve climbs continuously with no plateau while the rest stays flat: overheating in progress, land and find the cause (tight motor, failing ESC, poor cooling).',
         },
       },
+      gpsTrack: {
+        title: 'The GPS track',
+        intro:
+          'Your flight seen from above, north up, rebuilt from the GPS positions in the log. There is no map background on purpose: requesting map tiles from a server would send it your location. The track is drawn relative to the start point - no coordinate is shown or transmitted.',
+        points: [
+          'Color encodes ground speed, from muted (slow) to vivid (fast), relative to the top speed of the flight.',
+          'The green dot is the start, the square the end: far apart means the quad did not land where it took off.',
+          'The scale bar at the bottom gives the order of magnitude: it is the only metric reference in the frame.',
+          'Sawtooth segments or impossible jumps reveal poor GPS reception: cross-check with the satellite count.',
+        ],
+        examples: {
+          good: 'Continuous, fluid track with clean loops: healthy reception, trustworthy trajectory.',
+          bad: 'Chopped track jumping from point to point: the GPS keeps losing fix, positions are unreliable (and RTH is risky).',
+        },
+      },
     },
 
     // SVG charts - flat objects passed as the `labels` prop (pure components, no hooks).
@@ -944,6 +962,29 @@ export const en: Dict = {
         probeBaro: 'Baro',
         probeSens: (n: string): string => `Probe ${n}`,
         probeEscN: (n: string): string => `ESC ${n}`,
+      },
+      gpsTrack: {
+        title: 'GPS track (top-down view)',
+        ariaLabel: 'Ground track of the flight, north up, colored by ground speed',
+        stats: (dist: string, range: string, vmax: string): string =>
+          `distance ${dist} · max range ${range} · top speed ${vmax}`,
+        start: 'start',
+        end: 'end',
+        legendSpeed: 'ground speed (slow → fast)',
+        privacyNote: 'track relative to the start point - no GPS coordinate is shown or sent anywhere',
+        north: 'N',
+        showMap: 'Show map',
+        hideMap: 'Hide map',
+        mapConsent:
+          'OpenStreetMap background (libre cartography): tiles are fetched from openstreetmap.org, so the flight area becomes visible to that server. Nothing else leaves the browser.',
+        attribution: '© OpenStreetMap contributors',
+      },
+      gpsAlt: {
+        title: 'GPS altitude (m, relative to start)',
+        ariaLabel: 'GPS altitude profile of the flight, relative to the start point',
+        xAxis: 'Time (s)',
+        zeroLine: 'start',
+        maxLine: (m: string): string => `max +${m} m`,
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>

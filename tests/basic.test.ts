@@ -305,6 +305,7 @@ describe('pico btfl_002 session 1', () => {
       satsVsThrottle: null,
       hdopMedian: null,
       hdopWorst: null,
+      track: null,
     });
     expect(analyzeFailsafe(pico).triggered).toBe(false);
   });
@@ -413,7 +414,7 @@ describe('cas limites', () => {
     const gt = new Float64Array(gn);
     for (let i = 0; i < gn; i++) gt[i] = i * 0.2;
     const g = analyzeGps(
-      synth({ gps: { time: gt, numSat: sat, speedMps: new Float32Array(gn), hdop: null } }),
+      synth({ gps: { time: gt, numSat: sat, speedMps: new Float32Array(gn), hdop: null, latDeg: new Float64Array(gn), lonDeg: new Float64Array(gn), altM: new Float32Array(gn) } }),
     );
     expect(g.available).toBe(true);
     expect(g.numSatMin).toBe(8);
@@ -431,7 +432,7 @@ describe('cas limites', () => {
     const gt = new Float64Array(gn);
     for (let i = 0; i < gn; i++) gt[i] = i * 0.2;
     const g = analyzeGps(
-      synth({ gps: { time: gt, numSat: sat, speedMps: new Float32Array(gn), hdop: null } }),
+      synth({ gps: { time: gt, numSat: sat, speedMps: new Float32Array(gn), hdop: null, latDeg: new Float64Array(gn), lonDeg: new Float64Array(gn), altM: new Float32Array(gn) } }),
     );
     expect(g.numSatMin).toBe(5);
     expect(g.satDrops.length).toBe(1);
@@ -459,7 +460,7 @@ describe('cas limites', () => {
       synth({
         time,
         throttle,
-        gps: { time: gt, numSat: sat, speedMps: new Float32Array(gn), hdop: null },
+        gps: { time: gt, numSat: sat, speedMps: new Float32Array(gn), hdop: null, latDeg: new Float64Array(gn), lonDeg: new Float64Array(gn), altM: new Float32Array(gn) },
       }),
     );
     expect(g.satsVsThrottle).not.toBeNull();
@@ -475,10 +476,79 @@ describe('cas limites', () => {
     const hdop = new Float32Array(gn).fill(3.2);
     hdop[3] = 0; // frame partielle : ignorée
     const g = analyzeGps(
-      synth({ gps: { time: gt, numSat: new Float32Array(gn).fill(12), speedMps: new Float32Array(gn), hdop } }),
+      synth({ gps: { time: gt, numSat: new Float32Array(gn).fill(12), speedMps: new Float32Array(gn), hdop, latDeg: new Float64Array(gn), lonDeg: new Float64Array(gn), altM: new Float32Array(gn) } }),
     );
     expect(g.hdopMedian).toBeCloseTo(3.2, 5);
     expect(g.hdopWorst).toBeCloseTo(3.2, 5);
+  });
+
+  /** Frames G synthétiques à 45°N : vol vers l'est à vitesse constante. */
+  function gpsEast(gn: number, eastM: number) {
+    const gt = new Float64Array(gn);
+    const lat = new Float64Array(gn).fill(45);
+    const lon = new Float64Array(gn);
+    const mPerDegLon = 111_320 * Math.cos((45 * Math.PI) / 180);
+    for (let i = 0; i < gn; i++) {
+      gt[i] = i * 0.2;
+      lon[i] = 4 + (eastM * (i / (gn - 1))) / mPerDegLon;
+    }
+    return {
+      time: gt,
+      numSat: new Float32Array(gn).fill(12),
+      speedMps: new Float32Array(gn).fill(eastM / ((gn - 1) * 0.2)),
+      hdop: null,
+      latDeg: lat,
+      lonDeg: lon,
+      altM: new Float32Array(gn),
+    };
+  }
+
+  it('analyzeGps : trace est/nord en mètres locaux, distances exactes', () => {
+    const g = analyzeGps(synth({ gps: gpsEast(21, 100) }));
+    expect(g.track).not.toBeNull();
+    const t = g.track!;
+    expect(t.totalDistM).toBeCloseTo(100, 0);
+    expect(t.maxDistM).toBeCloseTo(100, 0);
+    const last = t.points[t.points.length - 1];
+    expect(last.x).toBeCloseTo(100, 0); // est = +x
+    expect(Math.abs(last.y)).toBeLessThan(0.01); // pas de dérive nord
+    // Le nord doit être +y : un pas de latitude pure le confirme.
+    const gn = 10;
+    const north = gpsEast(gn, 0);
+    for (let i = 0; i < gn; i++) north.latDeg[i] = 45 + (50 * (i / (gn - 1))) / 111_320;
+    const g2 = analyzeGps(synth({ gps: north }));
+    expect(g2.track!.points[g2.track!.points.length - 1].y).toBeCloseTo(50, 0);
+    // Origine = premier fix (sert au fond de carte opt-in).
+    expect(t.origin.latDeg).toBeCloseTo(45, 6);
+    expect(t.origin.lonDeg).toBeCloseTo(4, 6);
+    // Altitude relative au départ, ASL soustrait.
+    const climb = gpsEast(21, 100);
+    for (let i = 0; i < 21; i++) climb.altM[i] = 300 + 30 * (i / 20);
+    const g3 = analyzeGps(synth({ gps: climb }));
+    expect(g3.track!.altMaxM).toBeCloseTo(30, 0);
+    expect(g3.track!.altMinM).toBeCloseTo(0, 1);
+    expect(g3.track!.points[g3.track!.points.length - 1].altM).toBeCloseTo(30, 0);
+  });
+
+  it('analyzeGps : frame téléportée écartée de la trace (pas de distance folle)', () => {
+    const gps = gpsEast(21, 100);
+    gps.lonDeg[10] = 5; // ~78 km de saut : coordonnée corrompue
+    const g = analyzeGps(synth({ gps }));
+    expect(g.track).not.toBeNull();
+    expect(g.track!.totalDistM).toBeLessThan(150);
+    expect(g.track!.maxDistM).toBeLessThan(150);
+  });
+
+  it('analyzeGps : pas de trace sans fix (0/0) ni sous 5 m de déplacement', () => {
+    const gn = 30;
+    const gt = new Float64Array(gn);
+    for (let i = 0; i < gn; i++) gt[i] = i * 0.2;
+    const noFix = analyzeGps(
+      synth({ gps: { time: gt, numSat: new Float32Array(gn).fill(10), speedMps: new Float32Array(gn), hdop: null, latDeg: new Float64Array(gn), lonDeg: new Float64Array(gn), altM: new Float32Array(gn) } }),
+    );
+    expect(noFix.track).toBeNull();
+    const hover = analyzeGps(synth({ gps: gpsEast(21, 3) })); // 3 m = bruit récepteur
+    expect(hover.track).toBeNull();
   });
 
   it('analyzeFailsafe : déclenché si une phase non bénigne apparaît', () => {

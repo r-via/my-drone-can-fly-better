@@ -151,6 +151,7 @@ function makeAnalysis(mutate?: (a: SessionAnalysis) => void): SessionAnalysis {
       satsVsThrottle: null,
       hdopMedian: null,
       hdopWorst: null,
+    track: null,
     },
     failsafe: { phases: { '0': 240_000 }, triggered: false },
   };
@@ -464,6 +465,7 @@ describe('evaluateSession', () => {
         satsVsThrottle: null,
         hdopMedian: null,
         hdopWorst: null,
+      track: null,
       };
     });
     const findings = evaluateSession(a, pickProfile('LR4-O4PRO'));

@@ -605,6 +605,9 @@ export const es: Dict = {
       title: 'Agradecimientos',
       intro:
         'Gracias a los pilotos que han hecho avanzar el sitio: pruebas, logs compartidos, bugs reportados y buenas ideas.',
+      groups: {
+        professionals: 'Profesionales',
+      },
     },
 
     units: {
@@ -893,6 +896,21 @@ export const es: Dict = {
           bad: 'La curva ESC sube de forma continua sin meseta mientras el resto se mantiene plano: sobrecalentamiento en curso, aterriza y busca la causa (motor duro, ESC defectuoso, refrigeración insuficiente).',
         },
       },
+      gpsTrack: {
+        title: 'La traza GPS',
+        intro:
+          'El vuelo visto desde arriba, norte arriba, reconstruido a partir de las posiciones GPS del log. No hay fondo de mapa, y es a propósito: pedir teselas a un servidor supondría enviarle tu posición. La traza se dibuja respecto al punto de salida - ninguna coordenada se muestra ni se transmite.',
+        points: [
+          'El color codifica la velocidad sobre el suelo, de apagado (lento) a vivo (rápido), relativa a la velocidad máxima del vuelo.',
+          'El punto verde es la salida y el cuadrado el final: si están lejos, el quad no aterrizó donde despegó.',
+          'La barra de escala inferior da el orden de magnitud: es la única referencia métrica del cuadro.',
+          'Segmentos en dientes de sierra o saltos imposibles delatan mala recepción GPS: crúzalo con el número de satélites.',
+        ],
+        examples: {
+          good: 'Traza continua y fluida, bucles limpios: recepción sana, trayectoria fiable.',
+          bad: 'Traza troceada que salta de un punto a otro: el GPS pierde el fix, posiciones poco fiables (y RTH arriesgado).',
+        },
+      },
     },
 
     charts: {
@@ -932,6 +950,29 @@ export const es: Dict = {
         probeBaro: 'Baro',
         probeSens: (n: string): string => `Sonda ${n}`,
         probeEscN: (n: string): string => `ESC ${n}`,
+      },
+      gpsTrack: {
+        title: 'Traza GPS (vista cenital)',
+        ariaLabel: 'Traza en el suelo del vuelo, norte arriba, coloreada por velocidad sobre el suelo',
+        stats: (dist: string, range: string, vmax: string): string =>
+          `distancia ${dist} · alejamiento máx ${range} · velocidad máx ${vmax}`,
+        start: 'salida',
+        end: 'fin',
+        legendSpeed: 'velocidad (lento → rápido)',
+        privacyNote: 'traza relativa al punto de salida - ninguna coordenada GPS se muestra ni se envía',
+        north: 'N',
+        showMap: 'Mostrar el mapa',
+        hideMap: 'Ocultar el mapa',
+        mapConsent:
+          'Fondo OpenStreetMap (cartografía libre): las teselas se cargan desde openstreetmap.org, así que la zona del vuelo se vuelve visible para ese servidor. Nada más sale del navegador.',
+        attribution: '© colaboradores de OpenStreetMap',
+      },
+      gpsAlt: {
+        title: 'Altitud GPS (m, relativa a la salida)',
+        ariaLabel: 'Perfil de altitud GPS del vuelo, relativo al punto de salida',
+        xAxis: 'Tiempo (s)',
+        zeroLine: 'salida',
+        maxLine: (m: string): string => `máx +${m} m`,
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>

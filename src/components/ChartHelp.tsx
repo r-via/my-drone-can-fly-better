@@ -11,7 +11,7 @@ import type { JSX } from 'react';
 import { useLocale } from '@/lib/i18n/locale';
 import { InfoIcon, XIcon } from '@/components/icons';
 
-export type ChartHelpTopic = 'timeline' | 'spectrum' | 'step' | 'temperature';
+export type ChartHelpTopic = 'timeline' | 'spectrum' | 'step' | 'temperature' | 'gpsTrack';
 
 const TRACE = 'var(--chart-roll, #0891b2)';
 const BASELINE = 'var(--chart-baseline, rgba(148, 163, 184, 0.35))';
@@ -264,6 +264,50 @@ function TemperatureBad() {
   );
 }
 
+/** Décor commun de la trace GPS : barre d'échelle + point de départ accent. */
+function GpsDecor() {
+  return (
+    <>
+      <line x1={8} y1={92} x2={48} y2={92} stroke={BASELINE} strokeWidth={1.4} />
+      <line x1={8} y1={89} x2={8} y2={95} stroke={BASELINE} strokeWidth={1.4} />
+      <line x1={48} y1={89} x2={48} y2={95} stroke={BASELINE} strokeWidth={1.4} />
+      <circle cx={30} cy={78} r={4} fill="var(--accent, #c6ff5e)" />
+    </>
+  );
+}
+
+function GpsGood() {
+  return (
+    <Frame>
+      <GpsDecor />
+      <path
+        d="M30,78 C55,20 125,10 170,30 C205,46 195,74 152,80 C115,85 70,84 38,80"
+        fill="none"
+        stroke={TRACE}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </Frame>
+  );
+}
+
+function GpsBad() {
+  return (
+    <Frame>
+      <GpsDecor />
+      <path
+        d="M30,78 L52,38 L58,70 L95,22 L88,66 L132,40 L122,76 L168,30 L156,68 L192,50"
+        fill="none"
+        stroke={TRACE}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </Frame>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Registre : ordre et dessin des exemples par graphe ; les légendes viennent
 // du dictionnaire (dict.ui.chartHelp.<topic>.examples, mêmes clés).
@@ -290,7 +334,21 @@ const EXAMPLES: Record<
     { key: 'good', Svg: TemperatureGood },
     { key: 'bad', Svg: TemperatureBad },
   ],
+  gpsTrack: [
+    { key: 'good', Svg: GpsGood },
+    { key: 'bad', Svg: GpsBad },
+  ],
 };
+
+/**
+ * Vignette représentative d'un graphe : la silhouette « bonne courbe » du
+ * panneau d'aide, réutilisée par les tuiles de courbes du rapport. Décorative
+ * (aria-hidden via Frame) : le titre de la tuile porte le sens.
+ */
+export function ChartThumb({ topic }: { topic: ChartHelpTopic }): JSX.Element {
+  const Svg = EXAMPLES[topic][0].Svg;
+  return <Svg />;
+}
 
 // ---------------------------------------------------------------------------
 // Panneau latéral

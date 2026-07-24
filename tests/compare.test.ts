@@ -106,6 +106,7 @@ function makeAnalysis(over: Partial<SessionAnalysis> = {}): SessionAnalysis {
       satsVsThrottle: null,
       hdopMedian: null,
       hdopWorst: null,
+    track: null,
     },
     failsafe: { phases: {}, triggered: false },
     ...over,

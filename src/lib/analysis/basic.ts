@@ -745,6 +745,7 @@ const GPS_EMPTY: GpsMetrics = {
   satsVsThrottle: null,
   hdopMedian: null,
   hdopWorst: null,
+  track: null,
 };
 
 /** Médiane d'un tableau trié à la volée (copie locale). */
@@ -885,6 +886,8 @@ export function analyzeGps(fd: FlightData): GpsMetrics {
     }
   }
 
+  const track = buildGpsTrack(fd, kept);
+
   return {
     available: true,
     numSatMax,
@@ -897,6 +900,86 @@ export function analyzeGps(fd: FlightData): GpsMetrics {
     satsVsThrottle,
     hdopMedian,
     hdopWorst,
+    track,
+  };
+}
+
+/** Mètres par degré de latitude (équirectangulaire : <0,5 % d'erreur à l'échelle d'un vol). */
+const M_PER_DEG_LAT = 111_320;
+/** Au-delà, le déplacement entre deux frames est une téléportation (frame corrompue), pas un vol. */
+const GPS_TRACK_MAX_MPS = 250;
+/** Fixes minimum pour qu'une trace veuille dire quelque chose. */
+const GPS_TRACK_MIN_FIXES = 5;
+/** En dessous de cet éloignement max, la « trace » n'est que le bruit du récepteur (±2-3 m). */
+const GPS_TRACK_MIN_RANGE_M = 5;
+/** Assez pour un tracé fidèle, borné pour ne pas gonfler le rapport. */
+const GPS_TRACK_MAX_POINTS = 1200;
+
+/**
+ * Trace au sol en coordonnées LOCALES : mètres est/nord autour du premier fix.
+ * Les coordonnées absolues ne quittent jamais cette fonction - le rapport (et
+ * donc un lien de partage) ne contient que des déplacements relatifs.
+ * `kept` = indices des frames G déjà passées au filtre anti-corruption ; on y
+ * ajoute deux gardes propres à la position : fix présent (pas 0/0) et vitesse
+ * de déplacement plausible entre frames consécutives.
+ */
+function buildGpsTrack(fd: FlightData, kept: number[]): GpsMetrics['track'] {
+  if (!fd.gps) return null;
+  const { time, speedMps, latDeg, lonDeg, altM } = fd.gps;
+
+  const fix = kept.filter((i) => latDeg[i] !== 0 || lonDeg[i] !== 0);
+  if (fix.length < GPS_TRACK_MIN_FIXES) return null;
+
+  const lat0 = latDeg[fix[0]];
+  const lon0 = lonDeg[fix[0]];
+  const alt0 = altM[fix[0]];
+  const mPerDegLon = M_PER_DEG_LAT * Math.cos((lat0 * Math.PI) / 180);
+
+  // Pleine résolution d'abord : stats exactes, décimation ensuite (tracé seul).
+  const pts: Array<{ t: number; x: number; y: number; speedMps: number; altM: number }> = [];
+  let totalDistM = 0;
+  let maxDistM = 0;
+  let maxSpeedMps = 0;
+  let altMinM = 0;
+  let altMaxM = 0;
+  for (const i of fix) {
+    const x = (lonDeg[i] - lon0) * mPerDegLon;
+    const y = (latDeg[i] - lat0) * M_PER_DEG_LAT;
+    const prev = pts[pts.length - 1];
+    if (prev) {
+      const d = Math.hypot(x - prev.x, y - prev.y);
+      const dt = time[i] - prev.t;
+      // Saut impossible = coordonnée corrompue : on jette le point, pas la trace.
+      if (dt > 0 && d / dt > GPS_TRACK_MAX_MPS) continue;
+      totalDistM += d;
+    }
+    const v = speedMps[i] >= 0 && speedMps[i] < 200 ? speedMps[i] : 0;
+    if (v > maxSpeedMps) maxSpeedMps = v;
+    const dist0 = Math.hypot(x, y);
+    if (dist0 > maxDistM) maxDistM = dist0;
+    // Relative au départ ; une valeur délirante (> ±10 km) est un champ
+    // corrompu ou absent, neutralisée pour ne pas écraser l'échelle du profil.
+    const a = altM[i] - alt0;
+    const alt = Number.isFinite(a) && Math.abs(a) < 10_000 ? a : 0;
+    if (alt < altMinM) altMinM = alt;
+    if (alt > altMaxM) altMaxM = alt;
+    pts.push({ t: time[i], x, y, speedMps: v, altM: alt });
+  }
+  if (pts.length < GPS_TRACK_MIN_FIXES || maxDistM < GPS_TRACK_MIN_RANGE_M) return null;
+
+  const stride = Math.max(1, Math.ceil(pts.length / GPS_TRACK_MAX_POINTS));
+  const points = pts.filter((_, k) => k % stride === 0);
+  const last = pts[pts.length - 1];
+  if (points[points.length - 1] !== last) points.push(last);
+
+  return {
+    points,
+    totalDistM,
+    maxDistM,
+    maxSpeedMps,
+    altMinM,
+    altMaxM,
+    origin: { latDeg: lat0, lonDeg: lon0 },
   };
 }
 

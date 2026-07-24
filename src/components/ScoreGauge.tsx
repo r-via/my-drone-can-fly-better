@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import type { ComponentType } from 'react';
 import type { Severity } from '@/lib/types';
 
 /** Teinte d'un segment : sévérité de l'axe, ou gris quand la donnée manque. */
@@ -14,6 +15,8 @@ export interface GaugeSegment {
   tone: SegmentTone;
   /** Nom de l'axe : « PID ». */
   label: string;
+  /** Icône de la section (voir CATEGORY_ICONS) - affichée dans le tooltip. */
+  icon?: ComponentType<{ className?: string }>;
   /** Note de l'axe : « 92/100 » ou « non évaluée - données absentes ». */
   status: string;
   /** Part dans la note globale : « 20 % du score ». */
@@ -280,8 +283,11 @@ export default function ScoreGauge({
       </div>
       {hovered ? (
         <div className="absolute left-1/2 top-full z-10 mt-1 w-64 -translate-x-1/2 rounded-xl border border-line-strong bg-surface-2 p-3 text-left shadow-[0_16px_40px_-16px_rgba(0,0,0,0.6)]">
-          <p className="flex items-baseline justify-between gap-2 text-xs font-bold text-ink">
-            {hovered.label}
+          <p className="flex items-center justify-between gap-2 text-xs font-bold text-ink">
+            <span className="flex items-center gap-1.5">
+              {hovered.icon ? <hovered.icon className="size-3.5 shrink-0 text-ink-2" /> : null}
+              {hovered.label}
+            </span>
             <span className="font-mono font-semibold text-ink-2">{hovered.status}</span>
           </p>
           <p className="mt-0.5 text-[11px] font-semibold text-ink-3">{hovered.share}</p>

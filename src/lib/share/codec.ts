@@ -839,6 +839,8 @@ function neutralAnalysis(p: SharePayload): SessionAnalysis {
       satsVsThrottle: null,
       hdopMedian: null,
       hdopWorst: null,
+      // Jamais transporté par un lien : la trace reste sur la machine du pilote.
+      track: null,
     },
     failsafe: { phases: {}, triggered: false },
   };

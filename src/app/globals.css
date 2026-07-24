@@ -75,6 +75,13 @@
   --chart-temp-sens5: #0d9488;
   --chart-temp-sens6: #ea580c;
   --chart-temp-sens7: #c026d3;
+
+  /* Trace GPS - rampe séquentielle de vitesse (lent → rapide), un seul bleu :
+     sur surface sombre le rapide est le plus lumineux. */
+  --chart-gps-1: #3b82f6;
+  --chart-gps-2: #60a5fa;
+  --chart-gps-3: #93c5fd;
+  --chart-gps-4: #dbeafe;
 }
 
 @media (prefers-color-scheme: light) {
@@ -137,6 +144,13 @@
     --chart-temp-sens5: #0d9488;
     --chart-temp-sens6: #c2410c;
     --chart-temp-sens7: #86198f;
+
+    /* Trace GPS - même rampe, inversée en luminance : sur surface blanche le
+       rapide est le plus sombre (toujours le plus saillant). */
+    --chart-gps-1: #93c5fd;
+    --chart-gps-2: #60a5fa;
+    --chart-gps-3: #2563eb;
+    --chart-gps-4: #1e3a8a;
   }
 }
 

@@ -96,12 +96,17 @@ export interface FlightData {
   axisF: F32x3 | null;
   /** Séries G-frame. time est ancré sur la frame main précédente : l'horodatage
    *  propre aux frames G est trop souvent corrompu pour être utilisable.
-   *  hdop est en unités x1 (2.4 = médiocre), null hors INAV. */
+   *  hdop est en unités x1 (2.4 = médiocre), null hors INAV.
+   *  latDeg/lonDeg en degrés (brut 1e-7 déjà converti), 0/0 = pas de fix. */
   gps: {
     time: Float64Array;
     numSat: Float32Array;
     speedMps: Float32Array;
     hdop: Float32Array | null;
+    latDeg: Float64Array;
+    lonDeg: Float64Array;
+    /** Altitude GPS en mètres (brut décimètres BF et INAV, déjà converti). */
+    altM: Float32Array;
   } | null;
   failsafePhaseCounts: Record<string, number>;
 }
@@ -428,6 +433,34 @@ export interface GpsSatDrop {
   durationS: number;
 }
 
+/** Point de la trace au sol, en coordonnées LOCALES : mètres vers l'est (x) et
+ *  le nord (y) depuis le premier fix. Aucune latitude/longitude absolue ne sort
+ *  de l'analyse - rien à fuiter dans un rapport affiché ou un lien de partage. */
+export interface GpsTrackPoint {
+  t: number; // s, même base de temps que le log
+  x: number; // m vers l'est depuis le premier fix
+  y: number; // m vers le nord depuis le premier fix
+  speedMps: number;
+  /** Altitude GPS relative au premier fix, en mètres (0 si le champ manque). */
+  altM: number;
+}
+
+export interface GpsTrack {
+  /** Décimée pour le tracé ; les stats ci-dessous sont calculées pleine résolution. */
+  points: GpsTrackPoint[];
+  totalDistM: number;
+  /** Éloignement max du premier fix (rayon utile pour juger la portée). */
+  maxDistM: number;
+  maxSpeedMps: number;
+  /** Bornes d'altitude relative (pleine résolution) ; span quasi nul = pas de
+   *  donnée d'altitude exploitable, le profil n'est pas affiché. */
+  altMinM: number;
+  altMaxM: number;
+  /** Premier fix absolu - sert UNIQUEMENT au fond de carte opt-in, jamais
+   *  encodé dans un lien de partage (le codec ne transporte pas la trace). */
+  origin: { latDeg: number; lonDeg: number };
+}
+
 export interface GpsMetrics {
   available: boolean;
   /** min/max/médiane sur la série nettoyée : les frames G corrompues (sat=0,
@@ -447,6 +480,8 @@ export interface GpsMetrics {
   /** HDOP (INAV seulement) : médiane et pire valeur lissée de la session. */
   hdopMedian: number | null;
   hdopWorst: number | null;
+  /** Trace au sol reconstruite, null sans fix exploitable (ou déplacement < 5 m). */
+  track: GpsTrack | null;
 }
 
 export interface SessionAnalysis {

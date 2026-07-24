@@ -605,6 +605,9 @@ export const zh: Dict = {
     credits: {
       title: '鸣谢',
       intro: '感谢帮助本站不断进步的飞手们：测试、分享日志、报告问题和好点子。',
+      groups: {
+        professionals: '专业飞手',
+      },
     },
 
     // 随语言变化的单位（Mo/Ko ↔ MB/KB）。
@@ -893,6 +896,21 @@ export const zh: Dict = {
           bad: '其余曲线保持平稳，而 ESC 曲线持续攀升不见平台：过热进行中，降落并排查原因（电机偏紧、ESC 故障、散热不足）。',
         },
       },
+      gpsTrack: {
+        title: 'GPS 轨迹',
+        intro:
+          '从上方俯瞰的飞行轨迹，上为北，由日志中的 GPS 位置重建。有意不加地图底图：向服务器请求瓦片就等于把你的位置发给它。轨迹相对起点绘制，任何坐标都不会显示或传输。',
+        points: [
+          '颜色表示地速：从浅淡（慢）到浓重（快），相对于本次飞行的最高速度。',
+          '绿色圆点是起点，方块是终点：两者相距很远，说明降落点不在起飞点。',
+          '底部的比例尺给出数量级：它是图中唯一的公制参照。',
+          '锯齿状线段或不可能的跳变说明 GPS 接收不佳：请对照卫星数量。',
+        ],
+        examples: {
+          good: '轨迹连续流畅、转弯干净：接收良好，轨迹可信。',
+          bad: '轨迹断续、在点之间跳跃：GPS 频繁失锁，位置不可靠（RTH 也有风险）。',
+        },
+      },
     },
 
     // SVG 图表 - 以 `labels` prop 传入的扁平对象（纯组件，无 hook）。
@@ -933,6 +951,29 @@ export const zh: Dict = {
         probeBaro: '气压计',
         probeSens: (n: string): string => `探头 ${n}`,
         probeEscN: (n: string): string => `电调 ${n}`,
+      },
+      gpsTrack: {
+        title: 'GPS 轨迹（俯视图）',
+        ariaLabel: '飞行地面轨迹，上为北，按地速着色',
+        stats: (dist: string, range: string, vmax: string): string =>
+          `总距离 ${dist} · 最远距离 ${range} · 最高速度 ${vmax}`,
+        start: '起点',
+        end: '终点',
+        legendSpeed: '地速（慢 → 快）',
+        privacyNote: '轨迹相对起点绘制 - 不显示也不传输任何 GPS 坐标',
+        north: '北',
+        showMap: '显示地图',
+        hideMap: '隐藏地图',
+        mapConsent:
+          'OpenStreetMap 底图（自由地图）：瓦片从 openstreetmap.org 加载，因此该服务器会知道飞行区域。除此之外没有任何数据离开浏览器。',
+        attribution: '© OpenStreetMap 贡献者',
+      },
+      gpsAlt: {
+        title: 'GPS 高度（m，相对起点）',
+        ariaLabel: '相对起点的 GPS 高度曲线',
+        xAxis: '时间（s）',
+        zeroLine: '起点',
+        maxLine: (m: string): string => `最高 +${m} m`,
       },
       timeline: {
         ariaLabel: (duration: string, segmentCount: string): string =>

@@ -41,12 +41,19 @@ export default function Shell({ children }: { children: ReactNode }) {
     <>
       <header className="border-b border-line">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
-          <p className="flex items-baseline gap-2 whitespace-nowrap font-display text-[15px] font-bold tracking-[0.14em] text-ink">
+          {/* Lien dur vers l'accueil : l'état du rapport vit dans la page, un
+              <Link> vers la même route ne remonterait rien - le rechargement
+              complet EST le retour à l'accueil (et il retire le fragment #r/#s
+              d'un rapport partagé). */}
+          <a
+            href="/"
+            className="flex items-baseline gap-2 whitespace-nowrap font-display text-[15px] font-bold tracking-[0.14em] text-ink transition-opacity hover:opacity-80"
+          >
             <span aria-hidden="true" className="font-mono text-accent">
               //
             </span>
             {dict.ui.app.logo}
-          </p>
+          </a>
           <div className="flex items-center gap-2 sm:gap-3">
             <p className="hidden text-xs text-ink-3 xl:block">{dict.ui.app.headerTagline}</p>
             <a
